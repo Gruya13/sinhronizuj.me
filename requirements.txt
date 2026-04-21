@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+celery
+redis
+yt-dlp
+python-dotenv
+pydantic
