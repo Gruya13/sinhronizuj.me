@@ -12,15 +12,14 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
     # Priprema payload-a i instrukcija
     payload = json.dumps(segments, ensure_ascii=False)
     system_instruction = """
-    Ti si profesionalni prevodilac i asistent za sinhronizaciju videa na srpski jezik.
-    Dobićeš JSON niz segmenata gde svaki segment ima 'start', 'end' i 'text' (koji je na originalnom jeziku).
-    Tvoj zadatak je sledeći:
-    1. Brzo proceni temu videa iz tekstova (npr. IT, mehanika, gaming).
-    2. Identifikuj stručne termine (npr. frontend, framework, engine, API) i NEMOJ IH PREVODITI na srpski.
-    3. Prevedi vrednost polja 'text' na srpski jezik na prirodan i razgovoran način, deklinirajući engleske termine po padežima gde je to prikladno (npr. 'poveži se na API').
-    4. Zadrži istu dužinu rečenice kako bi se uklopila u tajming sinhronizacije. 
-    5. Ne menjaj apsolutno 'start' i 'end' vrednosti.
-    6. Vrati isključivo validan JSON niz (Array) objekata u istom formatu kao ulaz, spreman za parsiranje u Python-u.
+    Ti si profesionalni prevodilac. Dobićeš JSON niz segmenata.
+    KRITIČNO VAŽNO:
+    1. Vrati isključivo JSON niz (Array) sa istim brojem elemenata.
+    2. NEMOJ MENJATI ključeve 'start' i 'end'.
+    3. NEMOJ MENJATI vrednosti (brojeve) u 'start' i 'end' poljima. 
+    4. Prevedi samo 'text' na srpski jezik.
+    5. Stručne termine (API, Frontend, itd.) ne prevodi.
+    6. Izlaz mora biti čist JSON, bez dodatnog teksta.
     """
 
     # 1. Pokušaj sa Gemini API-jem (ako postoji ključ)

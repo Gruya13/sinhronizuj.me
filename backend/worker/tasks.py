@@ -62,7 +62,11 @@ def process_video_task(self, video_url: str):
     # --- FAZA 5: Sinteza Govora ---
     update_progress("Kloniranje glasa i sinteza (XTTS v2)...", 75, completed)
     from backend.worker.tts_engine import synthesize_audio
-    tts_result = synthesize_audio(sep_result["vocals_path"], translation_result["translated_segments"])
+    tts_result = synthesize_audio(
+        sep_result["vocals_path"], 
+        translation_result["translated_segments"],
+        transcription_result["segments"]
+    )
     
     if tts_result["status"] == "error":
         return tts_result

@@ -36,11 +36,9 @@ def create_reference_audio(vocals_path: str) -> str:
     ref_audio.export(ref_path, format="wav")
     return ref_path
 
-def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
+def synthesize_audio(vocals_path: str, translated_segments: list, original_segments: list = None) -> dict:
     """
     Generise srpski glas koristeci XTTS v2 i stapa ga sa vremenskim oznakama.
-    Kreira prazno platno (tisinu) i postavlja svaku izgovorenu recenicu na 
-    njen tacan 'start' tajming kako bi ostala uskladjena sa videom.
     """
     if not os.path.exists(vocals_path):
         return {"status": "error", "message": "Fajl sa vokalom nije pronadjen."}
@@ -64,35 +62,43 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
             # Pokusavamo da nadjemo bilo koju listu unutar dikta
             found_list = None
             for key, val in translated_segments.items():
-                if isinstance(val, list) and len(val) > 0 and isinstance(val[0], dict):
+                if isinstance(val, list) and len(val) > 0:
                     found_list = val
                     break
             
             if found_list:
                 translated_segments = found_list
             else:
-                # Ako nema liste, mozda je sam dikt jedan niz segmenta (kljucevi "0", "1"...)
-                try:
-                    # Sortiramo kljuceve ako su brojevi
-                    keys = sorted(translated_segments.keys(), key=lambda x: int(x) if x.isdigit() else x)
-                    translated_segments = [translated_segments[k] for k in keys if isinstance(translated_segments[k], dict)]
-                except:
-                    translated_segments = []
+                translated_segments = []
 
-        if not isinstance(translated_segments, list) or len(translated_segments) == 0:
-            print(f"[GRESKA] Prevedeni segmenti su neupotrebljivi: {translated_segments}")
-            return {"status": "error", "message": "Prevedeni segmenti nisu u ispravnom formatu liste."}
+        # KRPLJENJE TAJMINGA: Ako LLM vratio tekstove bez tajminga (None), koristimo originalne
+        final_segments = []
+        for i, segment in enumerate(translated_segments):
+            text = ""
+            start = None
+            end = None
+            
+            if isinstance(segment, dict):
+                text = segment.get("text", "")
+                # Proveravamo razne varijacije kljuceva koje LLM moze da izmisli
+                start = segment.get("start") or segment.get("start_time")
+                end = segment.get("end") or segment.get("end_time")
+            else:
+                text = str(segment)
 
-        # Finalna provera svakog segmenta
-        valid_segments = []
-        for s in translated_segments:
-            if isinstance(s, dict) and "text" in s and "end" in s:
-                valid_segments.append(s)
-        
-        if not valid_segments:
-            return {"status": "error", "message": "Nijedan segment nema ispravna polja (text, end)."}
-        
-        translated_segments = valid_segments
+            # Ako fale tajminzi ili su None, a imamo originale, krpimo
+            if (start is None or end is None) and original_segments and i < len(original_segments):
+                print(f"[INFO] Krpim tajming za segment {i} iz originala...")
+                start = original_segments[i]["start"]
+                end = original_segments[i]["end"]
+            
+            if text and start is not None and end is not None:
+                final_segments.append({"start": start, "end": end, "text": text})
+
+        if not final_segments:
+            return {"status": "error", "message": "Nijedan segment nema ispravna polja (text, start, end)."}
+
+        translated_segments = final_segments
 
         # Kreiramo prazno platno (tisinu) dugo koliko i kraj poslednjeg segmenta
         last_end_time_ms = int(translated_segments[-1]["end"] * 1000) + 2000
