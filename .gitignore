@@ -1,0 +1,18 @@
+# Okruzenja i kljucevi
+.env
+.env.*
+.venv/
+venv/
+env/
+
+# Python fajlovi i cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Medija i privremeni fajlovi za obradu
+temp_workspace/
+*.mp4
+*.wav
+*.mp3
