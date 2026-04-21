@@ -58,18 +58,41 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
         tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 
         # OSIGURANJE FORMATA: Ponekad LLM vrati dikt umesto liste (uzrok KeyError -1)
+        print(f"[DEBUG] Sirov prevod od AI-ja (tip: {type(translated_segments)}): {str(translated_segments)[:500]}...")
+        
         if isinstance(translated_segments, dict):
-            print("[UPOZORENJE] LLM je vratio rečnik umesto liste. Vrsim konverziju...")
-            if "segments" in translated_segments:
-                translated_segments = translated_segments["segments"]
-            elif "translated_segments" in translated_segments:
-                translated_segments = translated_segments["translated_segments"]
+            # Pokusavamo da nadjemo bilo koju listu unutar dikta
+            found_list = None
+            for key, val in translated_segments.items():
+                if isinstance(val, list) and len(val) > 0 and isinstance(val[0], dict):
+                    found_list = val
+                    break
+            
+            if found_list:
+                translated_segments = found_list
             else:
-                # Ako su kljucevi brojevi ("0", "1"...), uzimamo vrednosti
-                translated_segments = list(translated_segments.values())
+                # Ako nema liste, mozda je sam dikt jedan niz segmenta (kljucevi "0", "1"...)
+                try:
+                    # Sortiramo kljuceve ako su brojevi
+                    keys = sorted(translated_segments.keys(), key=lambda x: int(x) if x.isdigit() else x)
+                    translated_segments = [translated_segments[k] for k in keys if isinstance(translated_segments[k], dict)]
+                except:
+                    translated_segments = []
 
         if not isinstance(translated_segments, list) or len(translated_segments) == 0:
+            print(f"[GRESKA] Prevedeni segmenti su neupotrebljivi: {translated_segments}")
             return {"status": "error", "message": "Prevedeni segmenti nisu u ispravnom formatu liste."}
+
+        # Finalna provera svakog segmenta
+        valid_segments = []
+        for s in translated_segments:
+            if isinstance(s, dict) and "text" in s and "end" in s:
+                valid_segments.append(s)
+        
+        if not valid_segments:
+            return {"status": "error", "message": "Nijedan segment nema ispravna polja (text, end)."}
+        
+        translated_segments = valid_segments
 
         # Kreiramo prazno platno (tisinu) dugo koliko i kraj poslednjeg segmenta
         last_end_time_ms = int(translated_segments[-1]["end"] * 1000) + 2000
