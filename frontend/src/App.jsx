@@ -3,10 +3,8 @@ import { Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
-// Dinamičko detektovanje API URL-a (podržava i lokalni tunel i javni RunPod link)
-const API_BASE_URL = window.location.hostname === "localhost" && window.location.port !== "8000" 
-  ? "http://localhost:8000" 
-  : window.location.origin;
+// API URL postavljen na localhost:8000 (preko SSH tunela ka RunPodu)
+const API_BASE_URL = "http://localhost:8000";
 
 function App() {
   const [url, setUrl] = useState('');
