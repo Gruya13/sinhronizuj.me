@@ -48,7 +48,7 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
         full_prompt = f"{system_instruction}\n\nEvo JSON-a za prevod:\n{payload}"
         
         data = {
-            "model": "gemma2:9b",
+            "model": "gemma4",
             "prompt": full_prompt,
             "stream": False,
             "format": "json"
