@@ -27,9 +27,7 @@ def download_youtube_video(url: str) -> dict:
             'preferredquality': '192',
         }],
         'quiet': False,
-        'no_warnings': True,
-        # Kroz obrnuti SSH tunel rutiramo yt-dlp preko tvoje kucne IP adrese!
-        'proxy': 'socks5h://localhost:1080',
+        'cookiefile': '/root/daca_dub/cookies.txt',
         'nocheckcertificate': True,
         'geo_bypass': True,
     }
