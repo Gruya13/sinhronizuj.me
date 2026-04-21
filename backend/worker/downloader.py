@@ -28,6 +28,7 @@ def download_youtube_video(url: str) -> dict:
         }],
         'quiet': False,
         'cookiefile': '/root/daca_dub/cookies.txt',
+        'proxy': 'socks5h://localhost:1080',
         'nocheckcertificate': True,
         'geo_bypass': True,
     }
