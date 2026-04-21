@@ -135,7 +135,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
                     text=text,
                     file_path=temp_wav,
                     speaker_wav=ref_path,
-                    language="cs" # HAK: Koristimo ceski jer XTTS ne podrzava srpski (sr)
+                    language="pl" # HAK: Koristimo poljski jer num2words nema ceski
                 )
                 
                 generated_segment = AudioSegment.from_wav(temp_wav)
