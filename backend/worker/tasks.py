@@ -65,14 +65,27 @@ def process_video_task(self, video_url: str):
         
     print(f"[FAZA 5 ZAVRŠENA] Srpski glas uspešno generisan na: {tts_result['dubbed_audio_path']}")
     
-    # Sutra ovde dodajemo Opcioni Lip Sync ili Finalno Spajanje (FFmpeg)
+    # --- FAZA 6: Spajanje (FFmpeg) ---
+    print("[FAZA 6] Započinjem spajanje slike i zvuka...")
+    from backend.worker.merger import merge_audio_and_video
+    
+    merge_result = merge_audio_and_video(
+        result["video_path"], 
+        sep_result["no_vocals_path"], 
+        tts_result["dubbed_audio_path"]
+    )
+    
+    if merge_result["status"] == "error":
+        print(f"[GREŠKA] Spajanje nije uspelo: {merge_result['message']}")
+        return merge_result
+        
+    print(f"[FAZA 6 ZAVRŠENA] Finalni sinhronizovan video: {merge_result['final_video_path']}")
+    
+    # --- MESTO ZA FAZU 7 (Wav2Lip) ---
+    # Ovde sutra dodajemo uslov (ako ima lica na ekranu) da odradi LipSync nad 'final_video_path'
     
     return {
         "status": "completed", 
         "url": video_url,
-        "video_path": result["video_path"],
-        "audio_path": result["audio_path"],
-        "vocals_path": sep_result["vocals_path"],
-        "background_path": sep_result["no_vocals_path"],
-        "dubbed_audio_path": tts_result["dubbed_audio_path"]
+        "final_video_path": merge_result["final_video_path"]
     }
