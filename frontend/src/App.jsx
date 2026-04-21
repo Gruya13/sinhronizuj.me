@@ -3,16 +3,27 @@ import { Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
-// U produkciji ovaj URL bi isao preko ENV promenljive
-const API_BASE_URL = "https://i8qik1kv4z44ty-8000.proxy.runpod.net";
+// API URL postavljen na localhost:8000 (preko SSH tunela ka RunPodu)
+const API_BASE_URL = "http://localhost:8000";
 
 function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [taskId, setTaskId] = useState(null);
   const [status, setStatus] = useState('');
+  const [progressData, setProgressData] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [error, setError] = useState(null);
+
+  const STEPS = [
+    "Preuzimanje završeno",
+    "Vokal izolovan",
+    "Govor prepoznat",
+    "Tekst preveden",
+    "Glas generisan",
+    "Video spojen",
+    "Obrada završena"
+  ];
 
   // Efekat koji polluje server svake 3 sekunde da proveri status videa
   useEffect(() => {
@@ -26,16 +37,22 @@ function App() {
           if (data.status === 'SUCCESS') {
             setVideoUrl(`${API_BASE_URL}${data.video_url}`);
             setStatus('Završeno!');
+            setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
             clearInterval(interval);
-          } else if (data.status === 'FAILURE') {
+          } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
             setError(data.error || 'Došlo je do greške pri obradi.');
             setStatus('Greška');
             setLoading(false);
             clearInterval(interval);
           } else {
-            // Ako je pending ili started, prikazujemo
-            setStatus(data.status || 'OBRADA U TOKU...');
+            // Ako imamo progress_data, koristimo ga
+            if (data.progress_data) {
+              setProgressData(data.progress_data);
+              setStatus(data.progress_data.current_step);
+            } else {
+              setStatus(data.status || 'PRIPREMA...');
+            }
           }
         } catch (err) {
           console.error("Greška pri proveri statusa:", err);
@@ -53,7 +70,8 @@ function App() {
     setError(null);
     setVideoUrl(null);
     setTaskId(null);
-    setStatus('POKRETANJE AI MODELA...');
+    setProgressData(null);
+    setStatus('POKRETANJE...');
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
@@ -108,13 +126,39 @@ function App() {
             exit={{ opacity: 0, height: 0 }}
             className="status-card"
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <Loader2 className="spinner" style={{ borderColor: 'rgba(99,102,241,0.3)', borderTopColor: '#6366f1' }} size={24} />
-              <span style={{ fontWeight: 500, letterSpacing: '1px' }}>{status}</span>
+            <div className="progress-section">
+               <div className="progress-header">
+                  <span className="current-step-text">{status}</span>
+                  <span className="percent-text">{progressData?.percent || 0}%</span>
+               </div>
+               <div className="progress-bar-container">
+                  <motion.div 
+                    className="progress-bar-fill"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progressData?.percent || 0}%` }}
+                  />
+               </div>
             </div>
-            <p style={{ marginTop: '12px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              (Ovo može potrajati nekoliko minuta. AI rutine detektuju lica, kloniraju glas i usklađuju usne...)
-            </p>
+
+            <div className="steps-list">
+              {STEPS.map((step, idx) => {
+                const isCompleted = progressData?.completed_steps?.includes(step);
+                const isCurrent = status.toLowerCase().includes(step.split(' ')[0].toLowerCase());
+                
+                return (
+                  <div key={idx} className={`step-item ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}>
+                    {isCompleted ? (
+                      <CheckCircle2 size={16} className="step-icon success" />
+                    ) : isCurrent ? (
+                      <Loader2 size={16} className="step-icon spinner" />
+                    ) : (
+                      <div className="step-dot" />
+                    )}
+                    <span>{step}</span>
+                  </div>
+                );
+              })}
+            </div>
           </motion.div>
         )}
 

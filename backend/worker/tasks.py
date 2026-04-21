@@ -1,74 +1,77 @@
 from backend.worker.celery_app import celery_app
 from backend.worker.downloader import download_youtube_video
+import os
 
 @celery_app.task(bind=True, name="process_video_task")
 def process_video_task(self, video_url: str):
     """
-    Korenski Celery zadatak koji vodi Fazu 1 (yt-dlp preuzimanje).
+    Korenski Celery zadatak koji vodi Fazu 1 (yt-dlp preuzimanje) sa pracenjem progresa.
     """
-    print(f"[FAZA 1] Pocinjem preuzimanje za URL: {video_url}")
+    def update_progress(step_name, percentage, completed_steps):
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'current_step': step_name,
+                'percent': percentage,
+                'completed_steps': completed_steps
+            }
+        )
+
+    completed = []
     
+    # --- FAZA 1: Preuzimanje ---
+    update_progress("Preuzimanje videa sa YouTube-a...", 10, completed)
+    print(f"[FAZA 1] Pocinjem preuzimanje za URL: {video_url}")
     result = download_youtube_video(video_url)
     
     if result["status"] == "error":
-        print(f"[GREŠKA] Preuzimanje nije uspelo: {result['message']}")
         return result
         
-    print(f"[FAZA 1 ZAVRŠENA] Video preuzet: {result['video_path']}")
-    print(f"[FAZA 1 ZAVRŠENA] Audio ekstrahovan: {result['audio_path']}")
+    completed.append("Preuzimanje završeno")
     
-    # --- FAZA 2: Separacija Zvuka (Demucs) ---
-    print("[FAZA 2] Započinjem izolaciju vokala...")
+    # --- FAZA 2: Separacija Zvuka ---
+    update_progress("Izolacija vokala (AI Separacija)...", 30, completed)
     from backend.worker.audio_sep import separate_audio
     sep_result = separate_audio(result['audio_path'])
     
     if sep_result["status"] == "error":
-        print(f"[GREŠKA] Separacija zvuka nije uspela: {sep_result['message']}")
         return sep_result
-        
-    print(f"[FAZA 2 ZAVRŠENA] Čist vokal sacuvan na: {sep_result['vocals_path']}")
-    print(f"[FAZA 2 ZAVRŠENA] Pozadina sacuvana na: {sep_result['no_vocals_path']}")
     
-    # --- FAZA 3: Transkripcija (faster-whisper) ---
-    print("[FAZA 3] Pokrecem Whisper nad čistim vokalom...")
+    completed.append("Vokal izolovan")
+    
+    # --- FAZA 3: Transkripcija ---
+    update_progress("Prepoznavanje govora (Whisper AI)...", 45, completed)
     from backend.worker.transcriber import transcribe_audio
-    
     transcription_result = transcribe_audio(sep_result["vocals_path"])
     
     if transcription_result["status"] == "error":
-        print(f"[GREŠKA] Transkripcija nije uspela: {transcription_result['message']}")
         return transcription_result
         
-    print(f"[FAZA 3 ZAVRŠENA] Transkripcija uspešna. Generisano segmenata: {len(transcription_result['segments'])}")
+    completed.append("Govor prepoznat")
     
-    # --- FAZA 4: Pametni Prevod (LLM) ---
-    print("[FAZA 4] Započinjem pametni prevod teksta...")
+    # --- FAZA 4: Prevod ---
+    update_progress("Prevođenje na srpski (Gemma 2 LLM)...", 55, completed)
     from backend.worker.translator import translate_segments
-    
     translation_result = translate_segments(transcription_result["segments"])
     
     if translation_result["status"] == "error":
-        print(f"[GREŠKA] Prevod nije uspeo: {translation_result['message']}")
         return translation_result
         
-    print("[FAZA 4 ZAVRŠENA] Prevod na srpski jezik je uspesno generisan.")
+    completed.append("Tekst preveden")
     
-    # --- FAZA 5: Sinteza Srpskog Govora (XTTS v2) ---
-    print("[FAZA 5] Započinjem kloniranje glasa i sintezu govora...")
+    # --- FAZA 5: Sinteza Govora ---
+    update_progress("Kloniranje glasa i sinteza (XTTS v2)...", 75, completed)
     from backend.worker.tts_engine import synthesize_audio
-    
     tts_result = synthesize_audio(sep_result["vocals_path"], translation_result["translated_segments"])
     
     if tts_result["status"] == "error":
-        print(f"[GREŠKA] Sinteza govora nije uspela: {tts_result['message']}")
         return tts_result
         
-    print(f"[FAZA 5 ZAVRŠENA] Srpski glas uspešno generisan na: {tts_result['dubbed_audio_path']}")
+    completed.append("Glas generisan")
     
-    # --- FAZA 6: Spajanje (FFmpeg) ---
-    print("[FAZA 6] Započinjem spajanje slike i zvuka...")
+    # --- FAZA 6: Spajanje ---
+    update_progress("Finalno spajanje slike i tona...", 85, completed)
     from backend.worker.merger import merge_audio_and_video
-    
     merge_result = merge_audio_and_video(
         result["video_path"], 
         sep_result["no_vocals_path"], 
@@ -76,32 +79,26 @@ def process_video_task(self, video_url: str):
     )
     
     if merge_result["status"] == "error":
-        print(f"[GREŠKA] Spajanje nije uspelo: {merge_result['message']}")
         return merge_result
         
-    print(f"[FAZA 6 ZAVRŠENA] Finalni sinhronizovan video: {merge_result['final_video_path']}")
+    completed.append("Video spojen")
     
-    # --- FAZA 7: Pametni Lip Sync (OpenCV + Wav2Lip) ---
-    print("[FAZA 7] Započinjem analizu lica u videu zbog potencijalne optimizacije resursa...")
+    # --- FAZA 7: Lip Sync ---
+    update_progress("Optimizacija pokreta usana (Wav2Lip)...", 95, completed)
     from backend.worker.lipsync import has_sufficient_faces, apply_lip_sync
-    
-    # Prvo detektujemo lica (prag 10% vidljivosti)
     needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
     
     if needs_lipsync:
-        # Uslov zadovoljen, saljemo video kod koga je ZAMENJEN ZVUK i nas NOVI GLAS
         lip_result = apply_lip_sync(merge_result["final_video_path"], tts_result["dubbed_audio_path"])
         if lip_result["status"] == "error":
-            print(f"[GREŠKA] Lip Sync obrada nije uspela: {lip_result['message']}. Fallback: Vracam video iz Faze 6.")
             final_output = merge_result["final_video_path"]
         else:
             final_output = lip_result["lipsync_video_path"]
-            print(f"[FAZA 7 ZAVRŠENA] Uspesno primenjen Lip Sync: {final_output}")
     else:
-        print("[FAZA 7 ZAVRŠENA] PRESKOČENO: Nema dovoljno lica u videu (<10%). Masovna ušteda VRAM resursa i vremena.")
         final_output = merge_result["final_video_path"]
     
-    print("--- DACA DUB PIPELINE ZAVRSEN ---")
+    completed.append("Obrada završena")
+    update_progress("Spremanje fajla...", 100, completed)
     
     return {
         "status": "completed", 

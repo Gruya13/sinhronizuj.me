@@ -50,6 +50,10 @@ def get_task_status(task_id: str):
         "status": task_result.status,
     }
     
+    # Dodajemo meta-podatke o progresu ako postoje
+    if task_result.status == "PROGRESS":
+        response["progress_data"] = task_result.info
+    
     if task_result.status == "SUCCESS":
         result = task_result.result
         if result.get("status") == "error":
