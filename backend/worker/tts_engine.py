@@ -68,8 +68,10 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
             
             if found_list:
                 translated_segments = found_list
-            else:
-                translated_segments = []
+        # SPASAVANJE 1: Ako LLM vrati samo jedan rečnik umesto liste (kada ima samo 1 segment)
+        if isinstance(translated_segments, dict):
+            print("[INFO] LLM vratio jedan rečnik, pretvaram u listu...")
+            translated_segments = [translated_segments]
 
         # NUKLEARNI FALLBACK: Ako LLM vrati samo listu stringova umesto rečnika
         if isinstance(translated_segments, list) and len(translated_segments) > 0 and not isinstance(translated_segments[0], dict):
