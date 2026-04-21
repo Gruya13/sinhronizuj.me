@@ -28,9 +28,14 @@ def download_youtube_video(url: str) -> dict:
         }],
         'quiet': False,
         'no_warnings': True,
+        # Ultimativni bypass: Koristimo iOS API koji daje 360p video bez PO Tokena i Cookie-ja
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android']
+            }
+        },
         'nocheckcertificate': True,
         'geo_bypass': True,
-        'cookiefile': 'cookies.txt', # Apsolutno 100% resenje za bot detekciju
     }
 
     try:
