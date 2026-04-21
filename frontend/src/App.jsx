@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
 // U produkciji ovaj URL bi isao preko ENV promenljive
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://i8qik1kv4z44ty-8000.proxy.runpod.net";
 
 function App() {
   const [url, setUrl] = useState('');
