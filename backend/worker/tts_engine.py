@@ -108,4 +108,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
         }
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"DEBUG TTS GRESKA:\n{error_details}")
         return {"status": "error", "message": f"Greska pri TTS sintezi: {str(e)}"}
