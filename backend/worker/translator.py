@@ -51,56 +51,62 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
             print(f"[UPOZORENJE] Gemini greška: {str(e)}. Prelazim na lokalnu Gemma 4...")
 
     # 2. Fallback na lokalni Ollama (Gemma 4)
-    print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Ollama) sa deljenjem u pakete...")
+    print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Rečenicu po rečenicu)...")
     url = "http://localhost:11434/api/generate"
     
-    # Delimo segmente u pakete od 20 da model ne bi pukao zbog token limita
-    chunk_size = 20
     all_translated_segments = []
     
-    for i in range(0, len(segments), chunk_size):
-        chunk = segments[i:i+chunk_size]
-        payload = json.dumps(chunk, ensure_ascii=False)
-        full_prompt = f"{system_instruction}\n\nEvo JSON-a za prevod:\n{payload}"
+    # Dodajemo sistemsku instrukciju prilagodjenu za pojedinacne recenice
+    sentence_instruction = """
+    TI SI PROFESIONALNI PREVODILAC.
+    TVOJ ZADATAK JE DA PREVEDEŠ ZADATU REČENICU NA SRPSKI JEZIK.
+    STRIKTNA PRAVILA:
+    1. VRATI SAMO I ISKLJUČIVO PREVEDENI TEKST.
+    2. BEZ UVODA, BEZ OBJAŠNJENJA, BEZ NAVODNIKA OKO TEKSTA.
+    3. AKO NEMA ŠTA DA SE PREVEDE (NPR. SAMO ZNAKOVI), VRATI ORIGINAL.
+    """
+    
+    for i, segment in enumerate(segments):
+        original_text = segment.get("text", "").strip()
+        
+        if not original_text:
+            all_translated_segments.append(segment)
+            continue
+            
+        full_prompt = f"{sentence_instruction}\n\nTekst za prevod:\n{original_text}"
         
         data = {
             "model": "gemma4",
             "prompt": full_prompt,
-            "stream": False,
-            "format": "json",
-            "options": {"num_predict": 4096} # Osiguravamo dovoljno "mastila" za dugacke odgovore
+            "stream": False
         }
         
         try:
-            print(f"   -> Prevodim paket {i//chunk_size + 1} od {(len(segments)-1)//chunk_size + 1}...")
-            response = requests.post(url, json=data, timeout=300)
+            print(f"   -> Prevodim segment {i + 1} od {len(segments)}...")
+            response = requests.post(url, json=data, timeout=30)
             response.raise_for_status()
             
-            result_text = response.json().get('response', '[]')
+            # Uzimamo cist tekst odgovora i sklanjamo eventualne praznine i nove redove
+            result_text = response.json().get('response', '').strip()
             
-            try:
-                translated_chunk = json.loads(result_text)
-                if isinstance(translated_chunk, dict):
-                    translated_chunk = [translated_chunk]
-                all_translated_segments.extend(translated_chunk)
-            except json.JSONDecodeError as e:
-                print(f"[UPOZORENJE] Gemma nije vratila validan JSON za paket {i//chunk_size + 1}. Preskacem... Greska: {str(e)}")
-                # Ako nece da ga lepo prevede, zadrzavamo original da ne puca
-                all_translated_segments.extend(chunk)
+            # Zastita ako vrati prazno
+            if not result_text:
+                result_text = original_text
+                
+            translated_segment = {
+                "start": segment["start"],
+                "end": segment["end"],
+                "text": result_text
+            }
+            all_translated_segments.append(translated_segment)
                 
         except Exception as e:
-            print(f"[GREŠKA] Problem sa Gemma 4 zahtevom: {str(e)}")
-            # Fallback na originalni tekst
-            all_translated_segments.extend(chunk)
+            print(f"[GREŠKA] Problem sa Gemma 4 za segment {i + 1}: {str(e)}")
+            # U slucaju greške, vracamo originalni segment (engleski)
+            all_translated_segments.append(segment)
 
-    if not all_translated_segments:
-        return {
-            "status": "error",
-            "message": "Prevod nije uspeo. Gemma je vratila potpuno prazan rezultat."
-        }
-        
     return {
         "status": "success",
         "translated_segments": all_translated_segments,
-        "engine": "ollama_gemma4_chunked"
+        "engine": "ollama_gemma4_sentence_by_sentence"
     }
