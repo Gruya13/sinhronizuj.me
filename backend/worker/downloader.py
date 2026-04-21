@@ -3,59 +3,36 @@ import yt_dlp
 import uuid
 from backend.core.config import settings
 
+import subprocess
+
 def download_youtube_video(url: str) -> dict:
     """
-    Preuzima YouTube video u HD rezoluciji (do 1080p) i ekstrahuje .wav audio fajl.
-    Vraća putanje do preuzetog videa i audio fajla.
+    HAKOVANA VERZIJA ZA LOKALNI TEST:
+    Preskace YouTube i koristi 'videoplayback.mp4' iz rut direktorijuma.
     """
     if not os.path.exists(settings.TEMP_WORKSPACE):
         os.makedirs(settings.TEMP_WORKSPACE)
 
-    # Generisemo jedinstveni ID za ovaj video proces kako se fajlovi ne bi prepisivali
-    task_id = str(uuid.uuid4())[:8]
-    output_template = os.path.join(settings.TEMP_WORKSPACE, f"{task_id}_%(title)s.%(ext)s")
-    
-    ydl_opts = {
-        # Fleksibilniji format koji prihvata bilo koji najbolji kvalitet
-        'format': 'bestvideo+bestaudio/best',
-        'merge_output_format': 'mp4',
-        'remote_components': 'ejs:github',
-        'outtmpl': output_template,
-        'keepvideo': True, # Cuvamo originalni .mp4 fajl (ne zelimo da ga obrise nakon ekstrakcije zvuka)
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'wav',
-            'preferredquality': '192',
-        }],
-        'quiet': False,
-        'cookiefile': '/root/daca_dub/cookies.txt',
-        'proxy': 'socks5h://localhost:1080',
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-    }
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            # Prepare_filename vraca originalno ime sa video ekstenzijom
-            base_filename = ydl.prepare_filename(info)
-            
-            # Postprocesor pravi .wav fajl sa istim imenom osnove
-            audio_path = os.path.splitext(base_filename)[0] + ".wav"
-            video_path = base_filename
-            
-            # Zastita u slucaju da yt-dlp promeni ekstenziju zbog spajanja
-            if not os.path.exists(video_path):
-                video_path = os.path.splitext(base_filename)[0] + ".mkv"
-                
-            return {
-                "status": "success",
-                "video_path": video_path,
-                "audio_path": audio_path,
-                "title": info.get('title', 'Nepoznat Naslov')
-            }
+        video_path = "/root/daca_dub/videoplayback.mp4"
+        audio_path = os.path.join(settings.TEMP_WORKSPACE, "test_audio.wav")
+        
+        # Ekstrahujemo audio pomocu ffmpeg-a (ovo bi inace radio yt-dlp)
+        print("[FAZA 1] Hakovan downloader: Koristim lokalni fajl i vadim audio...")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path, 
+            "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", 
+            audio_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        return {
+            "status": "success",
+            "video_path": video_path,
+            "audio_path": audio_path,
+            "title": "Manuelni Lokalni Test"
+        }
     except Exception as e:
         return {
             "status": "error",
-            "message": str(e)
+            "message": f"Greška pri manuelnom ucitavanju: {str(e)}"
         }
