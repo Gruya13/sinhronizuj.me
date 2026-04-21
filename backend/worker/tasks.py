@@ -81,11 +81,30 @@ def process_video_task(self, video_url: str):
         
     print(f"[FAZA 6 ZAVRŠENA] Finalni sinhronizovan video: {merge_result['final_video_path']}")
     
-    # --- MESTO ZA FAZU 7 (Wav2Lip) ---
-    # Ovde sutra dodajemo uslov (ako ima lica na ekranu) da odradi LipSync nad 'final_video_path'
+    # --- FAZA 7: Pametni Lip Sync (OpenCV + Wav2Lip) ---
+    print("[FAZA 7] Započinjem analizu lica u videu zbog potencijalne optimizacije resursa...")
+    from backend.worker.lipsync import has_sufficient_faces, apply_lip_sync
+    
+    # Prvo detektujemo lica (prag 10% vidljivosti)
+    needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
+    
+    if needs_lipsync:
+        # Uslov zadovoljen, saljemo video kod koga je ZAMENJEN ZVUK i nas NOVI GLAS
+        lip_result = apply_lip_sync(merge_result["final_video_path"], tts_result["dubbed_audio_path"])
+        if lip_result["status"] == "error":
+            print(f"[GREŠKA] Lip Sync obrada nije uspela: {lip_result['message']}. Fallback: Vracam video iz Faze 6.")
+            final_output = merge_result["final_video_path"]
+        else:
+            final_output = lip_result["lipsync_video_path"]
+            print(f"[FAZA 7 ZAVRŠENA] Uspesno primenjen Lip Sync: {final_output}")
+    else:
+        print("[FAZA 7 ZAVRŠENA] PRESKOČENO: Nema dovoljno lica u videu (<10%). Masovna ušteda VRAM resursa i vremena.")
+        final_output = merge_result["final_video_path"]
+    
+    print("--- DACA DUB PIPELINE ZAVRSEN ---")
     
     return {
         "status": "completed", 
         "url": video_url,
-        "final_video_path": merge_result["final_video_path"]
+        "final_video_path": final_output
     }

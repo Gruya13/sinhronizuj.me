@@ -10,3 +10,4 @@ faster-whisper
 google-genai
 pydub
 TTS
+opencv-python
