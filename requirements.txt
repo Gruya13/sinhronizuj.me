@@ -5,3 +5,4 @@ redis
 yt-dlp
 python-dotenv
 pydantic
+demucs
