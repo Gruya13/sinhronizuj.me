@@ -55,7 +55,7 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
             "format": "json"
         }
         
-        response = requests.post(url, json=data, timeout=120)
+        response = requests.post(url, json=data, timeout=600)
         response.raise_for_status()
         
         result_text = response.json().get('response', '[]')
