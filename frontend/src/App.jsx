@@ -9,7 +9,7 @@ const API_BASE_URL = "http://localhost:8000";
 function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [taskId, setTaskId] = useState(null);
+  const [taskId, setTaskId] = useState(() => localStorage.getItem('daca_dub_task_id'));
   const [status, setStatus] = useState('');
   const [progressData, setProgressData] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
@@ -25,6 +25,14 @@ function App() {
     "Obrada završena"
   ];
 
+  // Inicijalno ucitavanje ako postoji task u memoriji
+  useEffect(() => {
+    if (taskId) {
+        setLoading(true);
+        setStatus('UČITAVANJE STATUSA...');
+    }
+  }, []);
+
   // Efekat koji polluje server svake 3 sekunde da proveri status videa
   useEffect(() => {
     let interval;
@@ -39,11 +47,13 @@ function App() {
             setStatus('Završeno!');
             setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
+            localStorage.removeItem('daca_dub_task_id'); // Cistimo kad zavrsi
             clearInterval(interval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
             setError(data.error || 'Došlo je do greške pri obradi.');
             setStatus('Greška');
             setLoading(false);
+            localStorage.removeItem('daca_dub_task_id');
             clearInterval(interval);
           } else {
             // Ako imamo progress_data, koristimo ga
@@ -51,7 +61,7 @@ function App() {
               setProgressData(data.progress_data);
               setStatus(data.progress_data.current_step);
             } else {
-              setStatus(data.status || 'PRIPREMA...');
+              setStatus(data.status || 'ČEKANJE NA RED...');
             }
           }
         } catch (err) {
@@ -83,6 +93,7 @@ function App() {
       const data = await res.json();
       if (data.status === 'success') {
         setTaskId(data.task_id);
+        localStorage.setItem('daca_dub_task_id', data.task_id);
       } else {
         setError(data.message || 'Greška pri slanju zahteva.');
         setLoading(false);
