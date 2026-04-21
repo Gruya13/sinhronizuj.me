@@ -11,3 +11,4 @@ google-genai
 pydub
 TTS
 opencv-python
+torchcodec
