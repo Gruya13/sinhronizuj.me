@@ -29,7 +29,19 @@ def process_video_task(self, video_url: str):
     print(f"[FAZA 2 ZAVRŠENA] Čist vokal sacuvan na: {sep_result['vocals_path']}")
     print(f"[FAZA 2 ZAVRŠENA] Pozadina sacuvana na: {sep_result['no_vocals_path']}")
     
-    # Sutra ovde dodajemo Fazu 3 (Whisper)
+    # --- FAZA 3: Transkripcija (faster-whisper) ---
+    print("[FAZA 3] Pokrecem Whisper nad čistim vokalom...")
+    from backend.worker.transcriber import transcribe_audio
+    
+    transcription_result = transcribe_audio(sep_result["vocals_path"])
+    
+    if transcription_result["status"] == "error":
+        print(f"[GREŠKA] Transkripcija nije uspela: {transcription_result['message']}")
+        return transcription_result
+        
+    print(f"[FAZA 3 ZAVRŠENA] Transkripcija uspešna. Generisano segmenata: {len(transcription_result['segments'])}")
+    
+    # Sutra ovde dodajemo Fazu 4 (LLM prevod)
     
     return {
         "status": "completed", 
@@ -37,5 +49,6 @@ def process_video_task(self, video_url: str):
         "video_path": result["video_path"],
         "audio_path": result["audio_path"],
         "vocals_path": sep_result["vocals_path"],
-        "background_path": sep_result["no_vocals_path"]
+        "background_path": sep_result["no_vocals_path"],
+        "transcription": transcription_result["segments"]
     }

@@ -6,3 +6,4 @@ yt-dlp
 python-dotenv
 pydantic
 demucs
+faster-whisper
