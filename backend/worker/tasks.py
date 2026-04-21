@@ -50,7 +50,8 @@ def process_video_task(self, video_url: str):
     completed.append("Govor prepoznat")
     
     # --- FAZA 4: Prevod ---
-    update_progress("Prevođenje na srpski (Gemma 2 LLM)...", 55, completed)
+    update_progress("Prevođenje na srpski (Gemma 4 LLM)...", 55, completed)
+    print("[FAZA 4] Pokretanje prevoda segmenata pomoću Gemma 4 modela...")
     from backend.worker.translator import translate_segments
     translation_result = translate_segments(transcription_result["segments"])
     

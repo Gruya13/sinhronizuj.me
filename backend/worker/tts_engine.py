@@ -71,6 +71,19 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
             else:
                 translated_segments = []
 
+        # NUKLEARNI FALLBACK: Ako LLM vrati samo listu stringova umesto rečnika
+        if isinstance(translated_segments, list) and len(translated_segments) > 0 and not isinstance(translated_segments[0], dict):
+            print("[INFO] LLM vratio listu stringova. Upitavam sa originalnim tajminzima...")
+            new_segments = []
+            for i, text in enumerate(translated_segments):
+                if original_segments and i < len(original_segments):
+                    new_segments.append({
+                        "start": original_segments[i]["start"],
+                        "end": original_segments[i]["end"],
+                        "text": str(text)
+                    })
+            translated_segments = new_segments
+
         # KRPLJENJE TAJMINGA: Ako LLM vratio tekstove bez tajminga (None), koristimo originalne
         final_segments = []
         for i, segment in enumerate(translated_segments):
@@ -81,8 +94,8 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
             if isinstance(segment, dict):
                 text = segment.get("text", "")
                 # Proveravamo razne varijacije kljuceva koje LLM moze da izmisli
-                start = segment.get("start") or segment.get("start_time")
-                end = segment.get("end") or segment.get("end_time")
+                start = segment.get("start") if segment.get("start") is not None else segment.get("start_time")
+                end = segment.get("end") if segment.get("end") is not None else segment.get("end_time")
             else:
                 text = str(segment)
 
@@ -96,7 +109,8 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
                 final_segments.append({"start": start, "end": end, "text": text})
 
         if not final_segments:
-            return {"status": "error", "message": "Nijedan segment nema ispravna polja (text, start, end)."}
+            debug_info = str(translated_segments)[:200]
+            return {"status": "error", "message": f"Gemma 4 nije vratila validan JSON (text/start/end). Dobijeno: {debug_info}"}
 
         translated_segments = final_segments
 

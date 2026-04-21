@@ -7,43 +7,52 @@ from backend.core.config import settings
 def translate_segments(segments: list, original_language: str = "en") -> dict:
     """
     Prevodi segmente koristeći Gemini API, sa automatskim fallback-om na lokalni
-    Gemma 2 model (preko Ollama) ako Gemini nije dostupan ili je preopterećen.
+    Gemma 4 model (preko Ollama).
     """
     # Priprema payload-a i instrukcija
     payload = json.dumps(segments, ensure_ascii=False)
     system_instruction = """
-    Ti si profesionalni prevodilac. Dobićeš JSON niz segmenata.
-    KRITIČNO VAŽNO:
-    1. Vrati isključivo JSON niz (Array) sa istim brojem elemenata.
-    2. NEMOJ MENJATI ključeve 'start' i 'end'.
-    3. NEMOJ MENJATI vrednosti (brojeve) u 'start' i 'end' poljima. 
-    4. Prevedi samo 'text' na srpski jezik.
-    5. Stručne termine (API, Frontend, itd.) ne prevodi.
-    6. Izlaz mora biti čist JSON, bez dodatnog teksta.
+    TI SI PROFESIONALNI PREVODILAC I JSON PARSER.
+    TVOJ ZADATAK JE DA PREVEDEŠ POLJE 'text' NA SRPSKI JEZIK.
+    
+    STRIKTNA PRAVILA:
+    1. IZLAZ MORA BITI ISKLJUČIVO VALIDAN JSON NIZ (ARRAY).
+    2. NEMOJ DODAVATI NIKAKAV UVOD, OBJAŠNJENJA ILI ZAKLJUČAK.
+    3. POLJA 'start' I 'end' SU SVETINJA - NE SMEŠ IH MENJATI NI ZA JEDNU MILISEKUNDU.
+    4. BROJ SEGMENATA U IZLAZU MORA BITI IDENTIČAN BROJU SEGMENATA U ULAZU.
+    5. PREVEDI SAMO SADRŽAJ POLJA 'text'.
+    6. STRUČNE TERMINE IZ IT SEKTORA (API, Frontend, Backend, Pod, itd.) OSTAVI U ORIGINALU.
+    7. KORISTI PRIRODAN SRPSKI JEZIK.
+    
+    FORMAT IZLAZA:
+    [
+      {"start": 0.0, "end": 2.0, "text": "Prevedeni tekst"},
+      ...
+    ]
     """
 
     # 1. Pokušaj sa Gemini API-jem (ako postoji ključ)
     if settings.GEMINI_API_KEY:
         try:
-            print("[FAZA 4] Pokušavam prevod preko Gemini API-ja...")
+            print("[FAZA 4] Prevođenje: Gemini API (Gemma 4 logika)...")
             client = genai.Client(api_key=settings.GEMINI_API_KEY)
             response = client.models.generate_content(
                 model='gemini-2.0-flash',
                 contents=payload,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
-                    temperature=0.2,
+                    temperature=0.1,
                     response_mime_type="application/json"
                 )
             )
             translated_segments = json.loads(response.text)
             return {"status": "success", "translated_segments": translated_segments, "engine": "gemini"}
         except Exception as e:
-            print(f"[UPOZORENJE] Gemini API greška: {str(e)}. Prelazim na lokalni fallback (Ollama)...")
+            print(f"[UPOZORENJE] Gemini greška: {str(e)}. Prelazim na lokalnu Gemma 4...")
 
-    # 2. Fallback na lokalni Ollama (Gemma 2)
+    # 2. Fallback na lokalni Ollama (Gemma 4)
     try:
-        print("[FAZA 4] Pokušavam lokalni prevod (Ollama + Gemma 2 9B)...")
+        print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Ollama)...")
         url = "http://localhost:11434/api/generate"
         full_prompt = f"{system_instruction}\n\nEvo JSON-a za prevod:\n{payload}"
         
