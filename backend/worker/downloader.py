@@ -16,9 +16,10 @@ def download_youtube_video(url: str) -> dict:
     output_template = os.path.join(settings.TEMP_WORKSPACE, f"{task_id}_%(title)s.%(ext)s")
     
     ydl_opts = {
-        # Sigurniji format koji uvek garantuje preuzimanje i spajanje u MP4
-        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+        # Fleksibilniji format koji prihvata bilo koji najbolji kvalitet
+        'format': 'bestvideo+bestaudio/best',
         'merge_output_format': 'mp4',
+        'remote_components': 'ejs:github',
         'outtmpl': output_template,
         'keepvideo': True, # Cuvamo originalni .mp4 fajl (ne zelimo da ga obrise nakon ekstrakcije zvuka)
         'postprocessors': [{
