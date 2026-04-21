@@ -28,12 +28,8 @@ def download_youtube_video(url: str) -> dict:
         }],
         'quiet': False,
         'no_warnings': True,
-        # Ultimativni bypass: Koristimo iOS API koji daje 360p video bez PO Tokena i Cookie-ja
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['ios', 'android']
-            }
-        },
+        # Kroz obrnuti SSH tunel rutiramo yt-dlp preko tvoje kucne IP adrese!
+        'proxy': 'socks5h://localhost:1080',
         'nocheckcertificate': True,
         'geo_bypass': True,
     }
