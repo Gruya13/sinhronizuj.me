@@ -1,20 +1,19 @@
 import os
-import torch
 import uuid
 import torch
 from pydub import AudioSegment
 from TTS.api import TTS
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import XttsAudioConfig, XttsArgs
-from TTS.config.shared_configs import BaseDatasetConfig
 from backend.core.config import settings
 
-# PyTorch 2.6+ zahteva eksplicitno odobrenje klasa koje se ucitavaju iz modela
-try:
-    if hasattr(torch.serialization, 'add_safe_globals'):
-        torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, XttsArgs, BaseDatasetConfig])
-except Exception as e:
-    print(f"Obavestenje: Safe globals vec podeseni ili nisu podrzani: {e}")
+# --- UNIVERZALNI FIKS ZA PYTORCH 2.6/2.11+ ---
+# Coqui TTS koristi torch.load interno, sto u novim verzijama PyTorch-a puca zbog 'weights_only' restrikcije.
+# Monkey-patching torch.load funkcije da uvek koristi weights_only=False dok se model ucitava.
+original_torch_load = torch.load
+def patched_torch_load(*args, **kwargs):
+    kwargs['weights_only'] = False
+    return original_torch_load(*args, **kwargs)
+torch.load = patched_torch_load
+# --------------------------------------------
 
 def create_reference_audio(vocals_path: str) -> str:
     """
