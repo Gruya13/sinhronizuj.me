@@ -142,8 +142,33 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
                 
                 generated_segment = AudioSegment.from_wav(temp_wav)
                 
-                # TODO za buduce optimizacije: Ovde mozemo iskoristiti pydub 'speedup' funkciju 
-                # ako je generated_segment duzi od (segment['end'] - segment['start'])
+                # --- PAMETNO UBRZAVANJE (AUDIO FIT) ---
+                target_duration_ms = int((segment["end"] - segment["start"]) * 1000)
+                current_duration_ms = len(generated_segment)
+                
+                # Ako je nas glas duzi od raspolozivog vremena (sa malom tolerancijom od 10%)
+                if current_duration_ms > target_duration_ms * 1.1:
+                    speed_factor = current_duration_ms / target_duration_ms
+                    
+                    # Ogranicavamo ubrzanje na max 2x da ne bi zvucalo skroz komicno
+                    if speed_factor > 2.0:
+                        speed_factor = 2.0
+                        
+                    print(f"   [!] Ubrzavam segment {i} za faktor {speed_factor:.2f}x kako bi se uklopio.")
+                    import subprocess
+                    temp_speed_wav = temp_wav.replace(".wav", "_fast.wav")
+                    
+                    try:
+                        subprocess.run([
+                            "ffmpeg", "-y", "-i", temp_wav,
+                            "-filter:a", f"atempo={speed_factor}",
+                            temp_speed_wav
+                        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        
+                        generated_segment = AudioSegment.from_wav(temp_speed_wav)
+                        os.remove(temp_speed_wav)
+                    except Exception as e:
+                        print(f"   [GREŠKA] FFmpeg ubrzavanje nije uspelo: {str(e)}. Koristim original.")
                 
                 # Lepimo srpsku recenicu tacno na milisekundu kad je pocela engleska
                 final_audio = final_audio.overlay(generated_segment, position=start_time_ms)
