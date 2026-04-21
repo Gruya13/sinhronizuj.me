@@ -8,6 +8,7 @@ pydantic
 demucs
 faster-whisper
 google-genai
+requests
 pydub
 TTS
 opencv-python
