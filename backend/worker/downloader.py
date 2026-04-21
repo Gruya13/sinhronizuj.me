@@ -28,12 +28,6 @@ def download_youtube_video(url: str) -> dict:
         }],
         'quiet': False,
         'no_warnings': True,
-        # Bypassing YouTube Bot detection
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web']
-            }
-        },
         'nocheckcertificate': True,
         'geo_bypass': True,
         'cookiefile': 'cookies.txt', # Apsolutno 100% resenje za bot detekciju
