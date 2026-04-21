@@ -53,10 +53,23 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # Postavljamo varijablu okruzenja koja automatski prihvata Coqui TOS
-        # Ovo resava "EOF when reading a line" gresku u pozadinskim procesima
         os.environ["COQUI_TOS_AGREED"] = "1"
         
         tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+
+        # OSIGURANJE FORMATA: Ponekad LLM vrati dikt umesto liste (uzrok KeyError -1)
+        if isinstance(translated_segments, dict):
+            print("[UPOZORENJE] LLM je vratio rečnik umesto liste. Vrsim konverziju...")
+            if "segments" in translated_segments:
+                translated_segments = translated_segments["segments"]
+            elif "translated_segments" in translated_segments:
+                translated_segments = translated_segments["translated_segments"]
+            else:
+                # Ako su kljucevi brojevi ("0", "1"...), uzimamo vrednosti
+                translated_segments = list(translated_segments.values())
+
+        if not isinstance(translated_segments, list) or len(translated_segments) == 0:
+            return {"status": "error", "message": "Prevedeni segmenti nisu u ispravnom formatu liste."}
 
         # Kreiramo prazno platno (tisinu) dugo koliko i kraj poslednjeg segmenta
         last_end_time_ms = int(translated_segments[-1]["end"] * 1000) + 2000
