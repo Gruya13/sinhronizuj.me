@@ -41,7 +41,19 @@ def process_video_task(self, video_url: str):
         
     print(f"[FAZA 3 ZAVRŠENA] Transkripcija uspešna. Generisano segmenata: {len(transcription_result['segments'])}")
     
-    # Sutra ovde dodajemo Fazu 4 (LLM prevod)
+    # --- FAZA 4: Pametni Prevod (LLM) ---
+    print("[FAZA 4] Započinjem pametni prevod teksta...")
+    from backend.worker.translator import translate_segments
+    
+    translation_result = translate_segments(transcription_result["segments"])
+    
+    if translation_result["status"] == "error":
+        print(f"[GREŠKA] Prevod nije uspeo: {translation_result['message']}")
+        return translation_result
+        
+    print("[FAZA 4 ZAVRŠENA] Prevod na srpski jezik je uspesno generisan.")
+    
+    # Sutra ovde dodajemo Fazu 5 (XTTS v2)
     
     return {
         "status": "completed", 
@@ -50,5 +62,6 @@ def process_video_task(self, video_url: str):
         "audio_path": result["audio_path"],
         "vocals_path": sep_result["vocals_path"],
         "background_path": sep_result["no_vocals_path"],
-        "transcription": transcription_result["segments"]
+        "original_transcription": transcription_result["segments"],
+        "translated_transcription": translation_result["translated_segments"]
     }

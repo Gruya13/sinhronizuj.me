@@ -7,3 +7,4 @@ python-dotenv
 pydantic
 demucs
 faster-whisper
+google-genai
