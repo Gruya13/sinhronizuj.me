@@ -41,6 +41,11 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
         print("[FAZA 5] Ucitavam XTTS v2 model u graficku memoriju (ovo moze potrajati)...")
         # Pristup sekvencijalnog ucitavanja - drzi se u memoriji samo dok traje funkcija
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Postavljamo varijablu okruzenja koja automatski prihvata Coqui TOS
+        # Ovo resava "EOF when reading a line" gresku u pozadinskim procesima
+        os.environ["COQUI_TOS_AGREED"] = "1"
+        
         tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
 
         # Kreiramo prazno platno (tisinu) dugo koliko i kraj poslednjeg segmenta
