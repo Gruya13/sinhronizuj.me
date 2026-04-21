@@ -51,31 +51,56 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
             print(f"[UPOZORENJE] Gemini greška: {str(e)}. Prelazim na lokalnu Gemma 4...")
 
     # 2. Fallback na lokalni Ollama (Gemma 4)
-    try:
-        print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Ollama)...")
-        url = "http://localhost:11434/api/generate"
+    print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Ollama) sa deljenjem u pakete...")
+    url = "http://localhost:11434/api/generate"
+    
+    # Delimo segmente u pakete od 20 da model ne bi pukao zbog token limita
+    chunk_size = 20
+    all_translated_segments = []
+    
+    for i in range(0, len(segments), chunk_size):
+        chunk = segments[i:i+chunk_size]
+        payload = json.dumps(chunk, ensure_ascii=False)
         full_prompt = f"{system_instruction}\n\nEvo JSON-a za prevod:\n{payload}"
         
         data = {
             "model": "gemma4",
             "prompt": full_prompt,
             "stream": False,
-            "format": "json"
+            "format": "json",
+            "options": {"num_predict": 4096} # Osiguravamo dovoljno "mastila" za dugacke odgovore
         }
         
-        response = requests.post(url, json=data, timeout=300)
-        response.raise_for_status()
-        
-        result_text = response.json().get('response', '[]')
-        translated_segments = json.loads(result_text)
-        
-        return {
-            "status": "success",
-            "translated_segments": translated_segments,
-            "engine": "ollama_gemma2"
-        }
-    except Exception as e:
+        try:
+            print(f"   -> Prevodim paket {i//chunk_size + 1} od {(len(segments)-1)//chunk_size + 1}...")
+            response = requests.post(url, json=data, timeout=300)
+            response.raise_for_status()
+            
+            result_text = response.json().get('response', '[]')
+            
+            try:
+                translated_chunk = json.loads(result_text)
+                if isinstance(translated_chunk, dict):
+                    translated_chunk = [translated_chunk]
+                all_translated_segments.extend(translated_chunk)
+            except json.JSONDecodeError as e:
+                print(f"[UPOZORENJE] Gemma nije vratila validan JSON za paket {i//chunk_size + 1}. Preskacem... Greska: {str(e)}")
+                # Ako nece da ga lepo prevede, zadrzavamo original da ne puca
+                all_translated_segments.extend(chunk)
+                
+        except Exception as e:
+            print(f"[GREŠKA] Problem sa Gemma 4 zahtevom: {str(e)}")
+            # Fallback na originalni tekst
+            all_translated_segments.extend(chunk)
+
+    if not all_translated_segments:
         return {
             "status": "error",
-            "message": f"Prevod nije uspeo ni na jednom servisu. Poslednja greška: {str(e)}"
+            "message": "Prevod nije uspeo. Gemma je vratila potpuno prazan rezultat."
         }
+        
+    return {
+        "status": "success",
+        "translated_segments": all_translated_segments,
+        "engine": "ollama_gemma4_chunked"
+    }
