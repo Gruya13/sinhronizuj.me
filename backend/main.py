@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
 from celery.result import AsyncResult
@@ -23,12 +24,21 @@ app.add_middleware(
 os.makedirs(settings.TEMP_WORKSPACE, exist_ok=True)
 app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="videos")
 
+# Serviranje frontenda direktno iz dist foldera
+frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../frontend/dist"))
+if os.path.exists(frontend_path):
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_path, "assets")), name="assets")
+
+    @app.get("/")
+    def serve_index():
+        return FileResponse(os.path.join(frontend_path, "index.html"))
+else:
+    @app.get("/")
+    def read_root():
+        return {"message": "Daca Dub API je aktivan, ali frontend nije pronadjen!"}
+
 class VideoRequest(BaseModel):
     url: str
-
-@app.get("/")
-def read_root():
-    return {"message": "Daca Dub API je aktivan!"}
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
