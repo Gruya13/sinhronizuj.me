@@ -1,9 +1,18 @@
 import os
 import torch
 import uuid
+import torch
 from pydub import AudioSegment
 from TTS.api import TTS
+from TTS.tts.configs.xtts_config import XttsConfig
 from backend.core.config import settings
+
+# PyTorch 2.6+ zahteva eksplicitno odobrenje klasa koje se ucitavaju iz modela
+try:
+    if hasattr(torch.serialization, 'add_safe_globals'):
+        torch.serialization.add_safe_globals([XttsConfig])
+except Exception as e:
+    print(f"Obavestenje: Safe globals vec podeseni ili nisu podrzani: {e}")
 
 def create_reference_audio(vocals_path: str) -> str:
     """
