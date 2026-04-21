@@ -35,6 +35,7 @@ def download_youtube_video(url: str) -> dict:
         },
         'nocheckcertificate': True,
         'geo_bypass': True,
+        'cookiefile': 'cookies.txt', # Apsolutno 100% resenje za bot detekciju
     }
 
     try:
