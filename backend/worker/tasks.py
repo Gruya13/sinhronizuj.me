@@ -53,7 +53,19 @@ def process_video_task(self, video_url: str):
         
     print("[FAZA 4 ZAVRŠENA] Prevod na srpski jezik je uspesno generisan.")
     
-    # Sutra ovde dodajemo Fazu 5 (XTTS v2)
+    # --- FAZA 5: Sinteza Srpskog Govora (XTTS v2) ---
+    print("[FAZA 5] Započinjem kloniranje glasa i sintezu govora...")
+    from backend.worker.tts_engine import synthesize_audio
+    
+    tts_result = synthesize_audio(sep_result["vocals_path"], translation_result["translated_segments"])
+    
+    if tts_result["status"] == "error":
+        print(f"[GREŠKA] Sinteza govora nije uspela: {tts_result['message']}")
+        return tts_result
+        
+    print(f"[FAZA 5 ZAVRŠENA] Srpski glas uspešno generisan na: {tts_result['dubbed_audio_path']}")
+    
+    # Sutra ovde dodajemo Opcioni Lip Sync ili Finalno Spajanje (FFmpeg)
     
     return {
         "status": "completed", 
@@ -62,6 +74,5 @@ def process_video_task(self, video_url: str):
         "audio_path": result["audio_path"],
         "vocals_path": sep_result["vocals_path"],
         "background_path": sep_result["no_vocals_path"],
-        "original_transcription": transcription_result["segments"],
-        "translated_transcription": translation_result["translated_segments"]
+        "dubbed_audio_path": tts_result["dubbed_audio_path"]
     }

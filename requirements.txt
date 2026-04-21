@@ -8,3 +8,5 @@ pydantic
 demucs
 faster-whisper
 google-genai
+pydub
+TTS
