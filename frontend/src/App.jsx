@@ -72,6 +72,17 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId, videoUrl, error]);
 
+  
+  const handleReset = () => {
+    localStorage.removeItem('daca_dub_task_id');
+    setTaskId(null);
+    setLoading(false);
+    setStatus('');
+    setProgressData(null);
+    setError(null);
+    window.location.reload();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!url) return;
@@ -120,13 +131,25 @@ function App() {
           disabled={loading}
           required
         />
-        <button type="submit" disabled={loading || !url}>
-          {loading ? (
-            <><Loader2 className="spinner" size={20} /> Obrađujem...</>
-          ) : (
-            <><Play size={20} /> Pokreni Sinhronizaciju</>
+        <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+          <button type="submit" style={{ flex: 1 }} disabled={loading || !url}>
+            {loading ? (
+              <><Loader2 className="spinner" size={20} /> Obrađujem...</>
+            ) : (
+              <><Play size={20} /> Pokreni Sinhronizaciju</>
+            )}
+          </button>
+          {loading && (
+            <button 
+              type="button" 
+              onClick={handleReset} 
+              style={{ background: "#ef4444", width: "auto", padding: "0 15px", color: "white", borderRadius: "8px", border: "none", cursor: "pointer" }}
+              title="Resetuj aplikaciju"
+            >
+              Otkaži
+            </button>
           )}
-        </button>
+        </div>
       </form>
 
       <AnimatePresence>
