@@ -15,8 +15,31 @@ function App() {
   const [error, setError] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
+  const [hwStats, setHwStats] = useState(null);
   
   const feedRef = useRef(null);
+
+  // HW Monitoring polling
+  useEffect(() => {
+    const fetchHw = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/hw-stats`);
+        const data = await res.json();
+        setHwStats(data);
+      } catch (err) { /* Silent fail if pod is down */ }
+    };
+    fetchHw();
+    const interval = setInterval(fetchHw, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStopPod = async () => {
+    if (!window.confirm("Da li ste sigurni da želite da ugasite RunPod instancu?")) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/runpod/stop`, { method: 'POST' });
+      alert("Komanda za gašenje poslata!");
+    } catch (err) { alert("Greška pri gašenju."); }
+  };
 
   const STEPS = [
     "Preuzimanje završeno",
@@ -122,6 +145,21 @@ function App() {
       </div>
 
       <div className="glass-container">
+        <div className="cloud-monitor">
+          <div className="hw-group">
+            {hwStats?.gpu?.map((g, i) => (
+              <div key={i} className="hw-item">
+                <Cpu size={14} />
+                <span>GPU {i}: {g.load}% | {g.memory_used}MB / {g.memory_total}MB | {g.temperature}°C</span>
+              </div>
+            ))}
+            {!hwStats && <span className="eta-text">Povezivanje sa RunPodom...</span>}
+          </div>
+          <button onClick={handleStopPod} className="stop-pod-btn" title="Ugasi RunPod">
+            <AlertCircle size={16} /> Stop
+          </button>
+        </div>
+
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <h1>Daca Dub AI</h1>
           <p className="subtitle">Transparentna AI Sinhronizacija v1.5</p>

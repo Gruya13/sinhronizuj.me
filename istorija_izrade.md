@@ -28,9 +28,7 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **2026-04-23 07:30** - **Daca Dub v1.5 "Dashboard & Granularity"**:
     1. **Granularni Progres:** Implementirano slanje metapodataka o svakoj rečenici iz Celery-ja na Frontend. Korisnik sada vidi "Live Script" feed koji se puni u realnom vremenu.
     2. **Multi-Instance Robustnost:** Dodat auto-retry mehanizam za Fish Speech API. Ako port 8080 padne, sistem automatski prebacuje na 8081 ili 8082.
-    3. **Premium UI/UX:** 
-        - Dodata **Aurora Background** animacija.
-        - Implementiran vizuelni indikator aktivnih GPU instanci (instance dots).
-        - Dodat pametni tajmer sa **ETA** (procenjeno vreme završetka).
-        - Implementirana **Lektor (Critic) animacija** skeniranja teksta.
-    4. **Stabilizacija:** Poboljšano rukovanje greškama i automatsko resetovanje stanja aplikacije.
+    3. **Premium UI/UX:** Dodata Aurora animacija, GPU instance dots, ETA tajmer i Lektor animacija.
+- **2026-04-23 07:35** - **RunPod Cloud Control Integration**:
+    1. **HW Monitoring:** Implementiran `hw_monitor.py` (nvidia-smi) za real-time GPU/VRAM statistiku u dashboard-u.
+    2. **Remote Management:** Dodata mogućnost gašenja RunPod instance direktno iz UI-ja preko GraphQL API-ja.

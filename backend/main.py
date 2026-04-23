@@ -68,3 +68,32 @@ def get_task_status(task_id: str):
         response["error"] = str(task_result.info)
         
     return response
+@app.get("/api/v1/hw-stats")
+def get_hw_stats():
+    from backend.worker.hw_monitor import get_gpu_stats, get_system_stats
+    return {
+        "gpu": get_gpu_stats(),
+        "system": get_system_stats()
+    }
+
+@app.post("/api/v1/runpod/stop")
+def stop_runpod():
+    import requests
+    if not settings.RUNPOD_API_KEY or not settings.RUNPOD_POD_ID:
+        raise HTTPException(status_code=400, detail="RunPod API ključ ili Pod ID nisu konfigurisani.")
+    
+    query = """
+    mutation {
+      podStop(input: {podId: "%s"}) {
+        id
+        desiredStatus
+      }
+    }
+    """ % settings.RUNPOD_POD_ID
+    
+    url = f"https://api.runpod.io/graphql?api_key={settings.RUNPOD_API_KEY}"
+    try:
+        res = requests.post(url, json={'query': query})
+        return res.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
