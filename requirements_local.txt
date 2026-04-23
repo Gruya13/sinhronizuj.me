@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+celery
+redis
+pydantic
+yt-dlp
+faster-whisper
+google-genai
+pydub
+opencv-python
+demucs

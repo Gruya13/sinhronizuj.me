@@ -69,8 +69,9 @@ class RunPodOrchestrator:
         """
         Automatski podiže novu RunPod instancu sa našim parametrima.
         """
-        # Ovde bismo definisali templateId ili direktno parametre kontejnera
-        # Za sada koristimo generičku mutaciju
+        # Mapiranje user-friendly imena na RunPod IDs ako je potrebno
+        # RunPod obično prihvata i puno ime kao ID u nekim API verzijama
+        
         mutation = """
         mutation {
           podDeploy(input: {
@@ -79,14 +80,14 @@ class RunPodOrchestrator:
             containerDiskSize: 40,
             volumeSize: 50,
             imageName: "pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime",
-            dockerArgs: "git clone https://github.com/Gruya13/daca_dub.git /app && cd /app && docker-compose up -d",
-            name: "Daca-Dub-Auto-Scale"
+            dockerArgs: "bash -c 'git clone https://github.com/Gruya13/daca_dub.git /app && cd /app && pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8000'",
+            name: "Daca-Dub-Nitro-%s"
           }) {
             id
             desiredStatus
           }
         }
-        """ % gpu_type
+        """ % (gpu_type, gpu_type.split()[-1])
         
         return self._query(mutation)
 
@@ -122,26 +123,30 @@ class RunPodOrchestrator:
         """
         pods = self.list_my_pods()
         
-        # 1. Tražimo postojeće podove koji odgovaraju tipu (opciono filtriranje)
+        # 1. Tražimo postojeće podove koji odgovaraju izabranom tipu
         for pod in pods:
-            # Ako pod već radi, proveri popunjenost
-            if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
-                ports = pod['runtime']['ports']
-                ip = ports[0]['ip'] if ports else None
-                public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
-                if ip and public_port:
-                    address = f"http://{ip}:{public_port}"
-                    if self.get_pod_hw_utilization(ip, public_port) == "FREE":
-                        return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
+            pod_gpu = pod.get('machine', {}).get('gpuDisplayName', "")
             
-            # 2. Ako pod NIJE upaljen, pokušaj da ga upališ
-            elif pod['desiredStatus'] == 'EXITED':
-                print(f"[Orkestrator] Pokušavam da probudim pod {pod['id']}...")
-                start_result = self.start_pod_safely(pod['id'])
+            # Ako pod odgovara željenom hardveru
+            if gpu_type.lower() in pod_gpu.lower():
+                # Ako pod već radi, proveri popunjenost
+                if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
+                    ports = pod['runtime']['ports']
+                    ip = ports[0]['ip'] if ports else None
+                    public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
+                    if ip and public_port:
+                        address = f"http://{ip}:{public_port}"
+                        if self.get_pod_hw_utilization(ip, public_port) == "FREE":
+                            return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
                 
-                if start_result['status'] == "SUCCESS":
-                    return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
-                else:
+                # Ako pod NIJE upaljen, pokušaj da ga upališ
+                elif pod['desiredStatus'] == 'EXITED':
+                    print(f"[Orkestrator] Pokušavam da probudim odgovarajući {gpu_type} pod {pod['id']}...")
+                    start_result = self.start_pod_safely(pod['id'])
+                    
+                    if start_result['status'] == "SUCCESS":
+                        return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
+                    # Ako je EXHAUSTED, nastavljamo dalje (možda imamo drugi isti takav pod)
                     continue
 
         # 3. Ako nema slobodnih, podigni novi sa izabranim GPU-om

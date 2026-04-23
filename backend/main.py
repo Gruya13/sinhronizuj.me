@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import os
 from celery.result import AsyncResult
 from backend.worker.celery_app import celery_app
-from backend.worker.tasks import process_video_task
+# from backend.worker.tasks import process_video_task (Uklonjeno radi brzine lokalnog orkestratora)
 from backend.core.config import settings
 
 app = FastAPI(title="Daca Dub API", description="API za inteligentnu sinhronizaciju videa", version="1.0.0")
@@ -32,6 +32,7 @@ def read_root():
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
+    from backend.worker.tasks import process_video_task
     # Okidamo Celery task u pozadini i vracamo task_id na frontend
     task = process_video_task.delay(request.url)
     return {

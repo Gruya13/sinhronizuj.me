@@ -206,13 +206,31 @@ function App() {
               <button onClick={() => setShowLogs(!showLogs)} className="logs-toggle-btn">
                 <Terminal size={14} /> Logovi
               </button>
+              <button onClick={async () => {
+                setStatus('POKRETANJE MIGRACIJE...');
+                setLoading(true);
+                try {
+                  const res = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?gpu_type=${encodeURIComponent(selectedGpu)}`);
+                  const data = await res.json();
+                  if (data.status === "DEPLOYING_NEW") alert("Podižem novu instancu!");
+                  else alert("Pronađen slobodan pod: " + data.pod_id);
+                } catch(e) { alert("Greška pri migraciji."); }
+                setLoading(false);
+              }} className="logs-toggle-btn" style={{color: '#60a5fa'}}>
+                <Database size={14} /> Migracija
+              </button>
             </div>
-            {hwStats?.gpu?.map((g, i) => (
+            {hwStats?.gpu?.length > 0 ? hwStats.gpu.map((g, i) => (
               <div key={i} className="hw-item">
                 <Cpu size={14} />
                 <span>GPU {i}: {g.load}% | {g.memory_used}MB / {g.memory_total}MB | {g.temperature}°C</span>
               </div>
-            ))}
+            )) : (
+              <div className="hw-item">
+                <Database size={14} />
+                <span>Lokalni režim (Orkestrator aktivan)</span>
+              </div>
+            )}
             {!hwStats && <span className="eta-text">Povezivanje sa RunPodom...</span>}
           </div>
           <button onClick={handleStopPod} className="stop-pod-btn" title="Ugasi RunPod">
