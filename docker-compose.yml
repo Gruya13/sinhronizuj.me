@@ -32,7 +32,7 @@ services:
     build: .
     container_name: daca_dub_worker
     # Ogranicavamo concurrency na 1 kako bi obrada bila sekvencijalna i da ne bi preopteretili 8GB VRAM-a
-    command: celery -A backend.worker.celery_app worker --loglevel=info --concurrency=1
+    command: sh -c "celery -A backend.worker.celery_app worker --loglevel=info --concurrency=1 2>&1 | tee /app/worker.log"
     environment:
       - REDIS_URL=redis://redis:6379/0
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}

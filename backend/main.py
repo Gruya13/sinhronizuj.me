@@ -99,8 +99,22 @@ def stop_runpod():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/orchestrator/find-best-pod")
-def find_best_pod():
+def find_best_pod(gpu_type: str = "NVIDIA GeForce RTX 3090"):
     from backend.core.orchestrator import RunPodOrchestrator
     orchestrator = RunPodOrchestrator()
-    best_pod_id = orchestrator.find_best_pod()
-    return {"best_pod_id": best_pod_id}
+    best_pod_info = orchestrator.find_best_pod(gpu_type)
+    return best_pod_info
+
+@app.get("/api/v1/logs")
+def get_worker_logs():
+    import os
+    log_path = "/app/worker.log"
+    if not os.path.exists(log_path):
+        return {"logs": "Log fajl još uvek nije generisan..."}
+    try:
+        # Čitamo poslednjih 100 linija
+        with os.popen(f"tail -n 100 {log_path}") as f:
+            logs = f.read()
+        return {"logs": logs}
+    except Exception as e:
+        return {"error": str(e)}

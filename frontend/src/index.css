@@ -442,3 +442,82 @@ video {
   background: rgba(239, 68, 68, 0.2) !important;
   transform: scale(1.05) !important;
 }
+
+.gpu-selector-wrapper {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gpu-select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.logs-toggle-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 4px 8px !important;
+  font-size: 0.7rem !important;
+  width: auto !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-panel {
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.log-header {
+  background: #1a1a1a;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.log-header button {
+  background: none !important;
+  border: none !important;
+  color: #ef4444 !important;
+  width: auto !important;
+  padding: 0 !important;
+  cursor: pointer;
+}
+
+.log-content {
+  padding: 12px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.65rem;
+  color: #00ff00;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  text-align: left;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.log-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.log-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}

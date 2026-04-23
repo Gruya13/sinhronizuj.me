@@ -16,14 +16,15 @@ function App() {
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [hwStats, setHwStats] = useState(null);
-  
-  const feedRef = useRef(null);
+  const [selectedGpu, setSelectedGpu] = useState("NVIDIA GeForce RTX 3090");
+  const [logs, setLogs] = useState("");
+  const [showLogs, setShowLogs] = useState(false);
 
   // HW Monitoring polling
   useEffect(() => {
     const fetchHw = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/hw-stats`);
+        const res = await fetch(`${activeApiUrl}/api/v1/hw-stats`);
         const data = await res.json();
         setHwStats(data);
       } catch (err) { /* Silent fail if pod is down */ }
@@ -31,7 +32,22 @@ function App() {
     fetchHw();
     const interval = setInterval(fetchHw, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeApiUrl]);
+
+  // Logs polling
+  useEffect(() => {
+    if (!showLogs) return;
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch(`${activeApiUrl}/api/v1/logs`);
+        const data = await res.json();
+        setLogs(data.logs || data.error);
+      } catch (err) { setLogs("Greška pri čitanju logova..."); }
+    };
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 3000);
+    return () => clearInterval(interval);
+  }, [showLogs, activeApiUrl]);
 
   const handleStopPod = async () => {
     if (!window.confirm("Da li ste sigurni da želite da ugasite RunPod instancu?")) return;
@@ -113,6 +129,8 @@ function App() {
 
   const [activeApiUrl, setActiveApiUrl] = useState(API_BASE_URL);
 
+  const feedRef = useRef(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!url) return;
@@ -122,8 +140,8 @@ function App() {
     setStatus('PROVERA INFRASTRUKTURE...');
 
     try {
-      // 1. Pitamo orkestrator za najbolji pod
-      const orchRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod`);
+      // 1. Pitamo orkestrator za najbolji pod (šaljemo željeni GPU)
+      const orchRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?gpu_type=${encodeURIComponent(selectedGpu)}`);
       const orchData = await orchRes.json();
       
       let targetUrl = activeApiUrl;
@@ -176,6 +194,20 @@ function App() {
       <div className="glass-container">
         <div className="cloud-monitor">
           <div className="hw-group">
+            <div className="gpu-selector-wrapper">
+              <select 
+                value={selectedGpu} 
+                onChange={(e) => setSelectedGpu(e.target.value)}
+                className="gpu-select"
+              >
+                <option value="NVIDIA GeForce RTX 3090">RTX 3090 (24GB)</option>
+                <option value="NVIDIA GeForce RTX 4090">RTX 4090 (24GB)</option>
+                <option value="NVIDIA RTX A6000">RTX A6000 (48GB)</option>
+              </select>
+              <button onClick={() => setShowLogs(!showLogs)} className="logs-toggle-btn">
+                <Terminal size={14} /> Logovi
+              </button>
+            </div>
             {hwStats?.gpu?.map((g, i) => (
               <div key={i} className="hw-item">
                 <Cpu size={14} />
@@ -188,6 +220,16 @@ function App() {
             <AlertCircle size={16} /> Stop
           </button>
         </div>
+
+        {showLogs && (
+          <div className="log-panel">
+            <div className="log-header">
+              <span>Sistemski Logovi (Worker)</span>
+              <button onClick={() => setShowLogs(false)}>X</button>
+            </div>
+            <pre className="log-content">{logs}</pre>
+          </div>
+        )}
 
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <h1>Daca Dub AI</h1>

@@ -115,18 +115,17 @@ class RunPodOrchestrator:
         
         return {"status": "SUCCESS", "data": result}
 
-    def find_best_pod(self):
+    def find_best_pod(self, gpu_type="NVIDIA GeForce RTX 3090"):
         """
         Glavna logika: Nađi slobodan pod, pokušaj da ga upališ, 
-        ako ne može zbog HW zauzeća na nivou platforme -> podigni novi.
+        ako ne može zbog HW zauzeća na nivou platforme -> podigni novi sa izabranim GPU tipom.
         """
         pods = self.list_my_pods()
         
-        # 1. Tražimo postojeće podove
+        # 1. Tražimo postojeće podove koji odgovaraju tipu (opciono filtriranje)
         for pod in pods:
             # Ako pod već radi, proveri popunjenost
             if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
-                # (Postojeća logika provere HW-a unutar poda...)
                 ports = pod['runtime']['ports']
                 ip = ports[0]['ip'] if ports else None
                 public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
@@ -135,20 +134,18 @@ class RunPodOrchestrator:
                     if self.get_pod_hw_utilization(ip, public_port) == "FREE":
                         return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
             
-            # 2. Ako pod NIJE upaljen, pokušaj da ga upališ (ali pazi na HW exhaustion)
+            # 2. Ako pod NIJE upaljen, pokušaj da ga upališ
             elif pod['desiredStatus'] == 'EXITED':
                 print(f"[Orkestrator] Pokušavam da probudim pod {pod['id']}...")
                 start_result = self.start_pod_safely(pod['id'])
                 
                 if start_result['status'] == "SUCCESS":
-                    # Pod se budi, ali klijent mora da sačeka par sekundi
                     return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
                 else:
-                    # Ovaj pod je "Exhausted", nastavljamo pretragu dalje kroz listu podova
                     continue
 
-        # 3. Ako smo prošli sve podove i nijedan nije FREE ili nije mogao da se upali -> Deploy novog
-        print("[Orkestrator] Nema dostupnih ili startabilnih podova. Skaliranje na novu mašinu...")
-        new_pod_data = self.deploy_new_instance()
+        # 3. Ako nema slobodnih, podigni novi sa izabranim GPU-om
+        print(f"[Orkestrator] Skaliranje na novu {gpu_type} mašinu...")
+        new_pod_data = self.deploy_new_instance(gpu_type)
         new_id = new_pod_data.get('data', {}).get('podDeploy', {}).get('id')
         return {"pod_id": new_id, "address": None, "status": "DEPLOYING_NEW"}
