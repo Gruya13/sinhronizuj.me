@@ -4,7 +4,7 @@ services:
   # 1. REDIS BROKER (Sluzi kao porukar izmedju API-ja i Celery Radnika)
   redis:
     image: redis:alpine
-    container_name: daca_dub_redis
+    container_name: sinhronizuj_me_redis
     ports:
       - "6379:6379"
     volumes:
@@ -14,7 +14,7 @@ services:
   # 2. FASTAPI SERVER (Komunicira sa frontendom/korisnikom)
   api:
     build: .
-    container_name: daca_dub_api
+    container_name: sinhronizuj_me_api
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -30,7 +30,7 @@ services:
   # 3. CELERY WORKER (Magarac koji vuce najtezi teret obrade: Demucs, Whisper, XTTS, Wav2Lip)
   worker:
     build: .
-    container_name: daca_dub_worker
+    container_name: sinhronizuj_me_worker
     # Ogranicavamo concurrency na 1 kako bi obrada bila sekvencijalna i da ne bi preopteretili 8GB VRAM-a
     command: sh -c "celery -A backend.worker.celery_app worker --loglevel=info --concurrency=1 2>&1 | tee /app/worker.log"
     environment:

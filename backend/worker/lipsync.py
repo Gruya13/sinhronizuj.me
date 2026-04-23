@@ -57,7 +57,7 @@ def apply_lip_sync(video_path: str, audio_path: str) -> dict:
     (Ovo zahteva posebnu Wav2Lip instalaciju na serveru)
     """
     print("[FAZA 7] Lica potvrdjena! Iniciram Wav2Lip modul (Lip Sync u toku)...")
-    output_path = os.path.join(settings.TEMP_WORKSPACE, f"daca_dub_lipsync_{uuid.uuid4().hex[:6]}.mp4")
+    output_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_lipsync_{uuid.uuid4().hex[:6]}.mp4")
     
     # Wav2Lip arhitektura se najcesce pokrece iz zasebnog foldera van glavnog koda
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")

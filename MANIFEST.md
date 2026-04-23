@@ -1,4 +1,4 @@
-# Projekat: Daca Dub (Inteligentna AI Sinhronizacija Videa)
+# Projekat: Sinhronizuj.me (Inteligentna AI Sinhronizacija Videa)
 
 **Namena:** Automatizovan sistem za preuzimanje YouTube videa, pametno prevođenje, kloniranje glasa i opcionu vizuelnu sinhronizaciju usana (Lip Sync) na srpski jezik.
 

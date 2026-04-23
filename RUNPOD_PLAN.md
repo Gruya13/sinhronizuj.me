@@ -1,4 +1,4 @@
-# Vodič: Pokretanje Daca Dub sistema na RunPod On-Demand Serveru
+# Vodič: Pokretanje Sinhronizuj.me sistema na RunPod On-Demand Serveru
 
 Pošto AI modeli kao što su *Demucs*, *faster-whisper*, *XTTS v2* i *Wav2Lip* konzumiraju mnogo VRAM-a, najbolje i najisplativije rešenje za obradu dugačkih videa bez blokade sopstvenog kompjutera jeste iznajmljivanje **RunPod On-Demand GPU** instanci.
 
@@ -11,7 +11,7 @@ Evo tačnog, tehničkog plana kako da ovaj GitHub repozitorijum postaviš i podi
 1. Registruj se i dodaj malo kredita na [RunPod.io](https://www.runpod.io/).
 2. Idi na sekciju **Pods** i klikni na dugme **Deploy**.
 3. Izaberi **Secure Cloud** (najstabilnije mašine).
-4. Izaberi grafičku karticu. Preporuka za naš Daca Dub (VRAM Optimizovan):
+4. Izaberi grafičku karticu. Preporuka za naš Sinhronizuj.me (VRAM Optimizovan):
    * **RTX 3090 (24GB VRAM)** - *Najbolji odnos cene i brzine (oko $0.39/h)*.
    * **RTX 4090 (24GB VRAM)** - *Za ultrabrzu obradu*.
    * **RTX A4000 (16GB VRAM)** - *Budget varijanta (oko $0.30/h), savršeno će se uklopiti u naš sekvencijalni model*.
@@ -26,16 +26,16 @@ Evo tačnog, tehničkog plana kako da ovaj GitHub repozitorijum postaviš i podi
 3. Otvori terminal na svom Windowsu/Macu/Linuxu i zalepi SSH komandu da uđeš u server.
    *(Alternativno: Možeš kliknuti na `Connect to Web Terminal` iz samog browsera na RunPodu).*
 
-## Korak 3: Postavljanje Daca Dub koda na Server
+## Korak 3: Postavljanje Sinhronizuj.me koda na Server
 
 Kada se nađeš u crnom terminalu RunPod servera (nalaziš se u `/workspace` folderu, koji jedini čuva podatke posle restarta!), kucaj sledeće komande:
 
 ```bash
 # 1. Kloniraj naš repozitorijum
-git clone https://github.com/Gruya13/daca_dub.git
+git clone https://github.com/Gruya13/sinhronizuj_me.git
 
 # 2. Udji u folder
-cd daca_dub
+cd sinhronizuj_me
 
 # 3. Kreiraj .env fajl i unesi Gemini kljuc
 nano .env
@@ -69,4 +69,4 @@ docker compose logs -f worker
 
 Tvoj Fast API je sada izložen na portu 8000 tog kontejnera. Na platformi RunPod, u delu "Connect", naći ćeš dugme **"HTTP Service"** i port **8000**. Klikom na to otvara ti se tvoj API spolja, odakle možeš započeti sinhronizaciju videa putem POST zahteva.
 
-**NAPOMENA ZA ZAVRŠETAK:** Kada završiš sa obradom videa, skini `final_mix_daca_dub.mp4` iz `temp_workspace` foldera na svoj lični računar. Nakon toga obavezno **STOPIRAJ (Stop Pod)** instancu na RunPodu kako ti ne bi trošila novac dok je ne koristiš!
+**NAPOMENA ZA ZAVRŠETAK:** Kada završiš sa obradom videa, skini `final_mix_sinhronizuj_me.mp4` iz `temp_workspace` foldera na svoj lični računar. Nakon toga obavezno **STOPIRAJ (Stop Pod)** instancu na RunPodu kako ti ne bi trošila novac dok je ne koristiš!

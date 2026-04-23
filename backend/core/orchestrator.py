@@ -30,7 +30,7 @@ class RunPodOrchestrator:
                 uptimeInSeconds
                 ports {
                   ip
-                  isPublic
+                  isIpPublic
                   publicPort
                   privatePort
                 }
@@ -74,14 +74,18 @@ class RunPodOrchestrator:
         
         mutation = """
         mutation {
-          podDeploy(input: {
+          podFindAndDeployOnDemand(input: {
+            cloudType: COMMUNITY,
+            gpuCount: 1,
+            volumeInGb: 50,
+            volumeMountPath: "/workspace",
+            containerDiskInGb: 40,
+            minVcpuCount: 2,
+            minMemoryInGb: 15,
             gpuTypeId: "%s",
-            cloudType: SECURE,
-            containerDiskSize: 40,
-            volumeSize: 50,
+            name: "Sinhronizuj-me-Nitro-%s",
             imageName: "pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime",
-            dockerArgs: "bash -c 'git clone https://github.com/Gruya13/daca_dub.git /app && cd /app && pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8000'",
-            name: "Daca-Dub-Nitro-%s"
+            dockerArgs: "bash -c 'git clone https://github.com/Gruya13/sinhronizuj_me.git /app && cd /app && pip install -r requirements.txt && uvicorn backend.main:app --host 0.0.0.0 --port 8000'"
           }) {
             id
             desiredStatus
@@ -98,7 +102,7 @@ class RunPodOrchestrator:
         """
         mutation = """
         mutation {
-          podStart(input: {podId: "%s"}) {
+          podResume(input: {podId: "%s", gpuCount: 1}) {
             id
             desiredStatus
           }
@@ -110,47 +114,68 @@ class RunPodOrchestrator:
         # Provera da li je RunPod vratio grešku o nedostatku resursa
         if result and 'errors' in result:
             error_msg = result['errors'][0].get('message', "").lower()
-            if "exhausted" in error_msg or "out of capacity" in error_msg:
-                print(f"[Orkestrator] Pod {pod_id} ne može biti pokrenut: Resursi na RunPod-u su iscrpljeni.")
-                return {"status": "EXHAUSTED", "error": error_msg}
+            if "not enough free gpus" in error_msg or "exhausted" in error_msg or "out of capacity" in error_msg:
+                print(f"[Orkestrator] Pod {pod_id} ne može biti pokrenut: Nema slobodnog hardvera kod hosta.")
+                return {"status": "EXHAUSTED", "error": "Nema slobodnih GPU resursa na host mašini za ovaj pod."}
+            else:
+                return {"status": "ERROR", "error": error_msg}
         
         return {"status": "SUCCESS", "data": result}
 
-    def find_best_pod(self, gpu_type="NVIDIA GeForce RTX 3090"):
+    def find_best_pod(self, gpu_type="NVIDIA GeForce RTX 3090", target_pod_id=None):
         """
-        Glavna logika: Nađi slobodan pod, pokušaj da ga upališ, 
-        ako ne može zbog HW zauzeća na nivou platforme -> podigni novi sa izabranim GPU tipom.
+        Glavna logika: Ako je target_pod_id prosleđen, koristi njega. 
+        Inače, traži najbolji pod prema gpu_type ili skalira.
         """
+        # Ako korisnik želi SKALIRANJE (specijalne komande iz UI)
+        if target_pod_id == "NEW_3090":
+            return self._deploy_and_return("NVIDIA GeForce RTX 3090")
+        if target_pod_id == "NEW_4090":
+            return self._deploy_and_return("NVIDIA GeForce RTX 4090")
+
         pods = self.list_my_pods()
         
-        # 1. Tražimo postojeće podove koji odgovaraju izabranom tipu
+        # 1. Tražimo specifičan pod ako je izabran
+        if target_pod_id:
+            pod = next((p for p in pods if p['id'] == target_pod_id), None)
+            if pod:
+                return self._check_and_prepare_pod(pod)
+
+        # 2. Ako nije izabran, tražimo bilo koji slobodan koji odgovara tipu
         for pod in pods:
             pod_gpu = pod.get('machine', {}).get('gpuDisplayName', "")
-            
-            # Ako pod odgovara željenom hardveru
             if gpu_type.lower() in pod_gpu.lower():
-                # Ako pod već radi, proveri popunjenost
-                if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
-                    ports = pod['runtime']['ports']
-                    ip = ports[0]['ip'] if ports else None
-                    public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
-                    if ip and public_port:
-                        address = f"http://{ip}:{public_port}"
-                        if self.get_pod_hw_utilization(ip, public_port) == "FREE":
-                            return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
-                
-                # Ako pod NIJE upaljen, pokušaj da ga upališ
-                elif pod['desiredStatus'] == 'EXITED':
-                    print(f"[Orkestrator] Pokušavam da probudim odgovarajući {gpu_type} pod {pod['id']}...")
-                    start_result = self.start_pod_safely(pod['id'])
-                    
-                    if start_result['status'] == "SUCCESS":
-                        return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
-                    # Ako je EXHAUSTED, nastavljamo dalje (možda imamo drugi isti takav pod)
-                    continue
+                res = self._check_and_prepare_pod(pod)
+                if res: return res
 
-        # 3. Ako nema slobodnih, podigni novi sa izabranim GPU-om
+        # 3. Ako ništa ne nađemo, skaliramo
+        return self._deploy_and_return(gpu_type)
+
+    def _check_and_prepare_pod(self, pod):
+        if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
+            ports = pod['runtime']['ports']
+            ip = ports[0]['ip'] if ports else None
+            public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
+            if ip and public_port:
+                address = f"http://{ip}:{public_port}"
+                if self.get_pod_hw_utilization(ip, public_port) == "FREE":
+                    return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
+        
+        elif pod['desiredStatus'] == 'EXITED':
+            start_result = self.start_pod_safely(pod['id'])
+            if start_result['status'] == "SUCCESS":
+                return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
+            else:
+                # Vraćamo grešku kako bismo je prikazali ili obradili
+                return {"pod_id": pod['id'], "address": None, "status": start_result['status'], "error": start_result.get('error')}
+        return None
+
+    def _deploy_and_return(self, gpu_type):
         print(f"[Orkestrator] Skaliranje na novu {gpu_type} mašinu...")
         new_pod_data = self.deploy_new_instance(gpu_type)
-        new_id = new_pod_data.get('data', {}).get('podDeploy', {}).get('id')
+        new_id = new_pod_data.get('data', {}).get('podFindAndDeployOnDemand', {}).get('id')
+        
+        if not new_id:
+            print("[Orkestrator] Greška pri deploy-u:", new_pod_data)
+            
         return {"pod_id": new_id, "address": None, "status": "DEPLOYING_NEW"}

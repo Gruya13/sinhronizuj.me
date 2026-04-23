@@ -14,7 +14,7 @@ def download_youtube_video(url: str) -> dict:
         os.makedirs(settings.TEMP_WORKSPACE)
 
     try:
-        video_path = "/root/daca_dub/videoplayback.mp4"
+        video_path = "/root/sinhronizuj_me/videoplayback.mp4"
         audio_path = os.path.join(settings.TEMP_WORKSPACE, "test_audio.wav")
         
         # Ekstrahujemo audio pomocu ffmpeg-a (ovo bi inace radio yt-dlp)

@@ -1,4 +1,4 @@
-# Plan za sutra: Daca Dub v1.5 "Dashboard & Granularity"
+# Plan za sutra: Sinhronizuj.me v1.5 "Dashboard & Granularity"
 
 Cilj za sutra je da pretvorimo "crnu kutiju" obrade u transparentan dashboard gde korisnik vidi svaku rečenicu u realnom vremenu.
 

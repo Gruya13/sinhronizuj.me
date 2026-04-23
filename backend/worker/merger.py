@@ -31,7 +31,7 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
         
         print("[FAZA 6] Final Mix zavrsen. Lepim sinhronizovani zvuk na video...")
         
-        final_video_path = os.path.join(settings.TEMP_WORKSPACE, f"daca_dub_final_{uuid.uuid4().hex[:6]}.mp4")
+        final_video_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_final_{uuid.uuid4().hex[:6]}.mp4")
         
         # Ekstremno brza FFmpeg komanda za spajanje:
         # -c:v copy preuzima video frejmove kakvi jesu (nema potrebe za renderingom = 100x brze)

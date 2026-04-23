@@ -8,7 +8,8 @@ const API_BASE_URL = "http://localhost:8000";
 function App() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [taskId, setTaskId] = useState(() => localStorage.getItem('daca_dub_task_id'));
+  const [podLoading, setPodLoading] = useState(false);
+  const [taskId, setTaskId] = useState(() => localStorage.getItem('sinhronizuj_me_task_id'));
   const [status, setStatus] = useState('');
   const [progressData, setProgressData] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
@@ -20,8 +21,36 @@ function App() {
   const [logs, setLogs] = useState("");
   const [showLogs, setShowLogs] = useState(false);
   const [activeApiUrl, setActiveApiUrl] = useState(API_BASE_URL);
+  const [podList, setPodList] = useState([]);
+  const [selectedPodId, setSelectedPodId] = useState(null);
   
   const feedRef = useRef(null);
+
+  const [pollInterval, setPollInterval] = useState(10000);
+
+  const fetchPods = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/orchestrator/list-pods`);
+      const data = await res.json();
+      setPodList(data);
+      if (data.length > 0 && !selectedPodId) {
+        setSelectedPodId(data[0].id);
+      }
+    } catch (err) { console.error("Greška pri listanju podova:", err); }
+  };
+
+  // Fetch pod list sa dinamičkim intervalom
+  useEffect(() => {
+    fetchPods();
+    const interval = setInterval(fetchPods, pollInterval);
+    return () => clearInterval(interval);
+  }, [pollInterval, selectedPodId]);
+
+  // Funkcija za "brzo osvežavanje" nakon akcije
+  const triggerFastPolling = () => {
+    setPollInterval(2000); // Svake 2 sekunde
+    setTimeout(() => setPollInterval(10000), 30000); // Vrati na 10s posle pola minuta
+  };
 
   const STEPS = [
     "Preuzimanje završeno",
@@ -65,9 +94,11 @@ function App() {
   const handleStopPod = async () => {
     if (!window.confirm("Da li ste sigurni da želite da ugasite RunPod instancu?")) return;
     try {
-      await fetch(`${activeApiUrl}/api/v1/runpod/stop`, { method: 'POST' });
-      alert("Komanda za gašenje poslata!");
+      setPodLoading(true);
+      await fetch(`${activeApiUrl}/api/v1/runpod/stop?pod_id=${selectedPodId || ""}`, { method: 'POST' });
+      triggerFastPolling();
     } catch (err) { alert("Greška pri gašenju."); }
+    setPodLoading(false);
   };
 
   useEffect(() => {
@@ -109,12 +140,12 @@ function App() {
             setStatus('Sve završeno!');
             setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
-            localStorage.removeItem('daca_dub_task_id');
+            localStorage.removeItem('sinhronizuj_me_task_id');
             clearInterval(interval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
             setError(data.error || 'Greška pri obradi.');
             setLoading(false);
-            localStorage.removeItem('daca_dub_task_id');
+            localStorage.removeItem('sinhronizuj_me_task_id');
             clearInterval(interval);
           } else {
             if (data.progress_data) {
@@ -134,32 +165,56 @@ function App() {
     e.preventDefault();
     if (!url) return;
 
+    const selectedPod = podList.find(p => p.id === selectedPodId);
+    if (!selectedPod || selectedPod.desiredStatus !== 'RUNNING') {
+      setError("RunPod instanca nije pokrenuta. Kliknite na zeleno dugme 'Start Pod' prvo.");
+      return;
+    }
+
     setLoading(true); setError(null); setVideoUrl(null); 
     setStartTime(Date.now()); setElapsed(0);
-    setStatus('PROVERA INFRASTRUKTURE...');
+    setStatus('POVEZIVANJE SA RUNPODOM...');
 
     try {
-      // 1. Pitamo orkestrator za najbolji pod (šaljemo željeni GPU)
-      const orchRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?gpu_type=${encodeURIComponent(selectedGpu)}`);
+      // 1. Pitamo orkestrator za potvrdu adrese
+      const orchRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?pod_id=${selectedPodId || ""}`);
       const orchData = await orchRes.json();
       
       let targetUrl = activeApiUrl;
 
-      if (orchData.address && orchData.address !== activeApiUrl) {
-        console.log("Migracija na slobodan pod:", orchData.address);
+      if (orchData.status === "EXISTING_FREE" && orchData.address) {
         targetUrl = orchData.address;
         setActiveApiUrl(targetUrl);
-        setStatus('MIGRACIJA NA SLOBODAN GPU...');
-      } else if (orchData.status === "WAKING_UP") {
-        setStatus('BUĐENJE INSTANCE (Sačekajte par sekundi)...');
-        // Čekamo 5 sekundi da RunPod inicijalizuje mrežu
-        await new Promise(r => setTimeout(r, 5000));
-      } else if (orchData.status === "DEPLOYING_NEW") {
-        setStatus('PODIZANJE NOVE INSTANCE (Skaliranje)...');
-        // Ovde bismo mogli uvesti polling dok novi pod ne postane READY
-        setError("Svi GPU resursi su zauzeti. Nova instanca se podiže, osvežite za par minuta.");
-        setLoading(false);
-        return;
+      } else if (orchData.status === "WAKING_UP" || orchData.status === "DEPLOYING_NEW") {
+        setStatus(`INSTANCA SE POKREĆE (${orchData.status})...`);
+        
+        let ready = false;
+        let attempts = 0;
+        while (!ready && attempts < 30) {
+          attempts++;
+          setStatus(`ČEKAM HARDVER... (${attempts * 10}s)`);
+          await new Promise(r => setTimeout(r, 10000));
+          
+          const checkRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/list-pods`);
+          const pods = await checkRes.json();
+          const currentPod = pods.find(p => p.id === orchData.pod_id);
+          
+          if (currentPod && currentPod.desiredStatus === 'RUNNING' && currentPod.runtime?.ports) {
+            const ports = currentPod.runtime.ports;
+            const publicPort = ports.find(p => p.privatePort === 8000)?.publicPort;
+            const ip = ports[0]?.ip;
+            if (ip && publicPort) {
+              targetUrl = `http://${ip}:${publicPort}`;
+              setActiveApiUrl(targetUrl);
+              ready = true;
+              setStatus("POVEZANO! ŠALJEM VIDEO...");
+            }
+          }
+        }
+        
+        if (!ready) {
+          throw new Error("Instanca nije postala spremna na vreme.");
+        }
       }
 
       // 2. Šaljemo zadatak na izabrani pod
@@ -172,7 +227,7 @@ function App() {
       const data = await res.json();
       if (data.status === 'success') {
         setTaskId(data.task_id);
-        localStorage.setItem('daca_dub_task_id', data.task_id);
+        localStorage.setItem('sinhronizuj_me_task_id', data.task_id);
       } else { setError(data.message); setLoading(false); }
     } catch (err) { setError('Greška pri orkestraciji. Proverite RunPod ključeve.'); setLoading(false); }
   };
@@ -195,29 +250,35 @@ function App() {
           <div className="hw-group">
             <div className="gpu-selector-wrapper">
               <select 
-                value={selectedGpu} 
-                onChange={(e) => setSelectedGpu(e.target.value)}
+                value={selectedPodId || ""} 
+                onChange={(e) => setSelectedPodId(e.target.value)}
                 className="gpu-select"
               >
-                <option value="NVIDIA GeForce RTX 3090">RTX 3090 (24GB)</option>
-                <option value="NVIDIA GeForce RTX 4090">RTX 4090 (24GB)</option>
-                <option value="NVIDIA RTX A6000">RTX A6000 (48GB)</option>
+                {podList.length > 0 ? podList.map(pod => (
+                  <option key={pod.id} value={pod.id}>
+                    {pod.name} ({pod.machine?.gpuDisplayName || "CPU"}) - {pod.desiredStatus}
+                  </option>
+                )) : (
+                  <option value="">{loading ? "Učitavanje podova..." : "Nema pronađenih podova (Proverite RunPod ključ)"}</option>
+                )}
               </select>
               <button onClick={() => setShowLogs(!showLogs)} className="logs-toggle-btn">
                 <Terminal size={14} /> Logovi
               </button>
               <button onClick={async () => {
-                setStatus('POKRETANJE MIGRACIJE...');
-                setLoading(true);
+                setPodLoading(true);
                 try {
-                  const res = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?gpu_type=${encodeURIComponent(selectedGpu)}`);
+                  // Tražimo BILO KOJI slobodan pod ili pravimo novi (ne prosleđujemo pod_id)
+                  const res = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod`);
                   const data = await res.json();
-                  if (data.status === "DEPLOYING_NEW") alert("Podižem novu instancu!");
-                  else alert("Pronađen slobodan pod: " + data.pod_id);
-                } catch(e) { alert("Greška pri migraciji."); }
-                setLoading(false);
-              }} className="logs-toggle-btn" style={{color: '#60a5fa'}}>
-                <Database size={14} /> Migracija
+                  if (data && data.pod_id) {
+                    setSelectedPodId(data.pod_id);
+                  }
+                  triggerFastPolling(); 
+                } catch(e) { console.error(e); }
+                setPodLoading(false);
+              }} className="logs-toggle-btn migrate-btn" style={{color: '#60a5fa'}} disabled={podLoading}>
+                {podLoading ? <Loader2 className="spinner" size={14} /> : <Database size={14} />} Wake/Migrate
               </button>
             </div>
             {hwStats?.gpu?.length > 0 ? hwStats.gpu.map((g, i) => (
@@ -233,9 +294,41 @@ function App() {
             )}
             {!hwStats && <span className="eta-text">Povezivanje sa RunPodom...</span>}
           </div>
-          <button onClick={handleStopPod} className="stop-pod-btn" title="Ugasi RunPod">
-            <AlertCircle size={16} /> Stop
-          </button>
+          
+          {/* Dinamička promena tastera na osnovu statusa izabranog poda */}
+          {podList.find(p => p.id === selectedPodId)?.desiredStatus === 'RUNNING' ? (
+            <button onClick={handleStopPod} className="stop-pod-btn" style={{background: '#ef4444'}} disabled={podLoading}>
+              {podLoading ? <Loader2 className="spinner" size={16} /> : <AlertCircle size={16} />} Stop Pod
+            </button>
+          ) : (
+            <button 
+              onClick={async () => {
+                setPodLoading(true);
+                try {
+                  const res = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?pod_id=${selectedPodId || ""}`);
+                  const data = await res.json();
+                  if (data && data.status === "EXHAUSTED") {
+                    if (window.confirm("Ovaj pod je blokiran jer na njegovom serveru trenutno nema slobodnih grafičkih kartica.\n\nDa li želite da sistem sada automatski kreira NOVI pod (migracija)?")) {
+                      setStatus('KREIRANJE NOVOG PODA...');
+                      const newRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod?pod_id=NEW_3090`);
+                      const newData = await newRes.json();
+                      if (newData && newData.pod_id) {
+                        setSelectedPodId(newData.pod_id);
+                      }
+                    }
+                  } else if (data && data.status === "ERROR") {
+                    alert("Greška sa RunPod-om: " + data.error);
+                  }
+                  triggerFastPolling();
+                } catch(e) { console.error("Greška pri paljenju:", e); }
+                setPodLoading(false);
+              }} 
+              className="stop-pod-btn start-pod-btn-green"
+              disabled={podLoading}
+            >
+              {podLoading ? <Loader2 className="spinner" size={16} /> : <Play size={16} />} Start Pod
+            </button>
+          )}
         </div>
 
         {showLogs && (
@@ -249,7 +342,7 @@ function App() {
         )}
 
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1>Daca Dub AI</h1>
+          <h1>Sinhronizuj.me AI</h1>
           <p className="subtitle">Transparentna AI Sinhronizacija v1.5</p>
         </motion.div>
 

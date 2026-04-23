@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings:
-    PROJECT_NAME: str = "Daca Dub"
+    PROJECT_NAME: str = "Sinhronizuj.me"
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     RUNPOD_API_KEY: str = os.getenv("RUNPOD_API_KEY", "")

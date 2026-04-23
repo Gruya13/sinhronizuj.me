@@ -8,7 +8,7 @@ from backend.worker.celery_app import celery_app
 # from backend.worker.tasks import process_video_task (Uklonjeno radi brzine lokalnog orkestratora)
 from backend.core.config import settings
 
-app = FastAPI(title="Daca Dub API", description="API za inteligentnu sinhronizaciju videa", version="1.0.0")
+app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhronizaciju videa", version="1.0.0")
 
 # CORS podešavanja za komunikaciju sa React frontendom
 app.add_middleware(
@@ -28,7 +28,7 @@ class VideoRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"message": "Daca Dub API je aktivan!"}
+    return {"message": "Sinhronizuj.me API je aktivan!"}
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
@@ -78,9 +78,10 @@ def get_hw_stats():
     }
 
 @app.post("/api/v1/runpod/stop")
-def stop_runpod():
+def stop_runpod(pod_id: str = None):
     import requests
-    if not settings.RUNPOD_API_KEY or not settings.RUNPOD_POD_ID:
+    target = pod_id or settings.RUNPOD_POD_ID
+    if not settings.RUNPOD_API_KEY or not target:
         raise HTTPException(status_code=400, detail="RunPod API ključ ili Pod ID nisu konfigurisani.")
     
     query = """
@@ -90,7 +91,7 @@ def stop_runpod():
         desiredStatus
       }
     }
-    """ % settings.RUNPOD_POD_ID
+    """ % target
     
     url = f"https://api.runpod.io/graphql?api_key={settings.RUNPOD_API_KEY}"
     try:
@@ -100,11 +101,19 @@ def stop_runpod():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/orchestrator/find-best-pod")
-def find_best_pod(gpu_type: str = "NVIDIA GeForce RTX 3090"):
+def find_best_pod(gpu_type: str = "NVIDIA GeForce RTX 3090", pod_id: str = None):
     from backend.core.orchestrator import RunPodOrchestrator
     orchestrator = RunPodOrchestrator()
-    best_pod_info = orchestrator.find_best_pod(gpu_type)
+    # Ako je pod_id prazan string, pretvori ga u None
+    target_id = pod_id if pod_id and pod_id.strip() != "" else None
+    best_pod_info = orchestrator.find_best_pod(gpu_type, target_pod_id=target_id)
     return best_pod_info
+
+@app.get("/api/v1/orchestrator/list-pods")
+def list_pods():
+    from backend.core.orchestrator import RunPodOrchestrator
+    orchestrator = RunPodOrchestrator()
+    return orchestrator.list_my_pods()
 
 @app.get("/api/v1/logs")
 def get_worker_logs():

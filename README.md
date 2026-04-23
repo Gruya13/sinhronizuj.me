@@ -1,7 +1,7 @@
-# 🎙️ Daca Dub AI
+# 🎙️ Sinhronizuj.me AI
 ### Inteligentna AI Sinhronizacija na Srpski Jezik
 
-**Daca Dub AI** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju. Koristeći najmodernije modele veštačke inteligencije, sistem omogućava preuzimanje YouTube videa, izolaciju originalnog glasa, preciznu transkripciju, pametan prevod i sintezu govora koja zadržava boju glasa originalnog govornika.
+**Sinhronizuj.me AI** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju. Koristeći najmodernije modele veštačke inteligencije, sistem omogućava preuzimanje YouTube videa, izolaciju originalnog glasa, preciznu transkripciju, pametan prevod i sintezu govora koja zadržava boju glasa originalnog govornika.
 
 ---
 
@@ -67,4 +67,4 @@ Sistem je razvio **Igor Grujović** u sklopu **IG-systems**.
 Razvojni proces i sve izmene su dokumentovane u `istorija_izrade.md`.
 Projekat je optimizovan za rad na **NVIDIA GPU** sa minimum **12GB VRAM-a**.
 
-**Daca Dub AI** - *Jer tehnologija treba da priča tvojim jezikom.*
+**Sinhronizuj.me AI** - *Jer tehnologija treba da priča tvojim jezikom.*
