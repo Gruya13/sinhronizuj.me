@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 from backend.core.config import settings
 
-def translate_segments(segments: list, original_language: str = "en") -> dict:
+def translate_segments(segments: list, original_language: str = "en", progress_callback=None) -> dict:
     """
     Prevodi segmente koristeći Gemini API, sa automatskim fallback-om na lokalni
     Gemma 4 model (preko Ollama).
@@ -46,6 +46,12 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
                 )
             )
             translated_segments = json.loads(response.text)
+            
+            # Obaveštavamo o završenom celom bloku (Gemini ne podržava rečenicu-po-rečenicu lako u ovom formatu)
+            if progress_callback:
+                for i, seg in enumerate(translated_segments):
+                    progress_callback(i, len(translated_segments), "gemini", seg["text"])
+                    
             return {"status": "success", "translated_segments": translated_segments, "engine": "gemini"}
         except Exception as e:
             print(f"[UPOZORENJE] Gemini greška: {str(e)}. Prelazim na lokalnu Gemma 4...")
@@ -56,7 +62,6 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
     
     all_translated_segments = []
     
-    # Dodajemo sistemsku instrukciju prilagodjenu za pojedinacne recenice
     sentence_instruction = """
     TI SI PROFESIONALNI PREVODILAC.
     TVOJ ZADATAK JE DA PREVEDEŠ ZADATU REČENICU NA SRPSKI JEZIK.
@@ -86,10 +91,8 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
             response = requests.post(url, json=data, timeout=30)
             response.raise_for_status()
             
-            # Uzimamo cist tekst odgovora i sklanjamo eventualne praznine i nove redove
             result_text = response.json().get('response', '').strip()
             
-            # Zastita ako vrati prazno
             if not result_text:
                 result_text = original_text
                 
@@ -99,10 +102,13 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
                 "text": result_text
             }
             all_translated_segments.append(translated_segment)
+            
+            # Šaljemo progres za svaku rečenicu
+            if progress_callback:
+                progress_callback(i, len(segments), "ollama", result_text)
                 
         except Exception as e:
             print(f"[GREŠKA] Problem sa Gemma 4 za segment {i + 1}: {str(e)}")
-            # U slucaju greške, vracamo originalni segment (engleski)
             all_translated_segments.append(segment)
 
     return {
@@ -110,3 +116,4 @@ def translate_segments(segments: list, original_language: str = "en") -> dict:
         "translated_segments": all_translated_segments,
         "engine": "ollama_gemma4_sentence_by_sentence"
     }
+

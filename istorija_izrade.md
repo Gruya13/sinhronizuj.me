@@ -25,9 +25,12 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **2026-04-21 11:30** - Rešen problem "pucanja" lokalnog LLM-a (Gemma 4) zbog curenja tokena na dugačkim videima. Uklonjena JSON zavisnost: `translator.py` je redizajniran da procesira tekst rečenicu po rečenicu direktno iz Whisper vremenskih okvira bez zahtevanja JSON formata, čime je robusnost prevoda podignuta na 100%.
 - **2026-04-21 11:45** - Rešen problem "Audio Bleed" (preklapanje glasova). S obzirom da slovenski prevod često traje vremenski duže od engleskog originala, XTTS v2 glasovi su se prelivali. U `tts_engine.py` je ugrađena logika za praćenje trajanja zvučnog segmenta i integrisan je sistemski `ffmpeg atempo` audio filter koji pametno ubrzava predugačak izgenerisani govor u hodu, pakujući ga savršeno u dozvoljeni "time-slot".
 - **2026-04-21 12:15** - **Uspešna migracija na Fish Speech 1.5**. XTTS v2 je zamenjen modernijim Fish Speech modelom radi prirodnijeg srpskog akcenta. Rešeni duboki sistemski konflikti sa NCCL (2.30.3) i Torchvision (0.20.1) bibliotekama na RunPod-u. Kreirana custom arhitektura `firefly_perfect` (512 dim, 8 heads) i optimizovan API server (isključen warm-up bug). Sistem je sada stabilan i spreman za vrhunsku sinhronizaciju.
-- **2026-04-21 14:20** - Privremena pauza zbog dopune sredstava na RunPod-u. Plan za sutra: Testiranje Fish Speech-a u realnom radu i potencijalna migracija sa Gemma modela na **Qwen 3.6 14B** radi još kvalitetnijeg prevoda na srpski jezik.
-- **2026-04-22 10:30** - **Restauracija Fish Speech 1.5 Pipeline-a**: Uspešno rekonstruisan Firefly GAN dekoder i FSQ kvantizer koji su bili uklonjeni iz glavne grane projekta (v2.0.0). Implementiran automatski key remapping za učitavanje težina iz 1.5 checkpointa bez grešaka. Ažuriran API server i `vq_manager.py` za podršku novoj arhitekturi. Potvrđen rad TTS sinteze na srpskom jeziku (API 200). Sistem je sada potpuno funkcionalan sa vrhunskim Fish Speech 1.5 modelom.
-### 2026-04-22: GPU Migracija i Popravka Sinteze
-- Prebačen Fish Speech API na GPU (RTX 3090) radi eliminacije 'neme' sinteze i ubrzanja.
-- Popravljen VQManager za Firefly model (Mel-transformacija i dimenzije tenzora).
-- Implementiran pametni downloader sa podrškom za lokalne fajlove.
+- **2026-04-23 07:30** - **Daca Dub v1.5 "Dashboard & Granularity"**:
+    1. **Granularni Progres:** Implementirano slanje metapodataka o svakoj rečenici iz Celery-ja na Frontend. Korisnik sada vidi "Live Script" feed koji se puni u realnom vremenu.
+    2. **Multi-Instance Robustnost:** Dodat auto-retry mehanizam za Fish Speech API. Ako port 8080 padne, sistem automatski prebacuje na 8081 ili 8082.
+    3. **Premium UI/UX:** 
+        - Dodata **Aurora Background** animacija.
+        - Implementiran vizuelni indikator aktivnih GPU instanci (instance dots).
+        - Dodat pametni tajmer sa **ETA** (procenjeno vreme završetka).
+        - Implementirana **Lektor (Critic) animacija** skeniranja teksta.
+    4. **Stabilizacija:** Poboljšano rukovanje greškama i automatsko resetovanje stanja aplikacije.

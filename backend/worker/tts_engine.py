@@ -26,12 +26,15 @@ def create_reference_audio(vocals_path: str) -> str:
     ref_audio.export(ref_path, format="wav")
     return ref_path
 
-def synthesize_audio(vocals_path: str, translated_segments: list, original_segments: list = None) -> dict:
+def synthesize_audio(vocals_path: str, translated_segments: list, original_segments: list = None, progress_callback=None) -> dict:
     """
     Generise srpski glas koristeci Fish Speech 1.5 API i stapa ga sa vremenskim oznakama.
+    Dodata podrška za multi-instance retry (8080, 8081, 8082).
     """
     if not os.path.exists(vocals_path):
         return {"status": "error", "message": "Fajl sa vokalom nije pronadjen."}
+
+    PORTS = [8080, 8081, 8082]
 
     try:
         ref_path = create_reference_audio(vocals_path)
@@ -40,7 +43,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
         with open(ref_path, "rb") as f:
             ref_audio_data = f.read()
 
-        # OSIGURANJE FORMATA: Ponekad LLM vrati dikt umesto liste
+        # OSIGURANJE FORMATA
         if isinstance(translated_segments, dict):
             found_list = None
             for key, val in translated_segments.items():
@@ -53,7 +56,6 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
         if isinstance(translated_segments, dict):
             translated_segments = [translated_segments]
 
-        # NUKLEARNI FALLBACK: Ako LLM vrati samo listu stringova umesto rečnika
         if isinstance(translated_segments, list) and len(translated_segments) > 0 and not isinstance(translated_segments[0], dict):
             new_segments = []
             for i, text in enumerate(translated_segments):
@@ -101,6 +103,8 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
 
         print(f"[FAZA 5] Pozivam Fish Speech API za {len(translated_segments)} segmenta...")
         
+        processed_segments = []
+
         for i, segment in enumerate(translated_segments):
             text = segment["text"]
             start_time_ms = int(segment["start"] * 1000)
@@ -110,61 +114,66 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
 
             temp_wav = os.path.join(output_dir, f"seg_{i}.wav")
             
-            # --- POZIV FISH SPEECH API-ja ---
-            try:
-                # Fish Speech 1.5 API format (OpenAI kompatibilan ili MsgPack)
-                # Ovde koristimo njihov FastAPI server direktno
-                payload = {
-                    "text": text,
-                    "references": [
-                        {
-                            "audio": base64.b64encode(ref_audio_data).decode("utf-8"),
-                            "text": "" # Opciono: originalni tekst referentnog snimka
-                        }
-                    ],
-                    "top_p": 0.7,
-                    "temperature": 0.7,
-                    "format": "wav"
-                }
-                
-                response = requests.post("http://localhost:8080/v1/tts", json=payload, timeout=60)
-                
-                if response.status_code == 200:
-                    with open(temp_wav, "wb") as f:
-                        f.write(response.content)
-                else:
-                    print(f"   [GREŠKA] Fish API vratio status {response.status_code}: {response.text}")
-                    continue
-
-                generated_segment = AudioSegment.from_wav(temp_wav)
-                
-                # --- PAMETNO UBRZAVANJE (AUDIO FIT) ---
-                target_duration_ms = int((segment["end"] - segment["start"]) * 1000)
-                current_duration_ms = len(generated_segment)
-                
-                if current_duration_ms > target_duration_ms * 1.1:
-                    speed_factor = current_duration_ms / target_duration_ms
-                    if speed_factor > 2.0:
-                        speed_factor = 2.0
-                        
-                    print(f"   [!] Ubrzavam Fish segment {i} za {speed_factor:.2f}x.")
-                    temp_speed_wav = temp_wav.replace(".wav", "_fast.wav")
+            # --- POZIV FISH SPEECH API-ja SA RETRY LOGIKOM ---
+            success = False
+            for port in PORTS:
+                try:
+                    payload = {
+                        "text": text,
+                        "references": [
+                            {
+                                "audio": base64.b64encode(ref_audio_data).decode("utf-8"),
+                                "text": ""
+                            }
+                        ],
+                        "top_p": 0.7,
+                        "temperature": 0.7,
+                        "format": "wav"
+                    }
                     
-                    import subprocess
-                    subprocess.run([
-                        "ffmpeg", "-y", "-i", temp_wav,
-                        "-filter:a", f"atempo={speed_factor}",
-                        temp_speed_wav
-                    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    response = requests.post(f"http://localhost:{port}/v1/tts", json=payload, timeout=30)
                     
-                    generated_segment = AudioSegment.from_wav(temp_speed_wav)
-                    os.remove(temp_speed_wav)
-                
-                final_audio = final_audio.overlay(generated_segment, position=start_time_ms)
-                os.remove(temp_wav)
+                    if response.status_code == 200:
+                        with open(temp_wav, "wb") as f:
+                            f.write(response.content)
+                        success = True
+                        # Javljamo frontendu koja instanca radi
+                        if progress_callback:
+                            progress_callback(i, len(translated_segments), port, text)
+                        break
+                    else:
+                        print(f"   [RETRY] Port {port} vratio {response.status_code}. Pokusavam sledeci...")
+                except Exception as e:
+                    print(f"   [RETRY] Port {port} nedostupan ({str(e)}). Pokusavam sledeci...")
+            
+            if not success:
+                print(f"   [FATAL] Svi portovi su pali na segmentu {i}. Preskacem...")
+                continue
 
-            except Exception as api_err:
-                print(f"   [GREŠKA] Problem sa Fish Speech API-jem na segmentu {i}: {str(api_err)}")
+            generated_segment = AudioSegment.from_wav(temp_wav)
+            
+            # --- PAMETNO UBRZAVANJE (AUDIO FIT) ---
+            target_duration_ms = int((segment["end"] - segment["start"]) * 1000)
+            current_duration_ms = len(generated_segment)
+            
+            if current_duration_ms > target_duration_ms * 1.1:
+                speed_factor = current_duration_ms / target_duration_ms
+                if speed_factor > 2.0:
+                    speed_factor = 2.0
+                    
+                temp_speed_wav = temp_wav.replace(".wav", "_fast.wav")
+                import subprocess
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", temp_wav,
+                    "-filter:a", f"atempo={speed_factor}",
+                    temp_speed_wav
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                
+                generated_segment = AudioSegment.from_wav(temp_speed_wav)
+                os.remove(temp_speed_wav)
+            
+            final_audio = final_audio.overlay(generated_segment, position=start_time_ms)
+            os.remove(temp_wav)
 
         # Ciscenje
         if os.path.exists(ref_path):
@@ -185,3 +194,4 @@ def synthesize_audio(vocals_path: str, translated_segments: list, original_segme
         import traceback
         print(f"DEBUG FISH TTS GRESKA:\n{traceback.format_exc()}")
         return {"status": "error", "message": f"Greska pri Fish TTS sintezi: {str(e)}"}
+

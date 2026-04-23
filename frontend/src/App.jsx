@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
-// API URL postavljen na localhost:8000 (preko SSH tunela ka RunPodu)
 const API_BASE_URL = "http://localhost:8000";
 
 function App() {
@@ -14,6 +13,10 @@ function App() {
   const [progressData, setProgressData] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  
+  const feedRef = useRef(null);
 
   const STEPS = [
     "Preuzimanje završeno",
@@ -25,15 +28,32 @@ function App() {
     "Obrada završena"
   ];
 
-  // Inicijalno ucitavanje ako postoji task u memoriji
   useEffect(() => {
     if (taskId) {
         setLoading(true);
-        setStatus('UČITAVANJE STATUSA...');
+        setStatus('UČITAVANJE...');
+        setStartTime(Date.now());
     }
   }, []);
 
-  // Efekat koji polluje server svake 3 sekunde da proveri status videa
+  // Tajmer za proteklo vreme
+  useEffect(() => {
+    let timer;
+    if (loading && !videoUrl) {
+      timer = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - (startTime || Date.now())) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [loading, videoUrl, startTime]);
+
+  // Scroll to bottom u feed-u
+  useEffect(() => {
+    if (feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
+  }, [progressData?.segments]);
+
   useEffect(() => {
     let interval;
     if (taskId && !videoUrl && !error) {
@@ -44,185 +64,172 @@ function App() {
           
           if (data.status === 'SUCCESS') {
             setVideoUrl(`${API_BASE_URL}${data.video_url}`);
-            setStatus('Završeno!');
+            setStatus('Sve završeno!');
             setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
-            localStorage.removeItem('daca_dub_task_id'); // Cistimo kad zavrsi
+            localStorage.removeItem('daca_dub_task_id');
             clearInterval(interval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
-            setError(data.error || 'Došlo je do greške pri obradi.');
-            setStatus('Greška');
+            setError(data.error || 'Greška pri obradi.');
             setLoading(false);
             localStorage.removeItem('daca_dub_task_id');
             clearInterval(interval);
           } else {
-            // Ako imamo progress_data, koristimo ga
             if (data.progress_data) {
               setProgressData(data.progress_data);
               setStatus(data.progress_data.current_step);
             } else {
-              setStatus(data.status || 'ČEKANJE NA RED...');
+              setStatus(data.status || 'ČEKANJE...');
             }
           }
-        } catch (err) {
-          console.error("Greška pri proveri statusa:", err);
-        }
-      }, 3000);
+        } catch (err) { console.error(err); }
+      }, 2000);
     }
     return () => clearInterval(interval);
   }, [taskId, videoUrl, error]);
 
-  
-  const handleReset = () => {
-    localStorage.removeItem('daca_dub_task_id');
-    setTaskId(null);
-    setLoading(false);
-    setStatus('');
-    setProgressData(null);
-    setError(null);
-    window.location.reload();
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!url) return;
-
-    setLoading(true);
-    setError(null);
-    setVideoUrl(null);
-    setTaskId(null);
-    setProgressData(null);
+    setLoading(true); setError(null); setVideoUrl(null); 
+    setStartTime(Date.now()); setElapsed(0);
     setStatus('POKRETANJE...');
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
       });
-      
       const data = await res.json();
       if (data.status === 'success') {
         setTaskId(data.task_id);
         localStorage.setItem('daca_dub_task_id', data.task_id);
-      } else {
-        setError(data.message || 'Greška pri slanju zahteva.');
-        setLoading(false);
-      }
-    } catch (err) {
-      setError('Nemoguće uspostaviti vezu sa serverom. Da li je API pokrenut?');
-      setLoading(false);
-    }
+      } else { setError(data.message); setLoading(false); }
+    } catch (err) { setError('Greška u konekciji.'); setLoading(false); }
+  };
+
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="glass-container">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1>Daca Dub AI</h1>
-        <p className="subtitle">Inteligentna sinhronizacija na srpski jezik</p>
-      </motion.div>
+    <>
+      <div className="aurora-bg">
+        <div className="aurora-blob" style={{ top: '10%', left: '10%' }}></div>
+        <div className="aurora-blob" style={{ bottom: '10%', right: '10%', background: 'radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, transparent 70%)' }}></div>
+      </div>
 
-      <form onSubmit={handleSubmit} className="input-group">
-        <input 
-          type="url" 
-          placeholder="Unesite YouTube URL..." 
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          disabled={loading}
-          required
-        />
-        <div style={{ display: "flex", gap: "10px", width: "100%" }}>
-          <button type="submit" style={{ flex: 1 }} disabled={loading || !url}>
-            {loading ? (
-              <><Loader2 className="spinner" size={20} /> Obrađujem...</>
-            ) : (
-              <><Play size={20} /> Pokreni Sinhronizaciju</>
-            )}
+      <div className="glass-container">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+          <h1>Daca Dub AI</h1>
+          <p className="subtitle">Transparentna AI Sinhronizacija v1.5</p>
+        </motion.div>
+
+        <form onSubmit={handleSubmit} className="input-group">
+          <input 
+            type="url" placeholder="Zalepite YouTube link..." 
+            value={url} onChange={(e) => setUrl(e.target.value)}
+            disabled={loading} required
+          />
+          <button type="submit" disabled={loading || !url}>
+            {loading ? <><Loader2 className="spinner" size={20} /> Obrađujem...</> : <><Play size={20} /> Pokreni</>}
           </button>
-          {loading && (
-            <button 
-              type="button" 
-              onClick={handleReset} 
-              style={{ background: "#ef4444", width: "auto", padding: "0 15px", color: "white", borderRadius: "8px", border: "none", cursor: "pointer" }}
-              title="Resetuj aplikaciju"
-            >
-              Otkaži
-            </button>
-          )}
-        </div>
-      </form>
+        </form>
 
-      <AnimatePresence>
-        {(loading || status) && !videoUrl && !error && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }} 
-            animate={{ opacity: 1, height: 'auto' }} 
-            exit={{ opacity: 0, height: 0 }}
-            className="status-card"
-          >
-            <div className="progress-section">
-               <div className="progress-header">
-                  <span className="current-step-text">{status}</span>
+        <AnimatePresence>
+          {loading && !videoUrl && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="status-card">
+              
+              {/* Progress Header */}
+              <div className="progress-section">
+                <div className="progress-header">
+                  <span className="current-step-text">
+                    {status.includes("Lektura") && <Loader2 className="spinner" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
+                    {status}
+                  </span>
                   <span className="percent-text">{progressData?.percent || 0}%</span>
-               </div>
-               <div className="progress-bar-container">
-                  <motion.div 
-                    className="progress-bar-fill"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressData?.percent || 0}%` }}
-                  />
-               </div>
-            </div>
+                </div>
+                <div className="progress-bar-container">
+                  <motion.div className="progress-bar-fill" animate={{ width: `${progressData?.percent || 0}%` }} />
+                </div>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '10px'}}>
+                  <span className="eta-text"><Clock size={12} style={{verticalAlign: 'middle'}}/> Proteklo: {formatTime(elapsed)}</span>
+                  {progressData?.percent > 0 && progressData?.percent < 100 && (
+                    <span className="eta-text">ETA: {formatTime(Math.round((elapsed / progressData.percent) * (100 - progressData.percent)))}</span>
+                  )}
+                </div>
+              </div>
 
-            <div className="steps-list">
-              {STEPS.map((step, idx) => {
-                const isCompleted = progressData?.completed_steps?.includes(step);
-                const isCurrent = status.toLowerCase().includes(step.split(' ')[0].toLowerCase());
-                
-                return (
-                  <div key={idx} className={`step-item ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}>
-                    {isCompleted ? (
-                      <CheckCircle2 size={16} className="step-icon success" />
-                    ) : isCurrent ? (
-                      <Loader2 size={16} className="step-icon spinner" />
-                    ) : (
-                      <div className="step-dot" />
-                    )}
-                    <span>{step}</span>
+              {/* Multi-Instance Status */}
+              <div className="instance-dots">
+                {Object.entries(progressData?.active_instances || {8080: "idle", 8081: "idle", 8082: "idle"}).map(([port, state]) => (
+                  <div key={port} className="instance-dot-wrapper">
+                    <div className={`instance-dot ${state === 'active' ? 'active' : ''}`} />
+                    <span className="instance-label">GPU:{port.slice(-1)}</span>
                   </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
+                ))}
+              </div>
 
-        {error && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            className="status-card error-text"
-          >
-            <AlertCircle size={24} style={{ margin: '0 auto 8px' }} />
-            <p>{error}</p>
-          </motion.div>
-        )}
+              {/* Live Script Feed */}
+              {progressData?.segments?.length > 0 && (
+                <div className="segments-feed" ref={feedRef}>
+                  {progressData.segments.map((seg, idx) => (
+                    <motion.div 
+                      key={idx} 
+                      initial={{ opacity: 0, x: -10 }} 
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`segment-card ${seg.status} ${status.includes("Lektura") && seg.status === "pending" ? "active" : ""}`}
+                    >
+                      {status.includes("Lektura") && seg.status === "pending" && idx === progressData.segments.findIndex(s => s.status === "pending") && (
+                        <div className="lektor-scanner" />
+                      )}
+                      <div className="segment-original">{seg.original}</div>
+                      {seg.translated && <div className="segment-translated">{seg.translated}</div>}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
 
-        {videoUrl && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            className="video-container"
-          >
-            <div style={{ padding: '12px', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <CheckCircle2 className="success-text" size={20} />
-              <span className="success-text" style={{ fontWeight: 600 }}>Sinhronizacija završena!</span>
+              {/* Steps Checklist */}
+              <div className="steps-list" style={{marginTop: '20px'}}>
+                {STEPS.map((step, idx) => {
+                  const isCompleted = progressData?.completed_steps?.includes(step);
+                  return (
+                    <div key={idx} className={`step-item ${isCompleted ? 'completed' : ''}`}>
+                      {isCompleted ? <CheckCircle2 size={14} /> : <div className="step-dot" />}
+                      <span>{step}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {videoUrl && (
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="video-container">
+              <div style={{ padding: '15px', background: 'rgba(16, 185, 129, 0.2)', display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                <CheckCircle2 size={20} className="success-text" />
+                <span className="success-text" style={{ fontWeight: 700 }}>SINHRONIZACIJA USPEŠNA!</span>
+              </div>
+              <video src={videoUrl} controls autoPlay />
+              <button onClick={() => window.location.reload()} style={{marginTop: '0', borderRadius: '0'}}>Sinhronizuj novi video</button>
+            </motion.div>
+          )}
+
+          {error && (
+            <div className="status-card error-text">
+              <AlertCircle size={30} style={{marginBottom: '10px'}}/>
+              <p>{error}</p>
+              <button onClick={() => window.location.reload()} style={{marginTop: '15px', background: 'var(--error-color)'}}>Pokušaj ponovo</button>
             </div>
-            <video src={videoUrl} controls autoPlay />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 }
 
 export default App;
+
