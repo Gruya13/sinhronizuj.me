@@ -90,30 +90,65 @@ class RunPodOrchestrator:
         
         return self._query(mutation)
 
+    def start_pod_safely(self, pod_id):
+        """
+        Pokušava da upali pod. Ako je HW zauzet na RunPod nivou (Exhausted),
+        vraća grešku kako bi sistem znao da mora da traži dalje.
+        """
+        mutation = """
+        mutation {
+          podStart(input: {podId: "%s"}) {
+            id
+            desiredStatus
+          }
+        }
+        """ % pod_id
+        
+        result = self._query(mutation)
+        
+        # Provera da li je RunPod vratio grešku o nedostatku resursa
+        if result and 'errors' in result:
+            error_msg = result['errors'][0].get('message', "").lower()
+            if "exhausted" in error_msg or "out of capacity" in error_msg:
+                print(f"[Orkestrator] Pod {pod_id} ne može biti pokrenut: Resursi na RunPod-u su iscrpljeni.")
+                return {"status": "EXHAUSTED", "error": error_msg}
+        
+        return {"status": "SUCCESS", "data": result}
+
     def find_best_pod(self):
         """
-        Glavna logika: Nađi slobodan pod, ako nema - podigni novi.
-        Vraća: {"pod_id": str, "address": str}
+        Glavna logika: Nađi slobodan pod, pokušaj da ga upališ, 
+        ako ne može zbog HW zauzeća na nivou platforme -> podigni novi.
         """
         pods = self.list_my_pods()
         
-        # 1. Tražimo pod koji je već Running i FREE
+        # 1. Tražimo postojeće podove
         for pod in pods:
+            # Ako pod već radi, proveri popunjenost
             if pod['desiredStatus'] == 'RUNNING' and pod['runtime']:
+                # (Postojeća logika provere HW-a unutar poda...)
                 ports = pod['runtime']['ports']
                 ip = ports[0]['ip'] if ports else None
-                # Tražimo javni port koji je mapiran na 8000
                 public_port = next((p['publicPort'] for p in ports if p['privatePort'] == 8000), None)
-                
                 if ip and public_port:
                     address = f"http://{ip}:{public_port}"
-                    status = self.get_pod_hw_utilization(ip, public_port)
-                    if status == "FREE":
-                        print(f"[Orkestrator] Pronadjen slobodan pod: {pod['id']} na adresi {address}")
+                    if self.get_pod_hw_utilization(ip, public_port) == "FREE":
                         return {"pod_id": pod['id'], "address": address, "status": "EXISTING_FREE"}
-        
-        # 2. Ako nema slobodnih, podigni novi (VRAĆA ID, ali klijent će morati da sačeka IP)
-        print("[Orkestrator] Svi podovi su zauzeti ili nedostupni. Podižem novu instancu...")
+            
+            # 2. Ako pod NIJE upaljen, pokušaj da ga upališ (ali pazi na HW exhaustion)
+            elif pod['desiredStatus'] == 'EXITED':
+                print(f"[Orkestrator] Pokušavam da probudim pod {pod['id']}...")
+                start_result = self.start_pod_safely(pod['id'])
+                
+                if start_result['status'] == "SUCCESS":
+                    # Pod se budi, ali klijent mora da sačeka par sekundi
+                    return {"pod_id": pod['id'], "address": None, "status": "WAKING_UP"}
+                else:
+                    # Ovaj pod je "Exhausted", nastavljamo pretragu dalje kroz listu podova
+                    continue
+
+        # 3. Ako smo prošli sve podove i nijedan nije FREE ili nije mogao da se upali -> Deploy novog
+        print("[Orkestrator] Nema dostupnih ili startabilnih podova. Skaliranje na novu mašinu...")
         new_pod_data = self.deploy_new_instance()
         new_id = new_pod_data.get('data', {}).get('podDeploy', {}).get('id')
         return {"pod_id": new_id, "address": None, "status": "DEPLOYING_NEW"}

@@ -133,6 +133,10 @@ function App() {
         targetUrl = orchData.address;
         setActiveApiUrl(targetUrl);
         setStatus('MIGRACIJA NA SLOBODAN GPU...');
+      } else if (orchData.status === "WAKING_UP") {
+        setStatus('BUĐENJE INSTANCE (Sačekajte par sekundi)...');
+        // Čekamo 5 sekundi da RunPod inicijalizuje mrežu
+        await new Promise(r => setTimeout(r, 5000));
       } else if (orchData.status === "DEPLOYING_NEW") {
         setStatus('PODIZANJE NOVE INSTANCE (Skaliranje)...');
         // Ovde bismo mogli uvesti polling dok novi pod ne postane READY
