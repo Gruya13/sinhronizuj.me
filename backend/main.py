@@ -97,3 +97,10 @@ def stop_runpod():
         return res.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/orchestrator/find-best-pod")
+def find_best_pod():
+    from backend.core.orchestrator import RunPodOrchestrator
+    orchestrator = RunPodOrchestrator()
+    best_pod_id = orchestrator.find_best_pod()
+    return {"best_pod_id": best_pod_id}

@@ -111,14 +111,39 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId, videoUrl, error]);
 
+  const [activeApiUrl, setActiveApiUrl] = useState(API_BASE_URL);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!url) return;
+
     setLoading(true); setError(null); setVideoUrl(null); 
     setStartTime(Date.now()); setElapsed(0);
-    setStatus('POKRETANJE...');
+    setStatus('PROVERA INFRASTRUKTURE...');
+
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
+      // 1. Pitamo orkestrator za najbolji pod
+      const orchRes = await fetch(`${activeApiUrl}/api/v1/orchestrator/find-best-pod`);
+      const orchData = await orchRes.json();
+      
+      let targetUrl = activeApiUrl;
+
+      if (orchData.address && orchData.address !== activeApiUrl) {
+        console.log("Migracija na slobodan pod:", orchData.address);
+        targetUrl = orchData.address;
+        setActiveApiUrl(targetUrl);
+        setStatus('MIGRACIJA NA SLOBODAN GPU...');
+      } else if (orchData.status === "DEPLOYING_NEW") {
+        setStatus('PODIZANJE NOVE INSTANCE (Skaliranje)...');
+        // Ovde bismo mogli uvesti polling dok novi pod ne postane READY
+        setError("Svi GPU resursi su zauzeti. Nova instanca se podiže, osvežite za par minuta.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Šaljemo zadatak na izabrani pod
+      setStatus('POKRETANJE...');
+      const res = await fetch(`${targetUrl}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -128,7 +153,7 @@ function App() {
         setTaskId(data.task_id);
         localStorage.setItem('daca_dub_task_id', data.task_id);
       } else { setError(data.message); setLoading(false); }
-    } catch (err) { setError('Greška u konekciji.'); setLoading(false); }
+    } catch (err) { setError('Greška pri orkestraciji. Proverite RunPod ključeve.'); setLoading(false); }
   };
 
   const formatTime = (s) => {
