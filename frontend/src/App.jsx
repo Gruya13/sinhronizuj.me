@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
@@ -19,6 +19,19 @@ function App() {
   const [selectedGpu, setSelectedGpu] = useState("NVIDIA GeForce RTX 3090");
   const [logs, setLogs] = useState("");
   const [showLogs, setShowLogs] = useState(false);
+  const [activeApiUrl, setActiveApiUrl] = useState(API_BASE_URL);
+  
+  const feedRef = useRef(null);
+
+  const STEPS = [
+    "Preuzimanje završeno",
+    "Vokal izolovan",
+    "Govor prepoznat",
+    "Tekst preveden",
+    "Glas generisan",
+    "Video spojen",
+    "Obrada završena"
+  ];
 
   // HW Monitoring polling
   useEffect(() => {
@@ -52,20 +65,10 @@ function App() {
   const handleStopPod = async () => {
     if (!window.confirm("Da li ste sigurni da želite da ugasite RunPod instancu?")) return;
     try {
-      await fetch(`${API_BASE_URL}/api/v1/runpod/stop`, { method: 'POST' });
+      await fetch(`${activeApiUrl}/api/v1/runpod/stop`, { method: 'POST' });
       alert("Komanda za gašenje poslata!");
     } catch (err) { alert("Greška pri gašenju."); }
   };
-
-  const STEPS = [
-    "Preuzimanje završeno",
-    "Vokal izolovan",
-    "Govor prepoznat",
-    "Tekst preveden",
-    "Glas generisan",
-    "Video spojen",
-    "Obrada završena"
-  ];
 
   useEffect(() => {
     if (taskId) {
@@ -98,11 +101,11 @@ function App() {
     if (taskId && !videoUrl && !error) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/v1/status/${taskId}`);
+          const res = await fetch(`${activeApiUrl}/api/v1/status/${taskId}`);
           const data = await res.json();
           
           if (data.status === 'SUCCESS') {
-            setVideoUrl(`${API_BASE_URL}${data.video_url}`);
+            setVideoUrl(`${activeApiUrl}${data.video_url}`);
             setStatus('Sve završeno!');
             setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
@@ -125,11 +128,7 @@ function App() {
       }, 2000);
     }
     return () => clearInterval(interval);
-  }, [taskId, videoUrl, error]);
-
-  const [activeApiUrl, setActiveApiUrl] = useState(API_BASE_URL);
-
-  const feedRef = useRef(null);
+  }, [taskId, videoUrl, error, activeApiUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
