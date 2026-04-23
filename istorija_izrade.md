@@ -26,8 +26,5 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **2026-04-21 11:45** - Rešen problem "Audio Bleed" (preklapanje glasova). S obzirom da slovenski prevod često traje vremenski duže od engleskog originala, XTTS v2 glasovi su se prelivali. U `tts_engine.py` je ugrađena logika za praćenje trajanja zvučnog segmenta i integrisan je sistemski `ffmpeg atempo` audio filter koji pametno ubrzava predugačak izgenerisani govor u hodu, pakujući ga savršeno u dozvoljeni "time-slot".
 - **2026-04-21 12:15** - **Uspešna migracija na Fish Speech 1.5**. XTTS v2 je zamenjen modernijim Fish Speech modelom radi prirodnijeg srpskog akcenta. Rešeni duboki sistemski konflikti sa NCCL (2.30.3) i Torchvision (0.20.1) bibliotekama na RunPod-u. Kreirana custom arhitektura `firefly_perfect` (512 dim, 8 heads) i optimizovan API server (isključen warm-up bug). Sistem je sada stabilan i spreman za vrhunsku sinhronizaciju.
 - **2026-04-23 07:30** - **Daca Dub v1.5 "Dashboard & Granularity"**: Granularni progres, Live Script feed i premium UI/UX.
-- **2026-04-23 07:45** - **Advanced Smart Orchestration & Monitoring**:
-    1. **GPU Selector:** Dodata mogućnost izbora tipa instance (RTX 3090, 4090, A6000) direktno pre pokretanja zadatka.
-    2. **Live Logs:** Implementiran "Terminal" panel u dashboard-u koji u realnom vremenu prikazuje logove Celery worker-a.
-    3. **Resource Handling:** Orkestrator automatski hendluje "Exhausted" platform-level greške i prebacuje na slobodne resurse.
-    4. **API Key Sync:** Potvrđeno da su `RUNPOD_API_KEY` i `RUNPOD_POD_ID` neophodni u `.env` za rad cloud funkcija.
+- **2026-04-23 07:45** - **Advanced Smart Orchestration & Monitoring**: GPU Selector, Live Logs i Exhaustion handling.
+- **2026-04-23 07:50** - **Infrastructure Setup:** Uspešno povezan RunPod API ključ i konfigurisan defaultni Pod ID (`4sw39...`). Sistem je spreman za automatsku orkestraciju.
