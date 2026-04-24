@@ -95,7 +95,7 @@ async def synthesize_audio_async(vocals_path: str, translated_segments: list) ->
             final_audio = final_audio.overlay(seg_audio, position=int(orig_seg["start"] * 1000))
             os.remove(temp_path)
 
-    final_output_path = os.path.join(settings.TEMP_WORKSPACE, f"runpod_dub_{uuid.uuid4().hex[:6]}.wav")
+    final_output_path = os.path.join(settings.TEMP_WORKSPACE, f"runpod_sinhronizuj_{uuid.uuid4().hex[:6]}.wav")
     final_audio.export(final_output_path, format="wav")
     
     # Čišćenje reference

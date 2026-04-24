@@ -1,11 +1,11 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: daca-db
+    container_name: sinhronizuj-db
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-daca_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-daca_pass_2026}
+      POSTGRES_USER: ${POSTGRES_USER:-sinhronizuj_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}
       POSTGRES_DB: ${POSTGRES_DB:-sinhronizuj_me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -14,7 +14,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: daca-redis
+    container_name: sinhronizuj-redis
     restart: always
     ports:
       - "6379:6379"
@@ -22,7 +22,7 @@ services:
 
   minio:
     image: minio/minio
-    container_name: daca-minio
+    container_name: sinhronizuj-minio
     restart: always
     ports:
       - "9000:9000"

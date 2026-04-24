@@ -1,49 +1,43 @@
 # 🎙️ Sinhronizuj.me AI
-### Inteligentna AI Sinhronizacija na Srpski Jezik
+### Hibridna AI Sinhronizacija na Srpski Jezik (V2)
 
-**Sinhronizuj.me AI** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju. Koristeći najmodernije modele veštačke inteligencije, sistem omogućava preuzimanje YouTube videa, izolaciju originalnog glasa, preciznu transkripciju, pametan prevod i sintezu govora koja zadržava boju glasa originalnog govornika.
+**Sinhronizuj.me AI** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju. Koristeći modernu hibridnu arhitekturu, sistem kombinuje stabilnost **Hetzner Control Plane-a** sa sirovom snagom **RunPod Serverless GPU** radnika.
 
 ---
 
 ## 🚀 Ključne Karakteristike
-- **Voice Cloning (Kloniranje glasa):** Korišćenjem *Fish Speech 1.5* i restaurirane *Firefly GAN* arhitekture, postižemo 1:1 sličnost sa originalnim govornikom na srpskom jeziku.
-- **Smart Translation:** Integracija sa *Qwen 2.5 14B* modelom omogućava prirodan prevod koji razume kontekst i tehničke termine.
-- **Vocal Isolation:** *Demucs v4* odvaja glas od muzike, omogućavajući kristalno čistu podlogu za novu sinhronizaciju.
-- **Lip Sync & Face Fix:** Opciona vizuelna sinhronizacija usana pomoću *Wav2Lip* i izoštravanje lica sa *GFPGAN*.
-- **Premium UI:** Moderan i responzivan React frontend sa animacijama u realnom vremenu.
+- **Hybrid Architecture:** Kontrolna logika i storage na Hetzner VPS-u, teška obrada (Whisper, Qwen, TTS) na RunPod Serverless GPU-ovima.
+- **TOON Format:** Token-Oriented Object Notation omogućava ultra-brzu komunikaciju sa LLM-om i uštedu tokena do 40%.
+- **Multimodalni Kontekst:** Sistem ekstrahuje vizuelne frejmove videa (sprite-sheets) koje AI model "gleda" radi preciznijeg prevoda.
+- **Voice Cloning:** Korišćenjem *Fish Speech 1.5*, postižemo 1:1 sličnost sa originalnim govornikom.
+- **Studio Interface:** Moderni React frontend sa uporednim prikazom originala i prevoda u realnom vremenu.
 
 ---
 
 ## 🛠️ Tehnološki Stack
-- **Frontend:** React, Vite, Framer Motion, Lucide Icons.
-- **Backend:** FastAPI, Celery (Task Queue), Redis (Message Broker).
-- **Infrastruktura:** RunPod (Cloud GPU), SSH Tunneling, SOCKS5 Proxy podrška.
+- **Frontend:** React (Vite), Framer Motion, Lucide Icons.
+- **Control Plane:** FastAPI, Celery, Redis, PostgreSQL, MinIO (S3 Storage) - Hostovano na Hetzner VPS-u.
+- **Compute Plane:** RunPod Serverless (RTX 3090/4090/A6000).
 - **AI Pipeline:**
   - **Download:** `yt-dlp`
-  - **Audio Sep:** `Demucs v4`
-  - **STT:** `Faster-Whisper (Large-v3)`
-  - **LLM:** `Qwen 2.5 14B` (Ollama)
-  - **TTS:** `Fish Speech 1.5` + `Firefly GAN (Legacy Restoration)`
-  - **Video:** `FFmpeg`, `OpenCV`, `Wav2Lip`
+  - **Vocal Separation:** `Demucs v4`
+  - **Transcription:** `Faster-Whisper` (RunPod Serverless)
+  - **Translation:** `Qwen 32B/35B` via vLLM (TOON Format)
+  - **TTS:** `Fish Speech 1.5` (RunPod Serverless)
+  - **Video:** `FFmpeg` (Stream Copy optimization)
 
 ---
 
-## 📦 Instalacija i Pokretanje
+## 📦 Pokretanje
 
-### 1. Serverska strana (RunPod/GPU)
-Potrebno je instalirati zavisnosti i pokrenuti servise:
+### 1. Backend (Hetzner)
+Sistem se pokreće putem Docker Compose-a na VPS-u:
 ```bash
-# Pokretanje svih servisa (API, Worker, Fish Speech)
-./start_runpod.sh
+cd infra/hetzner
+docker compose up -d
 ```
 
-### 2. Klijentska strana (Lokalno)
-Uspostavite SSH tunel ka RunPodu:
-```bash
-ssh -L 8000:localhost:8000 -L 8080:localhost:8080 root@<IP_ADRESA> -p <PORT>
-```
-
-Pokrenite Frontend:
+### 2. Frontend (Lokalno/VPS)
 ```bash
 cd frontend
 npm run dev
@@ -51,20 +45,18 @@ npm run dev
 
 ---
 
-## 📐 Arhitektura Pipeline-a
-1. **Faza 1:** Preuzimanje videa (ili korišćenje lokalnog `.mp4` za bypass).
-2. **Faza 2:** Separacija vokala i pozadinske muzike.
-3. **Faza 3:** Transkripcija originalnog govora sa tajminzima.
-4. **Faza 4:** Kontekstualni prevod na srpski jezik.
-5. **Faza 5:** Sinteza srpskog govora uz kloniranje glasa (Fish Speech).
-6. **Faza 6:** Opcioni Lip Sync (samo za kadrove gde je detektovano lice).
-7. **Faza 7:** Finalni miks zvuka i slike (Audio Ducking efekat).
+## 📐 Faze Obrade
+1. **Faza 1 (Download):** Preuzimanje i inicijalna provera.
+2. **Faza 2 (Preprocessing):** Separacija vokala i ekstrakcija vizuelnog konteksta.
+3. **Faza 3 (Transcription):** RunPod Whisper prepoznaje govor.
+4. **Faza 4 (Translation):** Qwen analizira tekst i sliku, generiše TOON prevod.
+5. **Faza 5 (Synthesis):** Paralelna sinteza glasa na RunPodu.
+6. **Faza 6 (Mix):** Finalno spajanje slike i zvuka (ffmpeg copy mode).
 
 ---
 
-## 📝 Autor i Istorija
-Sistem je razvio **Igor Grujović** u sklopu **IG-systems**.
-Razvojni proces i sve izmene su dokumentovane u `istorija_izrade.md`.
-Projekat je optimizovan za rad na **NVIDIA GPU** sa minimum **12GB VRAM-a**.
+## 📝 Dokumentacija
+- `istorija_izrade.md`: Hronološki dnevnik svih izmena.
+- `PLAN_ARHITEKTURE_V2.md`: Detaljan opis hibridnog sistema.
 
 **Sinhronizuj.me AI** - *Jer tehnologija treba da priča tvojim jezikom.*
