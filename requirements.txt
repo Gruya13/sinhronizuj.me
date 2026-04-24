@@ -15,3 +15,5 @@ pydub
 TTS
 opencv-python
 torchcodec
+httpx
+boto3

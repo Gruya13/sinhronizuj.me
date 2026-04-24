@@ -5,7 +5,7 @@ import os
 @celery_app.task(bind=True, name="process_video_task")
 def process_video_task(self, video_url: str):
     """
-    Korenski Celery zadatak koji vodi Fazu 1-7 sa granularnim praćenjem.
+    Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom RunPod arhitekturom.
     """
     progress_metadata = {
         'current_step': "Inicijalizacija...",
@@ -21,7 +21,6 @@ def process_video_task(self, video_url: str):
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if active_port:
-            # Resetujemo sve i palimo samo aktivni
             for p in progress_metadata['active_instances']:
                 progress_metadata['active_instances'][p] = "idle"
             if active_port in progress_metadata['active_instances']:
@@ -43,12 +42,11 @@ def process_video_task(self, video_url: str):
     update_progress(completed_step="Vokal izolovan")
     
     # --- FAZA 3: Transkripcija ---
-    update_progress("Prepoznavanje govora...", 40)
+    update_progress("Prepoznavanje govora (Whisper RunPod)...", 40)
     from backend.worker.transcriber import transcribe_audio
     transcription_result = transcribe_audio(sep_result["vocals_path"])
     if transcription_result["status"] == "error": return transcription_result
     
-    # Inicijalizujemo segmente za UI
     segments_ui = []
     for i, s in enumerate(transcription_result["segments"]):
         segments_ui.append({
@@ -59,43 +57,43 @@ def process_video_task(self, video_url: str):
         })
     update_progress(completed_step="Govor prepoznat", segments=segments_ui)
     
-    # --- FAZA 4: Prevod ---
-    update_progress("Prevođenje i Lektura...", 55)
+    # --- FAZA 4: Vizuelni Kontekst i Prevod ---
+    update_progress("Generisanje vizuelnog konteksta...", 50)
+    from backend.worker.preprocessor import extract_visual_context, upload_to_minio
+    preview_path = extract_visual_context(result["video_path"])
+    
+    visual_context_url = None
+    if preview_path:
+        visual_context_url = upload_to_minio(preview_path)
+    
+    update_progress("Prevođenje (RunPod + TOON)...", 60)
     from backend.worker.translator import translate_segments
     
-    def translation_callback(idx, total, engine, translated_text):
-        if idx < len(segments_ui):
-            segments_ui[idx]["translated"] = translated_text
-            segments_ui[idx]["status"] = "translated"
-            # Blago povećavamo procenat unutar faze (55-70%)
-            sub_percent = 55 + int((idx / total) * 15)
-            update_progress(percentage=sub_percent, segments=segments_ui)
-
     translation_result = translate_segments(
-        transcription_result["segments"], 
-        progress_callback=translation_callback
+        transcription_result["segments"]
+        # Budući upgrade: visual_context_url=visual_context_url
     )
     if translation_result["status"] == "error": return translation_result
-    update_progress(completed_step="Tekst preveden", percentage=70)
+    
+    # Ažuriramo UI segmente sa prevodom
+    for i, s in enumerate(translation_result["translated_segments"]):
+        if i < len(segments_ui):
+            segments_ui[i]["translated"] = s["text"]
+            segments_ui[i]["status"] = "translated"
+            
+    update_progress(completed_step="Tekst preveden", percentage=70, segments=segments_ui)
     
     # --- FAZA 5: Sinteza Govora ---
-    update_progress("Sinteza glasa (Multi-instance)...", 70)
+    update_progress("Sinteza glasa (RunPod TTS)...", 75)
     from backend.worker.tts_engine import synthesize_audio
     
-    def tts_callback(idx, total, port, text):
-        if idx < len(segments_ui):
-            segments_ui[idx]["status"] = "synthesized"
-            sub_percent = 70 + int((idx / total) * 15)
-            update_progress(percentage=sub_percent, segments=segments_ui, active_port=port)
-
     tts_result = synthesize_audio(
         sep_result["vocals_path"], 
         translation_result["translated_segments"],
-        transcription_result["segments"],
-        progress_callback=tts_callback
+        transcription_result["segments"]
     )
     if tts_result["status"] == "error": return tts_result
-    update_progress(completed_step="Glas generisan", percentage=85, active_port=None)
+    update_progress(completed_step="Glas generisan", percentage=85)
     
     # --- FAZA 6: Spajanje ---
     update_progress("Finalni Mix...", 90)
@@ -126,4 +124,3 @@ def process_video_task(self, video_url: str):
         "url": video_url,
         "final_video_path": final_output
     }
-

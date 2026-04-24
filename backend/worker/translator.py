@@ -1,119 +1,125 @@
 import json
-import requests
-from google import genai
-from google.genai import types
+import asyncio
+import httpx
+import re
+from typing import List, Dict, Any
 from backend.core.config import settings
 
-def translate_segments(segments: list, original_language: str = "en", progress_callback=None) -> dict:
-    """
-    Prevodi segmente koristeći Gemini API, sa automatskim fallback-om na lokalni
-    Gemma 4 model (preko Ollama).
-    """
-    # Priprema payload-a i instrukcija
-    payload = json.dumps(segments, ensure_ascii=False)
-    system_instruction = """
-    TI SI PROFESIONALNI PREVODILAC I JSON PARSER.
-    TVOJ ZADATAK JE DA PREVEDEŠ POLJE 'text' NA SRPSKI JEZIK.
-    
-    STRIKTNA PRAVILA:
-    1. IZLAZ MORA BITI ISKLJUČIVO VALIDAN JSON NIZ (ARRAY).
-    2. NEMOJ DODAVATI NIKAKAV UVOD, OBJAŠNJENJA ILI ZAKLJUČAK.
-    3. POLJA 'start' I 'end' SU SVETINJA - NE SMEŠ IH MENJATI NI ZA JEDNU MILISEKUNDU.
-    4. BROJ SEGMENATA U IZLAZU MORA BITI IDENTIČAN BROJU SEGMENATA U ULAZU.
-    5. PREVEDI SAMO SADRŽAJ POLJA 'text'.
-    6. STRUČNE TERMINE IZ IT SEKTORA (API, Frontend, Backend, Pod, itd.) OSTAVI U ORIGINALU.
-    7. KORISTI PRIRODAN SRPSKI JEZIK.
-    
-    FORMAT IZLAZA:
-    [
-      {"start": 0.0, "end": 2.0, "text": "Prevedeni tekst"},
-      ...
-    ]
-    """
+# TOON Specifikacija: [ID] [START] [END] [TEXT]
+TOON_HEADER = "# [START]\n# ID | START | END | ORIGINAL_TEXT\n"
+TOON_FOOTER = "# [END]"
 
-    # 1. Pokušaj sa Gemini API-jem (ako postoji ključ)
-    if settings.GEMINI_API_KEY:
-        try:
-            print("[FAZA 4] Prevođenje: Gemini API (Gemma 4 logika)...")
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=payload,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.1,
-                    response_mime_type="application/json"
-                )
-            )
-            translated_segments = json.loads(response.text)
-            
-            # Obaveštavamo o završenom celom bloku (Gemini ne podržava rečenicu-po-rečenicu lako u ovom formatu)
-            if progress_callback:
-                for i, seg in enumerate(translated_segments):
-                    progress_callback(i, len(translated_segments), "gemini", seg["text"])
-                    
-            return {"status": "success", "translated_segments": translated_segments, "engine": "gemini"}
-        except Exception as e:
-            print(f"[UPOZORENJE] Gemini greška: {str(e)}. Prelazim na lokalnu Gemma 4...")
+def to_toon(segments: List[Dict[str, Any]]) -> str:
+    """Pretvara listu segmenata u TOON format (Token-Oriented Object Notation)."""
+    lines = [TOON_HEADER]
+    for idx, s in enumerate(segments):
+        # Čistimo tekst od novih redova da ne pokvarimo tabelu
+        text = s['text'].replace('\n', ' ').strip()
+        lines.append(f"{idx} | {s['start']:.2f} | {s['end']:.2f} | {text}")
+    lines.append(TOON_FOOTER)
+    return "\n".join(lines)
 
-    # 2. Fallback na lokalni Ollama (Gemma 4)
-    print("[FAZA 4] Prevođenje: Lokalna Gemma 4 (Rečenicu po rečenicu)...")
-    url = "http://localhost:11434/api/generate"
+def from_toon(toon_str: str, original_segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Parsira TOON odgovor i vraća listu prevedenih segmenata."""
+    translated = []
+    # Tražimo linije koje počinju brojem (ID)
+    pattern = re.compile(r"^(\d+)\s*\|\s*[\d\.]+\s*\|\s*[\d\.]+\s*\|\s*(.*)$")
     
-    all_translated_segments = []
+    lines = toon_str.strip().split('\n')
+    translated_map = {}
     
-    sentence_instruction = """
-    TI SI PROFESIONALNI PREVODILAC.
-    TVOJ ZADATAK JE DA PREVEDEŠ ZADATU REČENICU NA SRPSKI JEZIK.
-    STRIKTNA PRAVILA:
-    1. VRATI SAMO I ISKLJUČIVO PREVEDENI TEKST.
-    2. BEZ UVODA, BEZ OBJAŠNJENJA, BEZ NAVODNIKA OKO TEKSTA.
-    3. AKO NEMA ŠTA DA SE PREVEDE (NPR. SAMO ZNAKOVI), VRATI ORIGINAL.
-    """
-    
-    for i, segment in enumerate(segments):
-        original_text = segment.get("text", "").strip()
+    for line in lines:
+        match = pattern.match(line.strip())
+        if match:
+            idx = int(match.group(1))
+            text = match.group(2).strip()
+            translated_map[idx] = text
+
+    # Spajamo sa originalnim segmentima da očuvamo metapodatke
+    for i, orig in enumerate(original_segments):
+        new_text = translated_map.get(i, orig['text'])
+        translated.append({
+            **orig,
+            "text": new_text
+        })
         
-        if not original_text:
-            all_translated_segments.append(segment)
-            continue
-            
-        full_prompt = f"{sentence_instruction}\n\nTekst za prevod:\n{original_text}"
-        
-        data = {
-            "model": "gemma4",
-            "prompt": full_prompt,
-            "stream": False
+    return translated
+
+async def runpod_generate(prompt: str, visual_context_url: str = None) -> str:
+    """Šalje zahtev RunPod Serverless endpoint-u."""
+    if not settings.RUNPOD_TRANSLATOR_ID:
+        # Fallback na mock ako nema endpoint ID-a za testiranje
+        print("[WARNING] RUNPOD_TRANSLATOR_ID nije definisan. Koristim mock.")
+        return "0 | 0.00 | 0.00 | Prevedeni tekst (MOCK)"
+
+    url = f"https://api.runpod.ai/v2/{settings.RUNPOD_TRANSLATOR_ID}/runsync"
+    headers = {
+        "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Qwen 32B Multimodal Prompt
+    payload = {
+        "input": {
+            "prompt": prompt,
+            "visual_context": visual_context_url,
+            "max_new_tokens": 4096,
+            "temperature": 0.2
         }
-        
-        try:
-            print(f"   -> Prevodim segment {i + 1} od {len(segments)}...")
-            response = requests.post(url, json=data, timeout=30)
-            response.raise_for_status()
-            
-            result_text = response.json().get('response', '').strip()
-            
-            if not result_text:
-                result_text = original_text
-                
-            translated_segment = {
-                "start": segment["start"],
-                "end": segment["end"],
-                "text": result_text
-            }
-            all_translated_segments.append(translated_segment)
-            
-            # Šaljemo progres za svaku rečenicu
-            if progress_callback:
-                progress_callback(i, len(segments), "ollama", result_text)
-                
-        except Exception as e:
-            print(f"[GREŠKA] Problem sa Gemma 4 za segment {i + 1}: {str(e)}")
-            all_translated_segments.append(segment)
-
-    return {
-        "status": "success",
-        "translated_segments": all_translated_segments,
-        "engine": "ollama_gemma4_sentence_by_sentence"
     }
 
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=payload, timeout=600)
+        response.raise_for_status()
+        result = response.json()
+        
+        if result.get("status") == "COMPLETED":
+            return result["output"]
+        else:
+            raise Exception(f"RunPod greška: {result}")
+
+async def translate_chunk(chunk_segments: List[Dict[str, Any]], visual_context_url: str = None) -> List[Dict[str, Any]]:
+    """Obrađuje jedan blok (chunk) segmenata."""
+    toon_input = to_toon(chunk_segments)
+    
+    system_prompt = (
+        "ZADATAK: Profesionalni prevodilac na SRPSKI jezik (LATINICA).\n"
+        "FORMAT: Odgovori isključivo u TOON formatu. Ne menjaj ID-eve.\n"
+        "STIL: Prirodan srpski, koristi š, ć, č, ž, đ. Ne prevodi brendove.\n"
+        "INPUT TOON:\n"
+    )
+    
+    full_prompt = f"{system_prompt}\n{toon_input}\n\nPREVEDI KOLONU ORIGINAL_TEXT:"
+    
+    try:
+        toon_output = await runpod_generate(full_prompt, visual_context_url)
+        return from_toon(toon_output, chunk_segments)
+    except Exception as e:
+        print(f"[ERROR] Greška u chunk-u: {e}")
+        return chunk_segments # Fallback na original u slučaju totalne greške
+
+async def translate_segments_async(segments: list, visual_context_url: str = None, chunk_size: int = 50) -> dict:
+    """Glavna funkcija za paralelni prevod transkripta."""
+    print(f"[TRANSLATOR V2] Pokrećem hibridni prevod ({len(segments)} segmenata)...")
+    
+    # Podela na chunkove
+    chunks = [segments[i:i + chunk_size] for i in range(0, len(segments), chunk_size)]
+    
+    # Paralelno izvršavanje
+    tasks = [translate_chunk(c, visual_context_url) for c in chunks]
+    results = await asyncio.gather(*tasks)
+    
+    # Spajanje rezultata
+    final_segments = []
+    for r in results:
+        final_segments.extend(r)
+        
+    return {
+        "status": "success",
+        "translated_segments": final_segments,
+        "engine": "qwen-32b-serverless-toon"
+    }
+
+def translate_segments(segments: list, original_language: str = "en", progress_callback=None) -> dict:
+    """Wrapper za sinhroni poziv iz Celery-ja."""
+    return asyncio.run(translate_segments_async(segments))
