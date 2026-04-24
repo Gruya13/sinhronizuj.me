@@ -15,8 +15,9 @@ class Settings:
     
     # MinIO Storage
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "admin")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "sinhronizuj_storage")
     MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minio_pass_2026")
+    MINIO_BUCKET: str = "uploads"
     
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
 

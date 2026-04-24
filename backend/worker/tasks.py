@@ -1,5 +1,5 @@
 from backend.worker.celery_app import celery_app
-from backend.worker.downloader import download_youtube_video
+from backend.worker.downloader import download_video
 import os
 
 @celery_app.task(bind=True, name="process_video_task")
@@ -31,7 +31,7 @@ def process_video_task(self, video_url: str):
 
     # --- FAZA 1: Preuzimanje ---
     update_progress("Preuzimanje videa...", 10)
-    result = download_youtube_video(video_url)
+    result = download_video(video_url)
     if result["status"] == "error": return result
     update_progress(completed_step="Preuzimanje završeno")
     
@@ -73,11 +73,9 @@ def process_video_task(self, video_url: str):
     
     translation_result = translate_segments(
         transcription_result["segments"]
-        # Budući upgrade: visual_context_url=visual_context_url
     )
     if translation_result["status"] == "error": return translation_result
     
-    # Ažuriramo UI segmente sa prevodom
     for i, s in enumerate(translation_result["translated_segments"]):
         if i < len(segments_ui):
             segments_ui[i]["translated"] = s["text"]

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 import './index.css';
 
 const API_BASE_URL = "http://localhost:8000";
@@ -16,11 +17,11 @@ function App() {
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [hwStats, setHwStats] = useState(null);
-  const [logs, setLogs] = useState("");
-  const [showLogs, setShowLogs] = useState(false);
   const [visualContextUrl, setVisualContextUrl] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const feedRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const STEPS = [
     "Preuzimanje završeno",
@@ -32,7 +33,6 @@ function App() {
     "Obrada završena"
   ];
 
-  // HW Monitoring polling (Local Hetzner Stats)
   useEffect(() => {
     const fetchHw = async () => {
       try {
@@ -54,7 +54,6 @@ function App() {
     }
   }, []);
 
-  // Tajmer za proteklo vreme
   useEffect(() => {
     let timer;
     if (loading && !videoUrl) {
@@ -65,14 +64,12 @@ function App() {
     return () => clearInterval(timer);
   }, [loading, videoUrl, startTime]);
 
-  // Scroll to bottom u feed-u
   useEffect(() => {
     if (feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
   }, [progressData?.segments]);
 
-  // Polling za status zadatka
   useEffect(() => {
     let interval;
     if (taskId && !videoUrl && !error) {
@@ -110,9 +107,10 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId, videoUrl, error]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!url) return;
+  const handleSubmit = async (e, customUrl = null) => {
+    if (e) e.preventDefault();
+    const targetUrl = customUrl || url;
+    if (!targetUrl) return;
 
     setLoading(true); setError(null); setVideoUrl(null); 
     setStartTime(Date.now()); setElapsed(0);
@@ -122,7 +120,7 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url: targetUrl })
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -130,6 +128,43 @@ function App() {
         localStorage.setItem('sinhronizuj_me_task_id', data.task_id);
       } else { setError(data.message); setLoading(false); }
     } catch (err) { setError('Greška pri slanju zadatka. Proverite backend.'); setLoading(false); }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    setStatus(`PRIPREMA UPLOADA: ${file.name}...`);
+    setError(null);
+    setUploadProgress(1);
+
+    try {
+      // 1. Dobavi Presigned URL
+      const res = await axios.get(`${API_BASE_URL}/api/v1/storage/upload-url`, {
+        params: { filename: file.name }
+      });
+      const { upload_url, s3_url } = res.data;
+
+      // 2. Upload na MinIO
+      setStatus(`UPLOADOVANJE NA S3 STORAGE...`);
+      await axios.put(upload_url, file, {
+        headers: { 'Content-Type': file.type },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+
+      // 3. Pokreni obradu sa S3 linkom
+      setUploadProgress(0);
+      handleSubmit(null, s3_url);
+
+    } catch (err) {
+      setError(`Greška pri uploadu: ${err.message}`);
+      setLoading(false);
+      setUploadProgress(0);
+    }
   };
 
   const formatTime = (s) => {
@@ -146,7 +181,6 @@ function App() {
       </div>
 
       <div className="glass-container studio-layout">
-        {/* HIBRIDNI MONITOR */}
         <div className="hybrid-monitor">
           <div className="monitor-section">
             <div className="monitor-label"><ShieldCheck size={14}/> Hetzner Control</div>
@@ -174,18 +208,36 @@ function App() {
         </motion.div>
 
         {!loading && !videoUrl && (
-          <form onSubmit={handleSubmit} className="input-group main-input">
-            <div className="input-wrapper">
-              <input 
-                type="url" placeholder="Zalepite YouTube ili S3 link..." 
-                value={url} onChange={(e) => setUrl(e.target.value)}
-                disabled={loading} required
-              />
-              <button type="submit" disabled={loading || !url} className="glow-button">
-                <Play size={20} /> Pokreni Sinhronizaciju
-              </button>
-            </div>
-          </form>
+          <div className="input-area">
+             <form onSubmit={handleSubmit} className="input-group main-input">
+                <div className="input-wrapper">
+                <input 
+                    type="url" placeholder="Zalepite YouTube ili S3 link..." 
+                    value={url} onChange={(e) => setUrl(e.target.value)}
+                    disabled={loading} required
+                />
+                <button 
+                    type="button" 
+                    className="icon-btn" 
+                    onClick={() => fileInputRef.current.click()}
+                    title="Uploaduj lokalni fajl"
+                >
+                    <Paperclip size={20} />
+                </button>
+                <button type="submit" disabled={loading || !url} className="glow-button">
+                    <Play size={20} /> Sinhronizuj
+                </button>
+                </div>
+            </form>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept="video/*" 
+                onChange={handleFileUpload}
+            />
+            <p className="upload-hint">Podržani formati: MP4, MKV, AVI. Max 500MB.</p>
+          </div>
         )}
 
         <AnimatePresence>
@@ -193,18 +245,26 @@ function App() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="studio-interface">
               
               <div className="studio-main">
-                {/* LEVA STRANA: TRANSKRIPT & PREVOD */}
                 <div className="studio-content">
                    <div className="progress-section">
                     <div className="progress-header">
                       <span className="current-step-text">
-                        {status.includes("RunPod") && <Zap className="pulse-icon" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
-                        {status}
+                        {uploadProgress > 0 ? (
+                           <><UploadCloud size={14} className="pulse-icon" style={{display: 'inline', marginRight: '8px'}}/> Upload na S3: {uploadProgress}%</>
+                        ) : (
+                          <>
+                            {status.includes("RunPod") && <Zap className="pulse-icon" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
+                            {status}
+                          </>
+                        )}
                       </span>
-                      <span className="percent-text">{progressData?.percent || 0}%</span>
+                      <span className="percent-text">{uploadProgress > 0 ? uploadProgress : (progressData?.percent || 0)}%</span>
                     </div>
                     <div className="progress-bar-container">
-                      <motion.div className="progress-bar-fill" animate={{ width: `${progressData?.percent || 0}%` }} />
+                      <motion.div 
+                        className={`progress-bar-fill ${uploadProgress > 0 ? 'uploading' : ''}`} 
+                        animate={{ width: `${uploadProgress > 0 ? uploadProgress : (progressData?.percent || 0)}%` }} 
+                      />
                     </div>
                   </div>
 
@@ -232,12 +292,11 @@ function App() {
                   ) : (
                     <div className="waiting-studio">
                       <Loader2 className="spinner-large" />
-                      <p>Pripremam studio za obradu...</p>
+                      <p>{uploadProgress > 0 ? 'Slanje fajla u oblak...' : 'Pripremam studio za obradu...'}</p>
                     </div>
                   )}
                 </div>
 
-                {/* DESNA STRANA: VIZUELNI KONTEKST & STATUS */}
                 <div className="studio-sidebar">
                   <div className="sidebar-card">
                     <div className="card-title"><Eye size={16}/> Visual Context</div>

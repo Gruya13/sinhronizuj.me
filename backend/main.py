@@ -1,3 +1,4 @@
+import boto3
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -5,12 +6,11 @@ from pydantic import BaseModel
 import os
 from celery.result import AsyncResult
 from backend.worker.celery_app import celery_app
-# from backend.worker.tasks import process_video_task (Uklonjeno radi brzine lokalnog orkestratora)
 from backend.core.config import settings
+from botocore.config import Config
 
 app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhronizaciju videa", version="1.0.0")
 
-# CORS podešavanja za komunikaciju sa React frontendom
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Kreiranje foldera ukoliko ne postoji i serviranje finalnih videa korisnicima
 os.makedirs(settings.TEMP_WORKSPACE, exist_ok=True)
 app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="videos")
 
@@ -30,10 +29,42 @@ class VideoRequest(BaseModel):
 def read_root():
     return {"message": "Sinhronizuj.me API je aktivan!"}
 
+@app.get("/api/v1/storage/upload-url")
+def get_upload_url(filename: str):
+    s3 = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+    try:
+        try:
+            s3.head_bucket(Bucket=settings.MINIO_BUCKET)
+        except:
+            s3.create_bucket(Bucket=settings.MINIO_BUCKET)
+            
+        url = s3.generate_presigned_url(
+            ClientMethod='put_object',
+            Params={
+                'Bucket': settings.MINIO_BUCKET, 
+                'Key': filename,
+                'ContentType': 'video/mp4'
+            },
+            ExpiresIn=3600
+        )
+        return {
+            "upload_url": url, 
+            "file_key": filename,
+            "s3_url": f"s3://{settings.MINIO_BUCKET}/{filename}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
     from backend.worker.tasks import process_video_task
-    # Okidamo Celery task u pozadini i vracamo task_id na frontend
     task = process_video_task.delay(request.url)
     return {
         "status": "success",
@@ -43,32 +74,25 @@ def process_video(request: VideoRequest):
 
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
-    # Frontend ce na svakih par sekundi pitati ovaj endpoint da li je gotovo
     task_result = AsyncResult(task_id, app=celery_app)
-    
     response = {
         "task_id": task_id,
         "status": task_result.status,
     }
-    
-    # Dodajemo meta-podatke o progresu ako postoje
     if task_result.status == "PROGRESS":
         response["progress_data"] = task_result.info
-    
     if task_result.status == "SUCCESS":
         result = task_result.result
         if result.get("status") == "error":
             response["status"] = "FAILURE"
             response["error"] = result.get("message")
         else:
-            # Izvlačimo samo ime fajla kako bismo kreirali validan link za frontend reprodukciju
             video_filename = os.path.basename(result["final_video_path"])
             response["video_url"] = f"/videos/{video_filename}"
-            
     elif task_result.status == "FAILURE":
         response["error"] = str(task_result.info)
-        
     return response
+
 @app.get("/api/v1/hw-stats")
 def get_hw_stats():
     from backend.worker.hw_monitor import get_gpu_stats, get_system_stats
@@ -77,52 +101,12 @@ def get_hw_stats():
         "system": get_system_stats()
     }
 
-@app.post("/api/v1/runpod/stop")
-def stop_runpod(pod_id: str = None):
-    import requests
-    target = pod_id or settings.RUNPOD_POD_ID
-    if not settings.RUNPOD_API_KEY or not target:
-        raise HTTPException(status_code=400, detail="RunPod API ključ ili Pod ID nisu konfigurisani.")
-    
-    query = """
-    mutation {
-      podStop(input: {podId: "%s"}) {
-        id
-        desiredStatus
-      }
-    }
-    """ % target
-    
-    url = f"https://api.runpod.io/graphql?api_key={settings.RUNPOD_API_KEY}"
-    try:
-        res = requests.post(url, json={'query': query})
-        return res.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/v1/orchestrator/find-best-pod")
-def find_best_pod(gpu_type: str = "NVIDIA GeForce RTX 3090", pod_id: str = None):
-    from backend.core.orchestrator import RunPodOrchestrator
-    orchestrator = RunPodOrchestrator()
-    # Ako je pod_id prazan string, pretvori ga u None
-    target_id = pod_id if pod_id and pod_id.strip() != "" else None
-    best_pod_info = orchestrator.find_best_pod(gpu_type, target_pod_id=target_id)
-    return best_pod_info
-
-@app.get("/api/v1/orchestrator/list-pods")
-def list_pods():
-    from backend.core.orchestrator import RunPodOrchestrator
-    orchestrator = RunPodOrchestrator()
-    return orchestrator.list_my_pods()
-
 @app.get("/api/v1/logs")
 def get_worker_logs():
-    import os
     log_path = "/app/worker.log"
     if not os.path.exists(log_path):
         return {"logs": "Log fajl još uvek nije generisan..."}
     try:
-        # Čitamo poslednjih 100 linija
         with os.popen(f"tail -n 100 {log_path}") as f:
             logs = f.read()
         return {"logs": logs}

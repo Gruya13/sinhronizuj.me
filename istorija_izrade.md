@@ -61,3 +61,6 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **Backend Sync:** Ažuriran tasks.py za slanje visual_context_url-a frontendu u realnom vremenu.
 - **Rebrendiranje:** Projekat je zvanično preimenovan u sinhronizuj.me. Ažuriran README.md, App.jsx, tts_engine.py i infra konfiguracije.
 - **Cleanup:** Obrisana zastarela dokumentacija (RUNPOD_PLAN.md, HIBRIDNA_ARHITEKTURA.md, MANIFEST.md) i test fajlovi radi lakšeg održavanja.
+- **Direktan Upload (S3):** Implementirana funkcija za upload lokalnih video fajlova direktno na MinIO S3 storage pomoću Presigned URL-ova.
+- **Univerzalni Downloader:** Worker sada podržava i YouTube i S3 (s3://) protokole za dobavljanje sirovog materijala.
+- **UI Upload Zone:** Dodata Paperclip ikonica i vizuelni indikator progressa za upload fajlova u studio.
