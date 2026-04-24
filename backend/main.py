@@ -29,8 +29,8 @@ class VideoRequest(BaseModel):
 def read_root():
     return {"message": "Sinhronizuj.me API je aktivan!"}
 
-@app.get("/api/v1/storage/upload-url")
-def get_upload_url(filename: str):
+@app.get("/api/v1/storage/upload_url")
+def get_upload_url(filename: str, content_type: str = 'video/mp4'):
     s3 = boto3.client(
         's3',
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
@@ -50,7 +50,7 @@ def get_upload_url(filename: str):
             Params={
                 'Bucket': settings.MINIO_BUCKET, 
                 'Key': filename,
-                'ContentType': 'video/mp4'
+                'ContentType': content_type
             },
             ExpiresIn=3600
         )

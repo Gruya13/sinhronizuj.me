@@ -140,7 +140,7 @@ function App() {
 
     try {
       // 1. Dobavi Presigned URL koristeći nativni fetch
-      const urlRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload-url?filename=${encodeURIComponent(file.name)}`);
+      const urlRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`);
       const { upload_url, s3_url } = await urlRes.json();
 
       // 2. Upload na MinIO koristeći XMLHttpRequest (za progress tracking)
