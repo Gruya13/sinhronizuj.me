@@ -18,9 +18,12 @@ temp_workspace/
 *.mp3
 cookies.txt
 brave.txt
-cookies.txt
-brave.txt
 
-# Markdown fajlovi (osim README)
+# Log fajlovi
+*.log
+
+# Markdown fajlovi (osim kljucne dokumentacije)
 *.md
 !README.md
+!PLAN_ARHITEKTURE_V2.md
+!istorija_izrade.md

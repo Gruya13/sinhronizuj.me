@@ -1,9 +1,9 @@
 # Istorija izrade projekta Sinhronizuj.me
 
 ## Trenutni Status:
-Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni problemi sa YouTube bot zaštitom korišćenjem SOCKS5 reverznog proxy-ja ka lokalnoj mašini klijenta. Razrešeni duboki sistemski konflikti u PyTorch okruženju (`torchaudio` višestruke `abi3` i `.so` biblioteke).
+Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlova na MinIO S3 radi. Demucs separacija vokala radi lokalno. **Blokirano:** RunPod Whisper endpoint vraća 401 Unauthorized iz Celery worker-a (radi iz standalone skripte). Istraga u toku — verovatno problem sa env varijablama u Celery forked procesima.
 
-### Poslednje izmene (21. April 2026):
+### Poslednje izmene (24. April 2026):
 1. **Torchaudio fiks:** Uklonjene stare zombirane `.so` datoteke iz Python `dist-packages` direktorijuma na RunPodu koje su rušile `Demucs` podproces prilikom učitavanja C++ ekstenzija. Ponovo instaliran čist `torchaudio==2.11.0`.
 2. **YouTube Bot Bypass:** Uklonjen `ios,android` bypass jer je davao limitirane rezultate, ugrađen dinamički SSH SOCKS5 Proxy (`localhost:1080`) koji sa RunPoda koristi direktno čistu kućnu IP adresu korisnika za zaobilaženje svih blokada.
 
@@ -64,3 +64,12 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **Direktan Upload (S3):** Implementirana funkcija za upload lokalnih video fajlova direktno na MinIO S3 storage pomoću Presigned URL-ova.
 - **Univerzalni Downloader:** Worker sada podržava i YouTube i S3 (s3://) protokole za dobavljanje sirovog materijala.
 - **UI Upload Zone:** Dodata Paperclip ikonica i vizuelni indikator progressa za upload fajlova u studio.
+
+### 24.04.2026. 14:00 — Debugging Upload Pipeline-a
+- **Celery Worker Fix:** Identifikovan problem — Celery worker nije bio pokrenut, pa su svi zadaci stajali u Redis redu bez obrade. Pokrenut ručno iz venv-a.
+- **Demucs Putanja:** Popravljena putanja do `demucs` izvršnog fajla. Dodata `os.path.abspath()` za pouzdano razrešavanje relativnih putanja iz `audio_sep.py`.
+- **Shebang Fix:** Ažurirani shebang redovi u svim skriptama unutar `venv/bin/` koji su još uvek referisali stari naziv projekta (`daca_dub` → `sinhronizuj.me`).
+- **torchcodec:** Instaliran `torchcodec==0.11.1` — nova zavisnost za `torchaudio` koja je nedostajala i rušila Demucs separaciju.
+- **RunPod API Ključ:** Napravljen novi API ključ (`sinhronizuj_studio`) na RunPod konzoli. Ključ uspešno verifikovan iz standalone Python skripte (status 200, endpoint zdrav).
+- **RunPod 401 Bug (AKTIVAN):** Celery worker i dalje dobija 401 Unauthorized pri pozivu RunPod Whisper endpointa, čak i sa hardkodovanim ključem u `config.py`. Problem je specifičan za Celery forked procese — isti ključ iz main procesa radi bez problema. Istraga u toku.
+- **Dokumentacija:** Kompletno ažurirani README.md, PLAN_ARHITEKTURE_V2.md i istorija_izrade.md da prate trenutno stanje sistema.

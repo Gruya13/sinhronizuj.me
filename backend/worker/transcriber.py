@@ -28,6 +28,7 @@ async def transcribe_audio_async(audio_path: str) -> dict:
         }
 
     url = f"https://api.runpod.ai/v2/{settings.RUNPOD_WHISPER_ID}/runsync"
+    print(f"[DEBUG] Koristim API ključ (prvih 10 karaktera): {settings.RUNPOD_API_KEY[:10]}...")
     headers = {
         "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
         "Content-Type": "application/json"
