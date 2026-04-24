@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, UploadCloud } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, CloudUpload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 import './index.css';
 
 const API_BASE_URL = "http://localhost:8000";
@@ -140,28 +139,45 @@ function App() {
     setUploadProgress(1);
 
     try {
-      // 1. Dobavi Presigned URL
-      const res = await axios.get(`${API_BASE_URL}/api/v1/storage/upload-url`, {
-        params: { filename: file.name }
-      });
-      const { upload_url, s3_url } = res.data;
+      // 1. Dobavi Presigned URL koristeći nativni fetch
+      const urlRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload-url?filename=${encodeURIComponent(file.name)}`);
+      const { upload_url, s3_url } = await urlRes.json();
 
-      // 2. Upload na MinIO
+      // 2. Upload na MinIO koristeći XMLHttpRequest (za progress tracking)
       setStatus(`UPLOADOVANJE NA S3 STORAGE...`);
-      await axios.put(upload_url, file, {
-        headers: { 'Content-Type': file.type },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentCompleted = Math.round((event.loaded * 100) / event.total);
           setUploadProgress(percentCompleted);
         }
-      });
+      };
 
-      // 3. Pokreni obradu sa S3 linkom
-      setUploadProgress(0);
-      handleSubmit(null, s3_url);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgress(0);
+          handleSubmit(null, s3_url);
+        } else {
+          setError(`Greška pri uploadu: ${xhr.statusText}`);
+          setLoading(false);
+          setUploadProgress(0);
+        }
+      };
+
+      xhr.onerror = () => {
+        setError("Greška pri mreži tokom uploada.");
+        setLoading(false);
+        setUploadProgress(0);
+      };
+
+      xhr.open('PUT', upload_url);
+      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.send(file);
 
     } catch (err) {
-      setError(`Greška pri uploadu: ${err.message}`);
+      setError(`Greška: ${err.message}`);
       setLoading(false);
       setUploadProgress(0);
     }
@@ -250,7 +266,7 @@ function App() {
                     <div className="progress-header">
                       <span className="current-step-text">
                         {uploadProgress > 0 ? (
-                           <><UploadCloud size={14} className="pulse-icon" style={{display: 'inline', marginRight: '8px'}}/> Upload na S3: {uploadProgress}%</>
+                           <><CloudUpload size={14} className="pulse-icon" style={{display: 'inline', marginRight: '8px'}}/> Upload na S3: {uploadProgress}%</>
                         ) : (
                           <>
                             {status.includes("RunPod") && <Zap className="pulse-icon" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
