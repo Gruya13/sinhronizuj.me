@@ -56,3 +56,4 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **Vizuelni Kontekst:** Dodat `preprocessor.py` za ekstrakciju frejmova i slanje multimodalnog konteksta modelu Qwen 32B.
 - **Optimizacija:** Sve FFMPEG operacije spajanja prebačene na `-c:v copy` radi rasterećenja CPU-a na Hetzneru.
 - **RunPod Serverless Endpoints:** Uspešno kreirana i konfigurisana 3 endpoint-a (Whisper, Translator na RTX A6000, TTS na RTX 4090) uz novi API ključ.
+- **Testiranje Saobraćaja:** Uspešno testirana komunikacija Hetzner -> RunPod. Whisper endpoint vratio status COMPLETED. Autentifikacija verifikovana.
