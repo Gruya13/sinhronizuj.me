@@ -15,11 +15,12 @@ def process_video_task(self, video_url: str):
         'active_instances': {8080: "idle", 8081: "idle", 8082: "idle"}
     }
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, active_port=None):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, active_port=None, visual_context_url=None):
         if step_name: progress_metadata['current_step'] = step_name
         if percentage: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
+        if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
         if active_port:
             for p in progress_metadata['active_instances']:
                 progress_metadata['active_instances'][p] = "idle"
@@ -65,6 +66,7 @@ def process_video_task(self, video_url: str):
     visual_context_url = None
     if preview_path:
         visual_context_url = upload_to_minio(preview_path)
+        update_progress(visual_context_url=visual_context_url)
     
     update_progress("Prevođenje (RunPod + TOON)...", 60)
     from backend.worker.translator import translate_segments

@@ -57,3 +57,5 @@ Sistem u Fazi 3. Uspostavljena kompletna RunPod infrastruktura, razrešeni probl
 - **Optimizacija:** Sve FFMPEG operacije spajanja prebačene na `-c:v copy` radi rasterećenja CPU-a na Hetzneru.
 - **RunPod Serverless Endpoints:** Uspešno kreirana i konfigurisana 3 endpoint-a (Whisper, Translator na RTX A6000, TTS na RTX 4090) uz novi API ključ.
 - **Testiranje Saobraćaja:** Uspešno testirana komunikacija Hetzner -> RunPod. Whisper endpoint vratio status COMPLETED. Autentifikacija verifikovana.
+- **Frontend v2.0 (Studio):** Kompletno redizajniran interfejs sa podrškom za hibridni monitoring, vizuelni kontekst i uporedni prikaz TOON segmenata.
+- **Backend Sync:** Ažuriran tasks.py za slanje visual_context_url-a frontendu u realnom vremenu.
