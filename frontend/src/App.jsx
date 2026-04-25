@@ -16,6 +16,7 @@ function App() {
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [hwStats, setHwStats] = useState(null);
+  const [runpodStatus, setRunpodStatus] = useState({ status: 'Učitavam...', active_workers: 0 });
   const [visualContextUrl, setVisualContextUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
@@ -57,9 +58,22 @@ function App() {
         setHwStats(data);
       } catch (err) { /* Silent fail */ }
     };
+    const fetchRunpod = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/runpod-status`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setRunpodStatus(data);
+      } catch (err) { /* Silent fail */ }
+    };
     fetchHw();
-    const interval = setInterval(fetchHw, 5000);
-    return () => clearInterval(interval);
+    fetchRunpod();
+    const intervalHw = setInterval(fetchHw, 5000);
+    const intervalRp = setInterval(fetchRunpod, 15000);
+    return () => {
+      clearInterval(intervalHw);
+      clearInterval(intervalRp);
+    };
   }, []);
 
   useEffect(() => {
@@ -250,7 +264,13 @@ function App() {
           </div>
           <div className="monitor-divider" />
           <div className="monitor-section">
-            <div className="monitor-label"><Zap size={14} className={status.includes("RunPod") ? "pulse-icon" : ""}/> RunPod Serverless</div>
+            <div className="monitor-label">
+              <Zap size={14} className={runpodStatus.status === "Active" ? "pulse-icon" : ""}/> 
+              RunPod Serverless 
+              <span className={`status-badge ${runpodStatus.status?.toLowerCase()}`}>
+                {runpodStatus.status === "Active" ? `AKTIVAN (${runpodStatus.active_workers})` : "SPAVA"}
+              </span>
+            </div>
             <div className="monitor-status">
               <span className={status.includes("Whisper") ? "active-worker" : ""}>Whisper</span>
               <span className={status.includes("Prevođenje") ? "active-worker" : ""}>Qwen 32B</span>

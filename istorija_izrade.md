@@ -144,3 +144,9 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Arhitektura:** Uvedena asinhrona komunikacija sa RunPod-om putem `/run` i `/status` endpointa.
 - **Utils:** Kreiran `utils.py` sa `wait_for_runpod_result` funkcijom (rešava Cold Start problem).
 - **Worker:** Refaktorisani `transcriber.py`, `translator.py` i `tts_engine.py` za stabilniji rad.
+
+### 25.04.2026. 14:41 — Granularni Monitoring i UI Redizajn
+- **Backend:** Celery sada šalje mikro-statuse (`detail`) i istoriju logova (`logs`) kroz `update_state`.
+- **Worker:** Implementirani callback-ovi za RunPod polling koji detektuju "Cold Start".
+- **Frontend:** Redizajniran statusni panel — dodat sub-status sa pulse efektom i interaktivna "WORKER_LOG_FEED" konzola.
+- **UX:** Uvedeni vizuelni indikatori za stanje RunPod instanci.
