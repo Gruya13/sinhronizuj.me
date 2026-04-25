@@ -47,34 +47,46 @@ def upload_to_minio(file_path: str, bucket_name: str = "previews") -> str:
 
     filename = os.path.basename(file_path)
     
-    s3 = boto3.client(
+    # 1. Interni klijent za brzi upload unutar Docker mreze
+    s3_internal = boto3.client(
         's3',
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1' # MinIO ignorise region, ali boto3 ga trazi za s3v4
+        region_name='us-east-1'
+    )
+    
+    # 2. Javni klijent za generisanje URL-a koji RunPod moze da vidi
+    s3_public = boto3.client(
+        's3',
+        endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
     )
     
     try:
-        # Proveri/kreiraj bucket
+        # Proveri/kreiraj bucket preko internog klijenta
         try:
-            s3.head_bucket(Bucket=bucket_name)
+            s3_internal.head_bucket(Bucket=bucket_name)
         except:
             print(f"[MINIO] Kreiram bucket: {bucket_name}")
-            s3.create_bucket(Bucket=bucket_name)
+            s3_internal.create_bucket(Bucket=bucket_name)
 
-        # Upload
+        # Upload preko internog klijenta (brze je)
         print(f"[MINIO] Uploadujem {filename} u {bucket_name}...")
-        s3.upload_file(file_path, bucket_name, filename)
+        s3_internal.upload_file(file_path, bucket_name, filename)
         
-        # Generiši presigned URL (validan 24h za dugačke procese)
-        url = s3.generate_presigned_url(
+        # Generisi presigned URL preko JAVNOG klijenta (validan 24h)
+        url = s3_public.generate_presigned_url(
             ClientMethod='get_object',
             Params={'Bucket': bucket_name, 'Key': filename},
             ExpiresIn=86400
         )
         
+        print(f"[MINIO] Generisan JAVNI URL za RunPod: {url}")
         return url
     except Exception as e:
         print(f"[ERROR] MinIO Upload Error: {str(e)}")

@@ -131,3 +131,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 ### 25.04.2026. 13:52 — Finalna Stabilizacija API Servisa
 - **Docker Compose:** Dodata eksplicitna `command: uvicorn backend.main:app...` direktiva u `api` servis. Ovo eliminiše rizik od gašenja kontejnera zbog nedostajućeg entrypoint-a u bazi imidža.
 - **Deploy:** Spreman plan za osvežavanje VPS-a.
+
+### 25.04.2026. 14:15 — Rešavanje Demucs TorchCodec zavisnosti
+- **Requirements:** Dodat `torchcodec==0.11.1` u `requirements.txt`. Ova biblioteka je neophodna za rad novijih verzija Demucs-a na CPU arhitekturi.
+- **Deploy:** Izvršen puni rebuild `sinhronizuj-worker` kontejnera na VPS-u.
+
+### 25.04.2026. 14:22 — Dodavanje requests biblioteke za RunPod komunikaciju
+- **Requirements:** Dodata `requests` biblioteka koja je neophodna za rad `transcriber.py`, `translator.py` i `tts_engine.py` modula.
+- **Deploy:** Izvršen ponovni rebuild `sinhronizuj-worker` kontejnera na VPS-u.
