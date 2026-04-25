@@ -36,7 +36,8 @@ def read_root():
 
 @app.get("/api/v1/storage/upload_url")
 def get_upload_url(filename: str, content_type: str = 'video/mp4'):
-    s3 = boto3.client(
+    # 1. Interni klijent za proveru bucket-a (brze unutar Docker mreze)
+    s3_internal = boto3.client(
         's3',
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
@@ -44,13 +45,24 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
         config=Config(signature_version='s3v4'),
         region_name='us-east-1'
     )
+    
+    # 2. Javni klijent ISKLJUCIVO za generisanje Presigned URL-a (ispravan potpis za klijenta)
+    s3_public = boto3.client(
+        's3',
+        endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+    
     try:
         try:
-            s3.head_bucket(Bucket=settings.MINIO_BUCKET)
+            s3_internal.head_bucket(Bucket=settings.MINIO_BUCKET)
         except:
-            s3.create_bucket(Bucket=settings.MINIO_BUCKET)
+            s3_internal.create_bucket(Bucket=settings.MINIO_BUCKET)
             
-        url = s3.generate_presigned_url(
+        url = s3_public.generate_presigned_url(
             ClientMethod='put_object',
             Params={
                 'Bucket': settings.MINIO_BUCKET, 
@@ -60,16 +72,7 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
             ExpiresIn=3600
         )
         
-        # LOG ZA DEBUG: Sta je tacno Boto3 generisao
-        print(f"--- DEBUG: ORIGINAL BOTO3 URL: {url}", flush=True)
-        
-        # FINALNI FIX: Eksplicitna zamena sa javnom IP adresom Hetznera
-        # Koristimo direktan string jer env varijable nekad zakazu u Docker-u
-        PUBLIC_IP = "178.104.214.78:9000"
-        if "minio:9000" in url:
-            url = url.replace("minio:9000", PUBLIC_IP)
-            
-        print(f"--- DEBUG: FINALNI URL KOJI SE SALJE: {url}", flush=True)
+        print(f"--- DEBUG: GENERISAN JAVNI URL: {url}", flush=True)
             
         return {
             "upload_url": url, 
