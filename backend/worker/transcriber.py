@@ -29,7 +29,9 @@ def transcribe_audio(audio_path: str) -> dict:
             "segments": [{"start": 0.0, "end": 2.0, "text": "This is a mock transcription."}]
         }
 
-    url = f"https://api.runpod.ai/v2/{settings.RUNPOD_WHISPER_ID}/runsync"
+    from backend.worker.utils import wait_for_runpod_result
+    
+    url = f"https://api.runpod.ai/v2/{settings.RUNPOD_WHISPER_ID}/run"
     headers = {
         "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
         "Content-Type": "application/json"
@@ -42,22 +44,22 @@ def transcribe_audio(audio_path: str) -> dict:
         }
     }
 
-    print(f"[TRANSCRIBER V2] Pozivam RunPod Whisper (ID: {settings.RUNPOD_WHISPER_ID})...")
+    print(f"[TRANSCRIBER V2] Pozivam RunPod Whisper (Asinhrono, ID: {settings.RUNPOD_WHISPER_ID})...")
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=600)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
-        result = response.json()
+        job_data = response.json()
+        job_id = job_data["id"]
         
-        if result.get("status") == "COMPLETED":
-            output = result["output"]
-            return {
-                "status": "success",
-                "language": output.get("language", "unknown"),
-                "full_text": output.get("text", ""),
-                "segments": output.get("segments", [])
-            }
-        else:
-            raise Exception(f"RunPod Whisper greška: {result}")
+        # Čekamo rezultat (polling)
+        output = wait_for_runpod_result(job_id, settings.RUNPOD_WHISPER_ID)
+        
+        return {
+            "status": "success",
+            "language": output.get("language", "unknown"),
+            "full_text": output.get("text", ""),
+            "segments": output.get("segments", [])
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
