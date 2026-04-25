@@ -1,13 +1,12 @@
 import os
-import httpx
-import asyncio
+import requests
 from typing import Dict, Any
 from backend.core.config import settings
 from backend.worker.preprocessor import upload_to_minio
 
-async def transcribe_audio_async(audio_path: str) -> dict:
+def transcribe_audio(audio_path: str) -> dict:
     """
-    Poziva RunPod Serverless Whisper endpoint za transkripciju.
+    Poziva RunPod Serverless Whisper endpoint za transkripciju koristeći requests (stabilnije od httpx).
     """
     if not os.path.exists(audio_path):
         return {"status": "error", "message": f"Fajl nije pronađen: {audio_path}"}
@@ -17,6 +16,9 @@ async def transcribe_audio_async(audio_path: str) -> dict:
     # 1. Upload fajla na MinIO (RunPod-u treba URL)
     audio_url = upload_to_minio(audio_path, bucket_name="input-audio")
     
+    if not audio_url:
+        return {"status": "error", "message": "MinIO upload nije uspeo."}
+
     # 2. Poziv RunPod-a
     if not settings.RUNPOD_WHISPER_ID:
         print("[WARNING] RUNPOD_WHISPER_ID nije definisan. Koristim mock transkripciju.")
@@ -28,7 +30,6 @@ async def transcribe_audio_async(audio_path: str) -> dict:
         }
 
     url = f"https://api.runpod.ai/v2/{settings.RUNPOD_WHISPER_ID}/runsync"
-    print(f"[DEBUG] Koristim API ključ (prvih 10 karaktera): {settings.RUNPOD_API_KEY[:10]}...")
     headers = {
         "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
         "Content-Type": "application/json"
@@ -37,15 +38,14 @@ async def transcribe_audio_async(audio_path: str) -> dict:
     payload = {
         "input": {
             "audio": audio_url,
-            "model": "large-v3",
-            "task": "transcribe"
+            "model": "large-v3"
         }
     }
 
     print(f"[TRANSCRIBER V2] Pozivam RunPod Whisper (ID: {settings.RUNPOD_WHISPER_ID})...")
     
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, timeout=600)
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=600)
         response.raise_for_status()
         result = response.json()
         
@@ -59,7 +59,5 @@ async def transcribe_audio_async(audio_path: str) -> dict:
             }
         else:
             raise Exception(f"RunPod Whisper greška: {result}")
-
-def transcribe_audio(audio_path: str, model_size: str = "large-v3") -> dict:
-    """Wrapper za sinhroni poziv."""
-    return asyncio.run(transcribe_audio_async(audio_path))
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

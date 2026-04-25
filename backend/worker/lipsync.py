@@ -72,7 +72,7 @@ def apply_lip_sync(video_path: str, audio_path: str) -> dict:
         "python", os.path.join(wav2lip_dir, "inference.py"),
         "--checkpoint_path", os.path.join(wav2lip_dir, "checkpoints", "wav2lip_gan.pth"),
         "--face", video_path,
-        "--audio", audio_path, # Ovde prosledjujemo XTTS nas srpski glas
+        "--audio", audio_path, # Ovde prosledjujemo AI generisani srpski glas (Fish Speech)
         "--outfile", output_path
     ]
     

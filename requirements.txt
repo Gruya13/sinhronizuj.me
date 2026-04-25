@@ -1,3 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchaudio
 fastapi
 uvicorn
 celery
@@ -6,14 +9,8 @@ yt-dlp
 python-dotenv
 pydantic
 demucs
-faster-whisper
-transformers==4.33.0
-tokenizers==0.13.3
-google-genai
-requests
-pydub
-TTS
-opencv-python
-torchcodec
-httpx
 boto3
+httpx
+pydub
+opencv-python
+psutil

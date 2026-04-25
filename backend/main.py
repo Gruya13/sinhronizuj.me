@@ -103,12 +103,15 @@ def get_hw_stats():
 
 @app.get("/api/v1/logs")
 def get_worker_logs():
-    log_path = "/app/worker.log"
+    # Dinamicka putanja: gleda u root projekta bez obzira na okruzenje
+    log_path = os.path.join(os.path.dirname(__file__), "../worker.log")
     if not os.path.exists(log_path):
         return {"logs": "Log fajl još uvek nije generisan..."}
     try:
-        with os.popen(f"tail -n 100 {log_path}") as f:
-            logs = f.read()
+        # Uzimamo poslednjih 100 linija
+        with open(log_path, "r") as f:
+            lines = f.readlines()
+            logs = "".join(lines[-100:])
         return {"logs": logs}
     except Exception as e:
         return {"error": str(e)}

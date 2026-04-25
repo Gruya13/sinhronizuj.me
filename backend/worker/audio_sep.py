@@ -18,7 +18,9 @@ def separate_audio(audio_path: str) -> dict:
     # Demucs CLI komanda
     # -n htdemucs: Optimizovan model
     # --two-stems vocals: Izdvaja samo glas, a sve ostalo spaja u no_vocals
-    demucs_bin = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../venv/bin/demucs"))
+    import shutil
+    demucs_bin = shutil.which("demucs") or "demucs"
+    
     command = [
         demucs_bin,
         "-n", "htdemucs",

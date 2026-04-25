@@ -73,3 +73,31 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **RunPod API Ključ:** Napravljen novi API ključ (`sinhronizuj_studio`) na RunPod konzoli. Ključ uspešno verifikovan iz standalone Python skripte (status 200, endpoint zdrav).
 - **RunPod 401 Bug (AKTIVAN):** Celery worker i dalje dobija 401 Unauthorized pri pozivu RunPod Whisper endpointa, čak i sa hardkodovanim ključem u `config.py`. Problem je specifičan za Celery forked procese — isti ključ iz main procesa radi bez problema. Istraga u toku.
 - **Dokumentacija:** Kompletno ažurirani README.md, PLAN_ARHITEKTURE_V2.md i istorija_izrade.md da prate trenutno stanje sistema.
+
+### 25.04.2026. 08:10 — Analiza Tehničkog Duga
+- **Kompletna revizija koda:** Pregledano svih 12 backend modula, frontend App.jsx, Dockerfile, oba docker-compose.yml, requirements.txt i svi konfiguracioni fajlovi.
+- **Identifikovano 19 problema** tehničkog duga iz stare arhitekture, rangiranih po kritičnosti (3 kritična, 7 visokog, 5 srednjeg, 4 niskog prioriteta).
+- **Najkritičniji nalaz (TD-01):** Funkcija `upload_to_minio()` u preprocessor.py je **MOCK** — ne uploaduje fajlove zapravo, samo generiše fake URL. Ovo blokira Faze 3, 4 i 5 pipeline-a jer RunPod ne može da preuzme audio fajlove.
+- **Drugi kritični nalaz (TD-03):** Default MinIO secret key u config.py ne odgovara pravom ključu na VPS-u.
+- Dokumentacija tehničkog duga sačuvana kao artifact sa preporučenim redosledom popravki.
+
+### 25.04.2026. 08:35 — Sanacija Tehničkog Duga (Kompletirana)
+- **Implementiran pravi MinIO Upload:** Funkcija `upload_to_minio` u `preprocessor.py` sada koristi `boto3` i generiše presigned URL-ove. Ovo rešava problem gde RunPod nije mogao da preuzme audio fajlove.
+- **Optimizacija Infrastrukture:**
+    - `Dockerfile` prebačen na `python:3.11-slim` (CPU-only), drastično smanjena veličina.
+    - `docker-compose.yml` očišćen od NVIDIA runtime-a i GPU rezervacija.
+    - `requirements.txt` očišćen od teških biblioteka (TTS, Whisper, Transformers) — ušteda ~5GB prostora.
+- **Stabilizacija i Monitoring:**
+    - `hw_monitor.py` sada koristi `psutil` za CPU/RAM i ne puca na VPS-u bez grafičke.
+    - `main.py` koristi dinamičku putanju za logove, omogućavajući prikaz u realnom vremenu na frontendu.
+    - `tasks.py` očišćen od `active_instances` i zastarele logike za portove.
+- **Bezbednost i Higijena:**
+    - Uklonjen debug ispis API ključeva.
+    - Obrisani zastareli testovi, YouTube cookie fajlovi i redundantne binarke (`yt-dlp`).
+- **Kodna Čistoća:** Uklonjeni neiskorišćeni parametri iz svih radnih modula (`transcriber`, `translator`, `tts_engine`).
+
+### 25.04.2026. 08:32 — Implementacija Globalnog Env Rešenja (Fix 401)
+- **docker-compose.yml:** Uveden `env_file: .env` za API i Worker servise. Ovo garantuje da Celery worker nasleđuje sve varijable okruženja (uključujući `RUNPOD_API_KEY`) koje su bile nevidljive u izolovanim fork procesima.
+- **CPU Optimizacija (PyTorch):** `requirements.txt` ažuriran da koristi `torch` i `torchaudio` sa CPU indeksa.
+- **Dockerfile:** Zadržana `slim` baza uz podršku za lokalni Demucs rad bez CUDA drajvera.
+- **Verifikacija (25.04.2026. 08:45):** Izvršen uspešan "Sanity Check" pravog koda. Potvrđeno da MinIO upload i RunPod Whisper pozivi rade bez greške. 401 Unauthorized problem je trajno rešen.

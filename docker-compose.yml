@@ -1,56 +1,32 @@
 version: '3.8'
 
 services:
-  # 1. REDIS BROKER (Sluzi kao porukar izmedju API-ja i Celery Radnika)
-  redis:
-    image: redis:alpine
-    container_name: sinhronizuj_me_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  # 2. FASTAPI SERVER (Komunicira sa frontendom/korisnikom)
   api:
     build: .
-    container_name: sinhronizuj_me_api
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    container_name: sinhronizuj-api
     ports:
       - "8000:8000"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-    volumes:
-      - .:/app
+    env_file:
+      - .env
     depends_on:
       - redis
-    restart: unless-stopped
+    volumes:
+      - ./temp_workspace:/app/temp_workspace
 
-  # 3. CELERY WORKER (Magarac koji vuce najtezi teret obrade: Demucs, Whisper, XTTS, Wav2Lip)
   worker:
     build: .
-    container_name: sinhronizuj_me_worker
-    # Ogranicavamo concurrency na 1 kako bi obrada bila sekvencijalna i da ne bi preopteretili 8GB VRAM-a
-    command: sh -c "celery -A backend.worker.celery_app worker --loglevel=info --concurrency=1 2>&1 | tee /app/worker.log"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-    volumes:
-      - .:/app
-      # Sinhronizacija foldera za privremene fajlove sa fizickim hostom (serverom)
-      - ./temp_workspace:/app/temp_workspace
+    container_name: sinhronizuj-worker
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1
+    env_file:
+      - .env
     depends_on:
       - redis
-    restart: unless-stopped
-    # NAJBITNIJE: Propustanje NVIDIA graficke karte do Docker kontejnera!
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+    volumes:
+      - ./temp_workspace:/app/temp_workspace
+      - .:/app # Za worker.log pristupačnost
 
-volumes:
-  redis_data:
+  redis:
+    image: redis:7-alpine
+    container_name: sinhronizuj-redis
+    ports:
+      - "6379:6379"

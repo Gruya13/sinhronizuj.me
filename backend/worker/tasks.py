@@ -11,21 +11,15 @@ def process_video_task(self, video_url: str):
         'current_step': "Inicijalizacija...",
         'percent': 0,
         'completed_steps': [],
-        'segments': [],
-        'active_instances': {8080: "idle", 8081: "idle", 8082: "idle"}
+        'segments': []
     }
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, active_port=None, visual_context_url=None):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None):
         if step_name: progress_metadata['current_step'] = step_name
-        if percentage: progress_metadata['percent'] = percentage
+        if percentage is not None: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
-        if active_port:
-            for p in progress_metadata['active_instances']:
-                progress_metadata['active_instances'][p] = "idle"
-            if active_port in progress_metadata['active_instances']:
-                progress_metadata['active_instances'][active_port] = "active"
         
         self.update_state(state='PROGRESS', meta=progress_metadata)
 
@@ -89,8 +83,7 @@ def process_video_task(self, video_url: str):
     
     tts_result = synthesize_audio(
         sep_result["vocals_path"], 
-        translation_result["translated_segments"],
-        transcription_result["segments"]
+        translation_result["translated_segments"]
     )
     if tts_result["status"] == "error": return tts_result
     update_progress(completed_step="Glas generisan", percentage=85)
