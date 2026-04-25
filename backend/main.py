@@ -60,9 +60,17 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
             ExpiresIn=3600
         )
         
-        # Zadatak: Zameni interni Docker hostname javnom IP adresom za frontend klijenta
+        # LOG ZA DEBUG: Sta je tacno Boto3 generisao
+        print(f"--- DEBUG: ORIGINAL BOTO3 URL: {url}")
+        
+        # Robustnija zamena: menja bilo koji 'minio:9000' sa javnom adresom
         if "minio:9000" in url:
-            url = url.replace("http://minio:9000", settings.MINIO_PUBLIC_ENDPOINT)
+            #settings.MINIO_PUBLIC_ENDPOINT je npr "http://178.104.214.78:9000"
+            #Zelimo samo IP:Port deo za zamenu ako vec postoji protokol
+            public_host = settings.MINIO_PUBLIC_ENDPOINT.replace("http://", "").replace("https://", "")
+            url = url.replace("minio:9000", public_host)
+            
+        print(f"--- DEBUG: FINALNI URL KOJI SE SALJE: {url}")
             
         return {
             "upload_url": url, 
