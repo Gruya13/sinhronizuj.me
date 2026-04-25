@@ -19,8 +19,9 @@ def wait_for_runpod_result(job_id: str, endpoint_id: str, timeout_seconds: int =
     last_status = None
     
     while True:
-        if time.time() - start_time > timeout_seconds:
-            raise Exception(f"RunPod timeout nakon {timeout_seconds}s (Job ID: {job_id})")
+        elapsed = time.time() - start_time
+        if elapsed > timeout_seconds:
+            raise Exception(f"RunPod TIMEOUT: Model se nije podigao nakon {timeout_seconds/60} minuta. Proverite RunPod infrastrukturu.")
             
         try:
             response = requests.get(status_url, headers=headers, timeout=30)

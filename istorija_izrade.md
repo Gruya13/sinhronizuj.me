@@ -150,3 +150,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Worker:** Implementirani callback-ovi za RunPod polling koji detektuju "Cold Start".
 - **Frontend:** Redizajniran statusni panel — dodat sub-status sa pulse efektom i interaktivna "WORKER_LOG_FEED" konzola.
 - **UX:** Uvedeni vizuelni indikatori za stanje RunPod instanci.
+
+### 25.04.2026. 14:43 — Globalni RunPod Status Monitor
+- **Backend:** Dodata `/api/v1/runpod-status` ruta koja proverava `workerCount` na RunPod-u.
+- **Frontend:** Dodat statusni bedž u Dashboard (🌙 Spava / 🟢 Aktivan).
+- **Optimizacija:** Implementiran polling za zdravlje infrastrukture bez buđenja instanci.
