@@ -121,3 +121,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - Kreiran `infra/Dockerfile.wav2lip` baziran na CUDA imidžu za izolovanu obradu.
     - Napisan `infra/wav2lip_server.py` (FastAPI) za asinhronu sinhronizaciju usana putem API-ja.
     - Ažuriran `README.md` sa novim statusima rešenih problema.
+
+### 25.04.2026. 13:50 — Frontend Redirekcija i CORS Stabilizacija
+- **Frontend (Lokal):** Preusmeren `API_BASE_URL` u `src/App.jsx` sa localhost-a na VPS IP (`178.104.214.78`).
+- **Frontend (Lokal):** Kreiran `.env` fajl sa `VITE_API_URL` varijablom radi lakše konfiguracije.
+- **Backend (VPS):** Ažurirana `CORSMiddleware` polisa u `backend/main.py`. Umesto džoker znaka `*`, eksplicitno su dodate adrese `http://localhost:5173` i `http://127.0.0.1:5173` uz omogućene kredencijale (`allow_credentials=True`), čime je rešen problem preflight OPTIONS blokade na Hetzneru.
+- **Deploy:** Izvršen `git pull` i restart `sinhronizuj-api` kontejnera na VPS-u.
+
+### 25.04.2026. 13:52 — Finalna Stabilizacija API Servisa
+- **Docker Compose:** Dodata eksplicitna `command: uvicorn backend.main:app...` direktiva u `api` servis. Ovo eliminiše rizik od gašenja kontejnera zbog nedostajućeg entrypoint-a u bazi imidža.
+- **Deploy:** Spreman plan za osvežavanje VPS-a.

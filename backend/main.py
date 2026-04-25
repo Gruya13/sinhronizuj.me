@@ -59,6 +59,11 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
             },
             ExpiresIn=3600
         )
+        
+        # Zadatak: Zameni interni Docker hostname javnom IP adresom za frontend klijenta
+        if "minio:9000" in url:
+            url = url.replace("http://minio:9000", settings.MINIO_PUBLIC_ENDPOINT)
+            
         return {
             "upload_url": url, 
             "file_key": filename,

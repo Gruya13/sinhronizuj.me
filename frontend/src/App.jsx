@@ -21,6 +21,20 @@ function App() {
   
   const feedRef = useRef(null);
   const fileInputRef = useRef(null);
+  const consecutiveErrors = useRef(0);
+
+  const resetStudio = () => {
+    setTaskId(null);
+    setLoading(false);
+    setStatus('');
+    setProgressData(null);
+    setVideoUrl(null);
+    setError(null);
+    setUploadProgress(0);
+    setVisualContextUrl(null);
+    localStorage.removeItem('sinhronizuj_me_task_id');
+    consecutiveErrors.current = 0;
+  };
 
   const STEPS = [
     "Preuzimanje završeno",
@@ -36,6 +50,7 @@ function App() {
     const fetchHw = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/v1/hw-stats`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         setHwStats(data);
       } catch (err) { /* Silent fail */ }
@@ -75,7 +90,18 @@ function App() {
       interval = setInterval(async () => {
         try {
           const res = await fetch(`${API_BASE_URL}/api/v1/status/${taskId}`);
+          
+          // Zadatak 1: Automatski reset ako task ne postoji (404)
+          if (res.status === 404) {
+            console.warn("Zadatak nije pronađen na serveru (404). Resetujem studio...");
+            resetStudio();
+            return;
+          }
+
+          if (!res.ok) throw new Error("Server error");
+          
           const data = await res.json();
+          consecutiveErrors.current = 0; // Resetujemo brojač grešaka pri uspešnom pozivu
           
           if (data.status === 'SUCCESS') {
             setVideoUrl(`${API_BASE_URL}${data.video_url}`);
@@ -100,7 +126,16 @@ function App() {
               setStatus(data.status || 'ČEKANJE...');
             }
           }
-        } catch (err) { console.error(err); }
+        } catch (err) { 
+          consecutiveErrors.current += 1;
+          console.error(`Greška pri pollingu (${consecutiveErrors.current}/5):`, err);
+          
+          // Zadatak 1: Reset nakon 5 uzastopnih grešaka (npr. server ugašen ili Redis očišćen)
+          if (consecutiveErrors.current >= 5) {
+            setError("Veza sa serverom je izgubljena. Zadatak je verovatno prekinut.");
+            setTimeout(resetStudio, 3000); // Resetuj nakon 3 sekunde da korisnik vidi grešku
+          }
+        }
       }, 2000);
     }
     return () => clearInterval(interval);
@@ -274,7 +309,16 @@ function App() {
                           </>
                         )}
                       </span>
-                      <span className="percent-text">{uploadProgress > 0 ? uploadProgress : (progressData?.percent || 0)}%</span>
+                      <div className="progress-actions">
+                        <span className="percent-text">{uploadProgress > 0 ? uploadProgress : (progressData?.percent || 0)}%</span>
+                        <button 
+                          className="cancel-task-btn" 
+                          onClick={resetStudio}
+                          title="Prekini i resetuj studio"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <div className="progress-bar-container">
                       <motion.div 

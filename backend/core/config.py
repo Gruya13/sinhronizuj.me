@@ -18,6 +18,7 @@ class Settings:
     MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "sinhronizuj_storage")
     MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "sinhronizuj_pass_2026")
     MINIO_BUCKET: str = "uploads"
+    MINIO_PUBLIC_ENDPOINT: str = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://178.104.214.78:9000")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
     
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
