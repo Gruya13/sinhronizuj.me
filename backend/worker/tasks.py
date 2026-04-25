@@ -1,12 +1,20 @@
 from backend.worker.celery_app import celery_app
 from backend.worker.downloader import download_video
+from backend.core.config import settings
 import os
+import shutil
+from datetime import datetime, timedelta, timezone
 
 @celery_app.task(bind=True, name="process_video_task")
 def process_video_task(self, video_url: str):
     """
     Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom RunPod arhitekturom.
     """
+    # Zadatak 1: Fallback učitavanje API ključa ako je izgubljen u forkovanom procesu
+    if not settings.RUNPOD_API_KEY:
+        settings.RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
+        print(f"[WORKER] Fallback: RUNPOD_API_KEY učitan iz os.environ (Dužina: {len(settings.RUNPOD_API_KEY)})")
+
     progress_metadata = {
         'current_step': "Inicijalizacija...",
         'percent': 0,
@@ -117,3 +125,58 @@ def process_video_task(self, video_url: str):
         "url": video_url,
         "final_video_path": final_output
     }
+
+@celery_app.task(name="backend.worker.tasks.cleanup_old_files")
+def cleanup_old_files():
+    """
+    Zadatak 3: Periodično čišćenje starih fajlova (starijih od 24h) sa S3 i lokalnog diska.
+    """
+    import boto3
+    print(f"[CLEANUP] Pokrećem čišćenje starih fajlova: {datetime.now()}")
+    
+    # 1. Čišćenje MinIO bucketa (uploads i processed)
+    try:
+        s3 = boto3.client(
+            's3',
+            endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY
+        )
+        
+        buckets = ['uploads', 'processed', 'input-audio'] # Dodajemo i input-audio za svaki slučaj
+        threshold = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        for bucket in buckets:
+            print(f"[CLEANUP] Proveravam bucket: {bucket}")
+            # Provera da li bucket postoji pre listanja
+            try:
+                objects = s3.list_objects_v2(Bucket=bucket)
+                if 'Contents' in objects:
+                    for obj in objects['Contents']:
+                        if obj['LastModified'] < threshold:
+                            print(f"[CLEANUP] Brišem {obj['Key']} iz {bucket}")
+                            s3.delete_object(Bucket=bucket, Key=obj['Key'])
+            except Exception as e:
+                print(f"[CLEANUP] Bucket {bucket} nije dostupan ili je prazan: {e}")
+                
+    except Exception as e:
+        print(f"[CLEANUP] S3 klijent greška: {e}")
+
+    # 2. Čišćenje lokalnog /app/temp_workspace
+    local_temp = "/app/temp_workspace"
+    if os.path.exists(local_temp):
+        threshold_ts = (datetime.now(timezone.utc) - timedelta(hours=24)).timestamp()
+        for item in os.listdir(local_temp):
+            item_path = os.path.join(local_temp, item)
+            try:
+                # Brišemo podfoldere i fajlove starije od 24h
+                mtime = os.path.getmtime(item_path)
+                if mtime < threshold_ts:
+                    if os.path.isdir(item_path):
+                        print(f"[CLEANUP] Brišem lokalni folder: {item_path}")
+                        shutil.rmtree(item_path, ignore_errors=True)
+                    else:
+                        print(f"[CLEANUP] Brišem lokalni fajl: {item_path}")
+                        os.remove(item_path)
+            except Exception as e:
+                print(f"[CLEANUP] Greška pri brisanju {item_path}: {e}")

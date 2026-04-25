@@ -1,0 +1,16 @@
+temp_workspace/
+venv/
+__pycache__/
+*.mp4
+*.wav
+*.json
+.git/
+.env
+worker.log
+models/
+outputs/
+test/
+scratch/
+yt-dlp
+cookies.txt
+brave.txt

@@ -101,3 +101,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **CPU Optimizacija (PyTorch):** `requirements.txt` ažuriran da koristi `torch` i `torchaudio` sa CPU indeksa.
 - **Dockerfile:** Zadržana `slim` baza uz podršku za lokalni Demucs rad bez CUDA drajvera.
 - **Verifikacija (25.04.2026. 08:45):** Izvršen uspešan "Sanity Check" pravog koda. Potvrđeno da MinIO upload i RunPod Whisper pozivi rade bez greške. 401 Unauthorized problem je trajno rešen.
+
+### 25.04.2026. 08:38 — Frontend/Backend Integracija i CORS Fix
+- **backend/main.py:** Dodata `CORSMiddleware` podrška za nesmetanu komunikaciju sa Vite (5173) frontendom.
+- **hw-stats:** Stabilizovan endpoint za praćenje resursa (izmenjena struktura JSON-a da odgovara frontend očekivanjima i dodat fail-safe).
+
+### 25.04.2026. 13:35 — Arhitektonska Unapređenja (Zadaci 1-4)
+- **Task 1: Celery 401 Fix (Env Robustness):**
+    - Uvedeno eksplicitno učitavanje `.env` fajla u `backend/worker/celery_app.py` pomoću `python-dotenv`.
+    - Dodata fallback logika u `backend/worker/tasks.py` koja osigurava re-populaciju `RUNPOD_API_KEY` iz `os.environ` u forkovanim procesima.
+    - `docker-compose.yml` ažuriran sa direktnim mapiranjem ključnih varijabli u `environment` sekciji worker-a.
+- **Task 2: MinIO CORS:**
+    - Generisan `infra/cors.json` koji dozvoljava GET, PUT, POST sa svih origin-a.
+    - Primena CORS polise na `uploads` bucket omogućava direktan frontend upload.
+- **Task 3: Celery Beat & SSD Cleanup:**
+    - Konfigurisan **Celery Beat** u `celery_app.py` sa cron rasporedom za čišćenje u 03:00 AM.
+    - Implementiran zadatak `cleanup_old_files` u `tasks.py` koji briše fajlove starije od 24h iz MinIO bucketa (`uploads`, `processed`, `input-audio`) i lokalnog `/app/temp_workspace` direktorijuma.
+- **Task 4: Wav2Lip Izolacija (Serverless GPU):**
+    - Kreiran `infra/Dockerfile.wav2lip` baziran na CUDA imidžu za izolovanu obradu.
+    - Napisan `infra/wav2lip_server.py` (FastAPI) za asinhronu sinhronizaciju usana putem API-ja.
+    - Ažuriran `README.md` sa novim statusima rešenih problema.

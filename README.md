@@ -34,7 +34,7 @@
 | 4. Prevod | `Qwen 32B/35B` via vLLM (TOON) | Kontekstualno prevođenje sa vizuelnim kontekstom |
 | 5. Sinteza | `Fish Speech 1.5` (RunPod) | Generisanje srpskog glasa sa kloniranim tembrom |
 | 6. Spajanje | `FFmpeg` (`-c:v copy`) | Finalno spajanje slike, pozadine i novog glasa |
-| 7. Lip Sync | `Wav2Lip` (opciono) | Sinhronizacija usana — preskače se za videa bez lica |
+| 7. Lip Sync | `Wav2Lip` (Serverless GPU) | Sinhronizacija usana — sada kao izolovana Serverless komponenta |
 
 ---
 
@@ -138,10 +138,9 @@ sinhronizuj.me/
 
 ## 🐛 Poznati Problemi (In Progress)
 
-| Problem | Status | Opis |
-|---|---|---|
-| RunPod 401 Unauthorized | 🔴 Aktivan | Celery worker dobija 401 pri pozivu RunPod Whisper endpointa, iako isti API ključ radi iz standalone Python skripte. Istraga u toku — moguć problem sa učitavanjem env varijabli u Celery fork procesima. |
-| CORS za MinIO PUT | 🟡 Potencijalan | Browser može blokirati direktan PUT ka MinIO ako CORS nije eksplicitno konfigurisan na serveru. |
+| RunPod 401 Unauthorized | ✅ Rešen/Testiranje | Problem rešen eksplicitnim učitavanjem `.env` fajla u worker procesima (dotenv) i mapiranjem environment varijabli u `docker-compose.yml`. |
+| CORS za MinIO PUT | ✅ Rešen | Implementiran `cors.json` koji dozvoljava klijentski upload sa svih origin-a (*). |
+| Wav2Lip Izolacija | ✅ Rešen | Wav2Lip prebačen u Serverless arhitekturu (izolovan Docker imidž sa FastAPI serverom) radi optimizacije resursa na Hetzneru. |
 | Demucs shebang putanje | ✅ Rešen | Skripte u venv-u su imale zastarele putanje od starog naziva projekta (daca_dub). Popravljeno. |
 | torchcodec zavisnost | ✅ Rešen | Instaliran `torchcodec` paket koji je nova zavisnost za `torchaudio`. |
 

@@ -94,12 +94,20 @@ def get_task_status(task_id: str):
     return response
 
 @app.get("/api/v1/hw-stats")
-def get_hw_stats():
-    from backend.worker.hw_monitor import get_gpu_stats, get_system_stats
-    return {
-        "gpu": get_gpu_stats(),
-        "system": get_system_stats()
-    }
+async def hw_stats():
+    try:
+        from backend.worker.hw_monitor import get_gpu_stats, get_system_stats
+        sys_stats = get_system_stats()
+        gpu_stats = get_gpu_stats()
+        return {
+            "status": "online",
+            "cpu_usage": sys_stats.get("cpu_usage", 0),
+            "memory": sys_stats.get("memory", {"percent": 0}),
+            "gpus": gpu_stats
+        }
+    except Exception as e:
+        print(f"HW Stats Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/api/v1/logs")
 def get_worker_logs():

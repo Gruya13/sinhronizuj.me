@@ -19,11 +19,27 @@ services:
     command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1
     env_file:
       - .env
+    environment:
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY}
+      - RUNPOD_WHISPER_ID=${RUNPOD_WHISPER_ID}
+      - RUNPOD_TRANSLATOR_ID=${RUNPOD_TRANSLATOR_ID}
+      - RUNPOD_TTS_ID=${RUNPOD_TTS_ID}
     depends_on:
       - redis
     volumes:
       - ./temp_workspace:/app/temp_workspace
       - .:/app # Za worker.log pristupačnost
+
+  beat:
+    build: .
+    container_name: sinhronizuj-beat
+    command: celery -A backend.worker.tasks beat --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - ./temp_workspace:/app/temp_workspace
 
   redis:
     image: redis:7-alpine
