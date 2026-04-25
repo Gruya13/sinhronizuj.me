@@ -19,35 +19,46 @@ def process_video_task(self, video_url: str):
         'current_step': "Inicijalizacija...",
         'percent': 0,
         'completed_steps': [],
-        'segments': []
+        'segments': [],
+        'detail': "Priprema radnog prostora...",
+        'logs': []
     }
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None):
         if step_name: progress_metadata['current_step'] = step_name
         if percentage is not None: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
+        if detail:
+            progress_metadata['detail'] = detail
+            ts = datetime.now().strftime("%H:%M:%S")
+            progress_metadata['logs'].append(f"[{ts}] {detail}")
+            if len(progress_metadata['logs']) > 20:
+                progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
         self.update_state(state='PROGRESS', meta=progress_metadata)
 
     # --- FAZA 1: Preuzimanje ---
-    update_progress("Preuzimanje videa...", 10)
+    update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje media fajlova...")
     result = download_video(video_url)
     if result["status"] == "error": return result
     update_progress(completed_step="Preuzimanje završeno")
     
     # --- FAZA 2: Separacija Zvuka ---
-    update_progress("Izolacija vokala...", 25)
+    update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na CPU-u. Ovo može potrajati par minuta...")
     from backend.worker.audio_sep import separate_audio
     sep_result = separate_audio(result['audio_path'])
     if sep_result["status"] == "error": return sep_result
     update_progress(completed_step="Vokal izolovan")
     
     # --- FAZA 3: Transkripcija ---
-    update_progress("Prepoznavanje govora (Whisper RunPod)...", 40)
+    update_progress("Prepoznavanje govora (Whisper RunPod)...", 40, detail="Inicijalizacija Whisper zahteva...")
     from backend.worker.transcriber import transcribe_audio
-    transcription_result = transcribe_audio(sep_result["vocals_path"])
+    transcription_result = transcribe_audio(
+        sep_result["vocals_path"],
+        progress_callback=lambda detail: update_progress(detail=detail)
+    )
     if transcription_result["status"] == "error": return transcription_result
     
     segments_ui = []
@@ -58,10 +69,10 @@ def process_video_task(self, video_url: str):
             "translated": "",
             "status": "pending"
         })
-    update_progress(completed_step="Govor prepoznat", segments=segments_ui)
+    update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
     
     # --- FAZA 4: Vizuelni Kontekst i Prevod ---
-    update_progress("Generisanje vizuelnog konteksta...", 50)
+    update_progress("Generisanje vizuelnog konteksta...", 50, detail="Ekstrakcija ključnih frejmova za analizu...")
     from backend.worker.preprocessor import extract_visual_context, upload_to_minio
     preview_path = extract_visual_context(result["video_path"])
     
@@ -70,11 +81,12 @@ def process_video_task(self, video_url: str):
         visual_context_url = upload_to_minio(preview_path)
         update_progress(visual_context_url=visual_context_url)
     
-    update_progress("Prevođenje (RunPod + TOON)...", 60)
+    update_progress("Prevođenje (RunPod + TOON)...", 60, detail="Slanje segmenata na Qwen 32B model...")
     from backend.worker.translator import translate_segments
     
     translation_result = translate_segments(
-        transcription_result["segments"]
+        transcription_result["segments"],
+        progress_callback=lambda detail: update_progress(detail=detail)
     )
     if translation_result["status"] == "error": return translation_result
     
@@ -86,12 +98,13 @@ def process_video_task(self, video_url: str):
     update_progress(completed_step="Tekst preveden", percentage=70, segments=segments_ui)
     
     # --- FAZA 5: Sinteza Govora ---
-    update_progress("Sinteza glasa (RunPod TTS)...", 75)
+    update_progress("Sinteza glasa (RunPod TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
     from backend.worker.tts_engine import synthesize_audio
     
     tts_result = synthesize_audio(
         sep_result["vocals_path"], 
-        translation_result["translated_segments"]
+        translation_result["translated_segments"],
+        progress_callback=lambda detail: update_progress(detail=detail)
     )
     if tts_result["status"] == "error": return tts_result
     update_progress(completed_step="Glas generisan", percentage=85)

@@ -3,7 +3,7 @@ import json
 from typing import List, Dict
 from backend.core.config import settings
 
-def translate_segments(segments: list) -> dict:
+def translate_segments(segments: list, progress_callback=None) -> dict:
     """
     Poziva RunPod Serverless Translator (Qwen 32B) koristeći TOON format.
     """
@@ -52,7 +52,7 @@ def translate_segments(segments: list) -> dict:
         job_id = job_data["id"]
         
         # Čekamo rezultat (polling)
-        output = wait_for_runpod_result(job_id, settings.RUNPOD_TRANSLATOR_ID)
+        output = wait_for_runpod_result(job_id, settings.RUNPOD_TRANSLATOR_ID, progress_callback=progress_callback)
         
         translated_toon = output["translated_segments"]
         

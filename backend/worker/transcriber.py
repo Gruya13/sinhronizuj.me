@@ -4,7 +4,7 @@ from typing import Dict, Any
 from backend.core.config import settings
 from backend.worker.preprocessor import upload_to_minio
 
-def transcribe_audio(audio_path: str) -> dict:
+def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
     """
     Poziva RunPod Serverless Whisper endpoint za transkripciju koristeći requests (stabilnije od httpx).
     """
@@ -53,7 +53,7 @@ def transcribe_audio(audio_path: str) -> dict:
         job_id = job_data["id"]
         
         # Čekamo rezultat (polling)
-        output = wait_for_runpod_result(job_id, settings.RUNPOD_WHISPER_ID)
+        output = wait_for_runpod_result(job_id, settings.RUNPOD_WHISPER_ID, progress_callback=progress_callback)
         
         return {
             "status": "success",

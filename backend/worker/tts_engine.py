@@ -4,7 +4,7 @@ import uuid
 from backend.core.config import settings
 from backend.worker.preprocessor import upload_to_minio
 
-def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
+def synthesize_audio(vocals_path: str, translated_segments: list, progress_callback=None) -> dict:
     """
     Poziva RunPod Serverless Fish Speech (TTS) koristeći requests.
     """
@@ -46,7 +46,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list) -> dict:
         job_id = job_data["id"]
         
         # Čekamo rezultat (polling)
-        output = wait_for_runpod_result(job_id, settings.RUNPOD_TTS_ID)
+        output = wait_for_runpod_result(job_id, settings.RUNPOD_TTS_ID, progress_callback=progress_callback)
         
         audio_url = output["audio_url"]
         

@@ -19,7 +19,9 @@ function App() {
   const [visualContextUrl, setVisualContextUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
+  const [terminalOpen, setTerminalOpen] = useState(true);
   const feedRef = useRef(null);
+  const terminalRef = useRef(null);
   const fileInputRef = useRef(null);
   const consecutiveErrors = useRef(0);
 
@@ -83,6 +85,12 @@ function App() {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
   }, [progressData?.segments]);
+
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [progressData?.logs]);
 
   useEffect(() => {
     let interval;
@@ -326,6 +334,13 @@ function App() {
                         animate={{ width: `${uploadProgress > 0 ? uploadProgress : (progressData?.percent || 0)}%` }} 
                       />
                     </div>
+
+                    {progressData?.detail && (
+                      <div className="sub-status-detail">
+                        {progressData.detail.includes("Cold Start") ? <Loader2 size={14} className="spinner-icon" /> : <Clock size={14} />}
+                        <span>{progressData.detail}</span>
+                      </div>
+                    )}
                   </div>
 
                   {progressData?.segments?.length > 0 ? (
@@ -355,6 +370,35 @@ function App() {
                       <p>{uploadProgress > 0 ? 'Slanje fajla u oblak...' : 'Pripremam studio za obradu...'}</p>
                     </div>
                   )}
+
+                  {/* Terminal Log Feed */}
+                  <div className="terminal-section">
+                    <div className="terminal-header" onClick={() => setTerminalOpen(!terminalOpen)}>
+                      <div className="flex items-center gap-2">
+                        <Terminal size={14} />
+                        <span>WORKER_LOG_FEED</span>
+                      </div>
+                      <span>{terminalOpen ? '−' : '+'}</span>
+                    </div>
+                    {terminalOpen && (
+                      <div className="terminal-body" ref={terminalRef}>
+                        {progressData?.logs?.length > 0 ? (
+                          progressData.logs.map((log, i) => {
+                            const [ts, ...msgParts] = log.split(' ');
+                            const msg = msgParts.join(' ');
+                            return (
+                              <div key={i} className="log-entry">
+                                <span className="log-ts">{ts}</span>
+                                <span className="log-msg">{msg}</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="log-entry opacity-40">Čekam prve mikro-statuse...</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="studio-sidebar">

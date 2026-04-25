@@ -139,3 +139,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 ### 25.04.2026. 14:22 — Dodavanje requests biblioteke za RunPod komunikaciju
 - **Requirements:** Dodata `requests` biblioteka koja je neophodna za rad `transcriber.py`, `translator.py` i `tts_engine.py` modula.
 - **Deploy:** Izvršen ponovni rebuild `sinhronizuj-worker` kontejnera na VPS-u.
+
+### 25.04.2026. 14:37 — Implementacija RunPod Polling mehanizma
+- **Arhitektura:** Uvedena asinhrona komunikacija sa RunPod-om putem `/run` i `/status` endpointa.
+- **Utils:** Kreiran `utils.py` sa `wait_for_runpod_result` funkcijom (rešava Cold Start problem).
+- **Worker:** Refaktorisani `transcriber.py`, `translator.py` i `tts_engine.py` za stabilniji rad.
