@@ -13,7 +13,12 @@ app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhr
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://178.104.214.78:8000",
+        "http://178.104.214.78",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -3,7 +3,7 @@ import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Termina
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
 function App() {
   const [url, setUrl] = useState('');
