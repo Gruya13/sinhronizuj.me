@@ -81,11 +81,12 @@ def process_video_task(self, video_url: str):
         visual_context_url = upload_to_minio(preview_path)
         update_progress(visual_context_url=visual_context_url)
     
-    update_progress("Prevođenje (RunPod + TOON)...", 60, detail="Slanje segmenata na Qwen 32B model...")
+    update_progress("Prevođenje (RunPod + Multimodal)...", 60, detail="Analiza vizuelnog konteksta i slanje segmenata na Qwen-VL...")
     from backend.worker.translator import translate_segments
     
     translation_result = translate_segments(
         transcription_result["segments"],
+        video_path=result["video_path"],
         progress_callback=lambda detail: update_progress(detail=detail)
     )
     if translation_result["status"] == "error": return translation_result

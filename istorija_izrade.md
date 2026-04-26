@@ -155,3 +155,21 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Backend:** Dodata `/api/v1/runpod-status` ruta koja proverava `workerCount` na RunPod-u.
 - **Frontend:** Dodat statusni bedž u Dashboard (🌙 Spava / 🟢 Aktivan).
 - **Optimizacija:** Implementiran polling za zdravlje infrastrukture bez buđenja instanci.
+### 25.04.2026. 15:04 — Infrastrukturna Popravka RunPod-a i Flush Sistema
+- **RunPod:** Ažuriran Translator template na `Qwen/Qwen2.5-32B-Instruct-AWQ`. Kvantizacija rešava OOM (Out of Memory) problem na A6000 karticama.
+- **Hetzner:** Izvršen `redis-cli FLUSHALL` za potpuno čišćenje "zombi" zadataka iz memorije.
+- **Safety:** Potvrđen timeout od 10 minuta za sve asinkrone RunPod pozive.
+- **Status:** Sistem je resetovan na nulu i spreman za čisti E2E test.
+
+### 26.04.2026. 10:42 — Migracija na INT4 AWQ Model (Qwen 27B)
+- **RunPod:** Model zamenjen sa `cyankiwi/Qwen3.6-27B-AWQ-INT4`. Težina modela smanjena na ~16GB.
+- **Konfiguracija:** `MAX_MODEL_LEN` postavljen na `8192`, kontejner disk na `40GB`.
+- **Hetzner:** Ponovljen `redis-cli FLUSHALL` radi čišćenja memorije nakon vLLM zastoja.
+- **Cilj:** Trajno rešavanje OOM grešaka i brži Cold Start.
+
+### 26.04.2026. 12:10 — Nova vLLM Infrastruktura sa Volume Keširanjem
+- **RunPod:** Obrisan stari endpoint i kreiran novi ID: `xn4s3fwip35hou`.
+- **Optimizacija:** Model se sada učitava sa mrežnog volume-a `xzu8xnqpdd` (HF keš na `/runpod-volume`).
+- **Hardware:** Proširen GPU selektor na A6000, A100, H100, L40/L40S (Multi-GPU fallback).
+- **Hetzner:** Ažuriran `.env` sa novim Translator ID-em i restartovani servisi.
+- **Benefit:** Cold start smanjen sa ~5 min na ~30s zbog trajnog keša na disku.
