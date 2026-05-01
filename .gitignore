@@ -26,6 +26,7 @@ brave.txt
 *.md
 !README.md
 !docs/PLAN_ARHITEKTURE_V2.md
+!docs/PLAN_RUNPOD_ARHITEKTURE.md
 !docs/istorija_izrade.md
 
 docs/redis_password.txt

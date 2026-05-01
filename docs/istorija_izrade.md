@@ -203,3 +203,9 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Organizacija:** Kreiran je novi direktorijum `docs/` u koji su prebačeni svi dokumentacioni fajlovi (`PLAN_ARHITEKTURE_V2.md`, `istorija_izrade.md`, `struktura_projekta.txt`, `README_old.md`, `redis_password.txt`).
 - **Git:** Ažuriran `.gitignore` kako bi pratio nove putanje dokumentacije i nastavio da ignoriše fajl sa lozinkom.
 - **Root:** `README.md` je zadržan u root direktorijumu radi lakšeg pregleda na GitHub-u.
+
+### 01.05.2026. 07:24 — Brainstorming i Planiranje Custom RunPod Arhitekture
+- **Inicijativa:** Kako bismo zaobišli bespotrebno probijanje kvota na Docker Hub-u i GitHub Actions-u zbog veličine AI modela, kreiran je detaljan plan prelaska na Custom Docker slike za RunPod Serverless radnike.
+- **Dokumentacija:** Generisan kompletan plan i sačuvan u `docs/PLAN_RUNPOD_ARHITEKTURE.md`. Plan obuhvata strategije za Multi-stage build (smanjenje ispod 3GB), Lazy loading AI modela (Whisper, Qwen, Fish Speech) sa mrežnog drajva i rešavanje CI/CD timeout problema (direktno preuzimanje pre-compiled `flash-attn` wheel-ova).
+- **Infrastruktura:** Odlučeno je da zadržimo "Monorepo" strukturu i novu arhitekturu gradimo unutar `runpod_workers` direktorijuma uz pomoć GitHub Actions *Path filtering-a*.
+
