@@ -223,4 +223,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **CI/CD Automatizacija:** Kreiran `.github/workflows/runpod-builder.yml`. Ovaj workflow se okida samo pri promenama unutar `runpod_workers/` foldera (*Path filtering*). Prijavljuje se na `ghcr.io`, prepoznaje repozitorijum, vrši `buildx` optimizaciju uz GitHub Actions caching (čime sledeći buildovi traju drastično kraće) i automatski push-uje gotove Docker imidže.
 - **Status:** Custom RunPod infrastruktura je tehnički zaokružena i endpointi su spremni za testno podizanje na RunPod platformi iz `ghcr.io` registra.
 
+### 01.05.2026. 07:42 — Debugging: Pad GitHub Actions CI/CD Pipeline-a
+- **Problem:** Inicijalni GitHub Actions run je pukao zbog dva česta razloga za teške ML kontejnere: nedostatak prostora na disku za runner-a (GitHub daje samo ~14GB slobodnog prostora po besplatnom runneru) i implicitno kompajliranje `flash-attn` modula pri instalaciji `vLLM` u `stt_llm` kontejneru.
+- **Rešenje 1 (Disk Space):** Dodat `jlumbroso/free-disk-space@main` korak u `.github/workflows/runpod-builder.yml` koji briše neiskorišćene Android, .NET i Haskell keš fajlove na GitHub runner-u, oslobađajući dodatnih ~25-30GB pre početka build-a.
+- **Rešenje 2 (Flash-attn u vLLM-u):** Unutar `runpod_workers/stt_llm/Dockerfile` dodat je međukorak koji instalira *pre-compiled* `flash-attn` wheel pre nego što se preuzme `vLLM` iz `requirements.txt`. Ovo zaustavlja instalaciju vLLM-a da trigeruje 40-minutno kompajliranje sa izvornog koda na GitHub mašini.
+
+
 

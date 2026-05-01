@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements-stt-llm.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu121torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl && \
     pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements-stt-llm.txt
 
 # ==========================================
