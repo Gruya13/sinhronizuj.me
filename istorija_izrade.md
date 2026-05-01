@@ -186,3 +186,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Konfiguracija:** Svi osetljivi podaci zamenjeni su odgovarajućim placeholder tekstovima.
 - **Bekap:** Stara verzija fajla sačuvana kao `README_old.md`.
 
+### 01.05.2026. 06:56 — Debugging: Zadaci blokirani u PENDING statusu
+- **Simptomi:** Novi video zadaci stoje u "PENDING" statusu i ne pomeraju se, UI prikazuje "Čekam prve mikro-statuse...".
+- **Uzrok:** Analizom VPS infrastrukture utvrđeno je da je Docker kontejner `sinhronizuj-worker` pao (Exited 1) pre 3 dana zbog `redis.exceptions.ResponseError: UNBLOCKED`. Ovo je direktna posledica `redis-cli FLUSHALL` komande koja je prekinula Celery konekcije, a kontejner se nije automatski restartovao.
+- **Rešenje:** Podignut `sinhronizuj-worker` kontejner putem komande `docker compose up -d worker`. Radnik je trenutno aktivan i odmah je preuzeo zaglavljene zadatke iz Redis reda.
+
+### 01.05.2026. 07:00 — Sigurnosna zakrpa za Redis (BSI Upozorenje)
+- **Problem:** Primljen abuse izveštaj od Hetznera (prosledio BSI) koji upozorava da je Redis server na portu 6379 javno dostupan bez SASL/password autentifikacije, što predstavlja ozbiljan sigurnosni rizik.
+- **Rešenje:**
+    1. Izgenerisana je snažna nasumična lozinka (32 karaktera) i dodata u `.env` pod varijablom `REDIS_PASSWORD`.
+    2. Modifikovan `docker-compose.yml` tako da `sinhronizuj-redis` kontejner sada prihvata `--requirepass ${REDIS_PASSWORD}` zastavicu pri pokretanju.
+    3. Ažurirana `REDIS_URL` varijabla za sve servise (FastAPI, Worker, Beat) tako da se uspešno loguju uz novu lozinku (format: `redis://:password@ip:6379/0`).
+    4. Nove konfiguracije su primenjene na VPS-u komandom `docker compose up -d`. Redis baza je sada zaštićena od neovlašćenih upada sa interneta.
+
