@@ -209,3 +209,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Dokumentacija:** Generisan kompletan plan i sačuvan u `docs/PLAN_RUNPOD_ARHITEKTURE.md`. Plan obuhvata strategije za Multi-stage build (smanjenje ispod 3GB), Lazy loading AI modela (Whisper, Qwen, Fish Speech) sa mrežnog drajva i rešavanje CI/CD timeout problema (direktno preuzimanje pre-compiled `flash-attn` wheel-ova).
 - **Infrastruktura:** Odlučeno je da zadržimo "Monorepo" strukturu i novu arhitekturu gradimo unutar `runpod_workers` direktorijuma uz pomoć GitHub Actions *Path filtering-a*.
 
+### 01.05.2026. 07:28 — Implementacija RunPod Worker Skeletons
+- **Struktura:** Uspešno kreirana `runpod_workers/` putanja sa dva izolovana pod-direktorijuma: `stt_llm/` i `tts/`.
+- **Faza 1 (Radnik A):** Kreirani `Dockerfile`, `requirements-stt-llm.txt` i `handler.py` za Whisper i vLLM.
+    - *Optimizacija:* Urađen **Multi-stage Docker build**. Točkovi se bildaju u privremenom kontejneru (`builder`), a zatim se prebacuju u `python:3.10-slim` runtime kontejner, čime se briše sav apt i pip keš.
+- **Faza 2 (Radnik B):** Kreirani fajlovi za Fish Speech TTS radnika.
+    - *Rešen problem:* `flash-attn` biblioteka inače traje 40 minuta za kompajliranje, što obično uzrokuje timeout i pad GitHub Actions CI/CD procesa. Rešenje je primenjeno eksplicitnim povlačenjem `pre-compiled wheel` arhiva sa interneta (`flash_attn-2.6.3+cu121torch2.4...`), čime se instalacija skraćuje na par sekundi.
+- **Lazy Loading (Handler):** U oba handlera implementirana logika (`ensure_model_exists`) koja proverava `/runpod-volume/models` direktorijum pri startu (Cold Start) pre nego što pokrene API. Ako model fali, povlači ga sa Hugging Face-a.
+
+
