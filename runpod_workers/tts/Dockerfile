@@ -12,7 +12,7 @@ COPY requirements-tts.txt .
 RUN pip install --no-cache-dir -r requirements-tts.txt
 
 # Pre-compiled flash-attn wheel za brzo instaliranje bez build timeout-a
-RUN pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.6.3/flash_attn-2.6.3+cu121torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+RUN pip install --no-cache-dir https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 
 COPY handler.py .
 
