@@ -25,6 +25,7 @@ brave.txt
 # Markdown fajlovi (osim kljucne dokumentacije)
 *.md
 !README.md
-!PLAN_ARHITEKTURE_V2.md
-!istorija_izrade.md
-redis_password.txt
+!docs/PLAN_ARHITEKTURE_V2.md
+!docs/istorija_izrade.md
+
+docs/redis_password.txt

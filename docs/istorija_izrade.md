@@ -199,3 +199,7 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     3. Ažurirana `REDIS_URL` varijabla za sve servise (FastAPI, Worker, Beat) tako da se uspešno loguju uz novu lozinku (format: `redis://:password@ip:6379/0`).
     4. Nove konfiguracije su primenjene na VPS-u komandom `docker compose up -d`. Redis baza je sada zaštićena od neovlašćenih upada sa interneta.
 
+### 01.05.2026. 07:07 — Reorganizacija dokumentacije
+- **Organizacija:** Kreiran je novi direktorijum `docs/` u koji su prebačeni svi dokumentacioni fajlovi (`PLAN_ARHITEKTURE_V2.md`, `istorija_izrade.md`, `struktura_projekta.txt`, `README_old.md`, `redis_password.txt`).
+- **Git:** Ažuriran `.gitignore` kako bi pratio nove putanje dokumentacije i nastavio da ignoriše fajl sa lozinkom.
+- **Root:** `README.md` je zadržan u root direktorijumu radi lakšeg pregleda na GitHub-u.
