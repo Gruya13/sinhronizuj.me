@@ -173,3 +173,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Hardware:** Proširen GPU selektor na A6000, A100, H100, L40/L40S (Multi-GPU fallback).
 - **Hetzner:** Ažuriran `.env` sa novim Translator ID-em i restartovani servisi.
 - **Benefit:** Cold start smanjen sa ~5 min na ~30s zbog trajnog keša na disku.
+
+### 26.04.2026. 23:22 — Prelazak na Multimodalni Pipeline (Qwen2-VL)
+- **Backend:** `translator.py` sada izvlači 10 ključnih frejmova iz videa pomoću OpenCV-a.
+- **Vision:** Implementiran OpenAI Vision payload format (tekst + Base64 slike).
+- **Infrastruktura:** Pripremljen RunPod za `Qwen/Qwen2-VL-7B-Instruct-AWQ` sa mrežnim volume keširanjem.
+- **Dependencies:** Dodat `opencv-python-headless` u `requirements.txt`.
+- **Status:** Radnik se rebuild-uje na VPS-u, multimodalni prevod je spreman za test.
+
+### 01.05.2026. 06:48 — Čišćenje Osetljivih Podataka
+- **Bezbednost:** Izvršena detaljna revizija fajla `README.md` radi uklanjanja potencijalno osetljivih produkcionih podataka (RunPod endpointi, MinIO ključevi, Hetzner IP adrese).
+- **Konfiguracija:** Svi osetljivi podaci zamenjeni su odgovarajućim placeholder tekstovima.
+- **Bekap:** Stara verzija fajla sačuvana kao `README_old.md`.
+

@@ -1,17 +1,17 @@
 # 🎙️ Sinhronizuj.me
 ### AI Video Sinhronizacija na Srpski Jezik — Hibridna Arhitektura V2
 
-**Sinhronizuj.me** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju (dubbing). Koristeći hibridnu cloud arhitekturu, sistem kombinuje stabilnost **Hetzner VPS Control Plane-a** sa sirovom GPU snagom **RunPod Serverless** radnika.
+**Sinhronizuj.me** je napredni "end-to-end" sistem za automatizovanu video sinhronizaciju (dubbing). Koristeći hibridnu cloud arhitekturu, sistem kombinuje stabilnost **Cloud Control Plane-a** sa sirovom GPU snagom **Serverless GPU** radnika.
 
 ---
 
 ## 🚀 Ključne Karakteristike
 
-- **Hibridna Arhitektura:** Kontrolna logika, storage i orkestracija na Hetzner VPS-u; teška GPU obrada (Whisper, Qwen, Fish TTS) na RunPod Serverless instancama.
-- **Direktan Upload:** Korisnik može uploadovati lokalne video fajlove direktno u MinIO S3 storage putem Presigned URL-ova (bez prolaska kroz backend).
+- **Hibridna Arhitektura:** Kontrolna logika, skladištenje i orkestracija na VPS-u; teška GPU obrada (Whisper, Qwen, Fish TTS) na Serverless GPU instancama.
+- **Direktan Upload:** Korisnik može uploadovati lokalne video fajlove direktno u Object Storage putem Presigned URL-ova (bez opterećivanja glavnog backend-a).
 - **TOON Format:** Token-Oriented Object Notation — kompaktni format za komunikaciju sa LLM-om koji štedi do 40% tokena u odnosu na JSON.
 - **Multimodalni Kontekst:** Sistem ekstrahuje vizuelne frejmove videa (sprite-sheets) koje AI model „gleda" radi preciznijeg prevoda (rodovi, kontekst, ton).
-- **Voice Cloning:** Korišćenjem *Fish Speech 1.5*, postiže se visoka sličnost sa originalnim govornikom.
+- **Voice Cloning:** Postiže se visoka sličnost sa originalnim govornikom kroz naprednu AI sintezu.
 - **Studio Interface:** Moderni React frontend sa real-time progresom, uporednim prikazom originala i prevoda, i vizuelnim kontekstom.
 
 ---
@@ -21,38 +21,36 @@
 | Sloj | Tehnologije |
 |---|---|
 | **Frontend** | React (Vite), Framer Motion, Lucide Icons |
-| **Control Plane (Hetzner VPS)** | FastAPI, Celery, Redis, PostgreSQL, MinIO (S3) |
-| **Compute Plane (RunPod)** | RunPod Serverless (RTX 3090 / 4090 / A6000) |
+| **Control Plane (VPS)** | API Server, Asinhroni Worker, Message Broker, Relaciona Baza, Object Storage |
+| **Compute Plane** | Serverless GPU (RTX 3090 / 4090 / A6000) |
 
 ### AI Pipeline (Faze Obrade)
 
-| Faza | Alat | Opis |
-|---|---|---|
-| 1. Preuzimanje | `yt-dlp` / S3 Upload | YouTube link ili direktan upload lokalnog fajla |
-| 2. Separacija | `Demucs v4 (htdemucs)` | Izolacija vokala od pozadinske muzike |
-| 3. Transkripcija | `Faster-Whisper` (RunPod) | Prepoznavanje govora iz izolovanog vokala |
-| 4. Prevod | `Qwen 32B/35B` via vLLM (TOON) | Kontekstualno prevođenje sa vizuelnim kontekstom |
-| 5. Sinteza | `Fish Speech 1.5` (RunPod) | Generisanje srpskog glasa sa kloniranim tembrom |
-| 6. Spajanje | `FFmpeg` (`-c:v copy`) | Finalno spajanje slike, pozadine i novog glasa |
-| 7. Lip Sync | `Wav2Lip` (Serverless GPU) | Sinhronizacija usana — sada kao izolovana Serverless komponenta |
+| Faza | Opis |
+|---|---|
+| 1. Preuzimanje | YouTube link ili direktan upload lokalnog fajla u Storage |
+| 2. Separacija | Izolacija vokala od pozadinske muzike |
+| 3. Transkripcija | Prepoznavanje govora iz izolovanog vokala (GPU) |
+| 4. Prevod | Kontekstualno prevođenje sa vizuelnim kontekstom (LLM) |
+| 5. Sinteza | Generisanje srpskog glasa sa kloniranim tembrom |
+| 6. Spajanje | Finalno spajanje slike, pozadine i novog glasa bez rekompresije videa |
+| 7. Lip Sync | Sinhronizacija usana kao izolovana Serverless komponenta |
 
 ---
 
 ## 📦 Infrastruktura
 
-### Hetzner VPS (Control Plane)
-- **Model:** CPX32 — 4 vCPU (AMD), 8 GB RAM, 160 GB NVMe SSD
-- **IP:** `178.104.214.78`
-- **Servisi:** Redis (port 6379), MinIO S3 (port 9000), PostgreSQL
-- **Docker Compose** za orkestraciju svih servisa
+### VPS (Control Plane)
+- **Model:** Preporučeno 4 vCPU, 8 GB RAM
+- **Servisi:** Message Broker, Object Storage, Database
+- **Orkestracija:** Docker Compose za podizanje svih internih servisa
 
-### RunPod Serverless (Compute Plane)
-- **Whisper Endpoint:** `3wqmtjpb3z2z18` — RTX 3090/4000 Ada
-- **Translator Endpoint:** `ehsr5yiypxz4ap` — RTX A6000 (48GB VRAM)
-- **TTS Endpoint:** `9zx2al4sof2ian` — RTX 3090/4090
+### Serverless GPU (Compute Plane)
+- **Transkripcija:** RTX 3090/4000 Ada (ili slično)
+- **Prevod (LLM):** RTX A6000 (ili slično, zavisno od modela)
+- **Sinteza (TTS):** RTX 3090/4090 (ili slično)
 
-### MinIO S3 Storage
-- **Bucket:** `uploads`
+### Object Storage
 - **Pristup:** Presigned URL-ovi za direktan klijent-to-storage upload
 
 ---
@@ -61,12 +59,12 @@
 
 ### 1. Backend
 ```bash
-cd /home/gruya/Projektri/sinhronizuj.me
+cd /putanja/do/projekta/sinhronizuj.me
 source venv/bin/activate
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn backend.main:app --host 0.0.0.0 --reload
 ```
 
-### 2. Celery Worker
+### 2. Asinhroni Worker
 ```bash
 celery -A backend.worker.celery_app worker --loglevel=info
 ```
@@ -77,9 +75,9 @@ cd frontend
 npm run dev
 ```
 
-### 4. Infrastruktura (Hetzner VPS)
+### 4. Infrastruktura (VPS)
 ```bash
-ssh root@178.104.214.78
+ssh user@vps-ip-adresa
 cd /opt/sinhronizuj-me
 docker compose up -d
 ```
@@ -88,16 +86,19 @@ docker compose up -d
 
 ## ⚙️ Konfiguracija (.env)
 
+Za pokretanje je potrebno kreirati `.env` fajl na osnovu templejta:
+
 ```env
-RUNPOD_API_KEY=rpa_...
-RUNPOD_WHISPER_ID=3wqmtjpb3z2z18
-RUNPOD_TRANSLATOR_ID=ehsr5yiypxz4ap
-RUNPOD_TTS_ID=9zx2al4sof2ian
-REDIS_URL=redis://178.104.214.78:6379/0
-MINIO_ENDPOINT=178.104.214.78:9000
-MINIO_ACCESS_KEY=sinhronizuj_storage
-MINIO_SECRET_KEY=***
-MINIO_BUCKET=uploads
+GPU_API_KEY=your_api_key
+WHISPER_ENDPOINT_ID=your_whisper_endpoint_id
+TRANSLATOR_ENDPOINT_ID=your_translator_endpoint_id
+TTS_ENDPOINT_ID=your_tts_endpoint_id
+
+BROKER_URL=broker://your-vps-ip:port/0
+STORAGE_ENDPOINT=your-vps-ip:port
+STORAGE_ACCESS_KEY=your_storage_access_key
+STORAGE_SECRET_KEY=your_storage_secret_key
+STORAGE_BUCKET=your_bucket_name
 ```
 
 ---
@@ -107,20 +108,20 @@ MINIO_BUCKET=uploads
 ```
 sinhronizuj.me/
 ├── backend/
-│   ├── main.py              # FastAPI server (API + presigned URL)
+│   ├── main.py              # API server + presigned URL logika
 │   ├── core/
 │   │   └── config.py        # Centralna konfiguracija (env varijable)
 │   └── worker/
-│       ├── celery_app.py    # Celery konfiguracija
+│       ├── celery_app.py    # Worker konfiguracija
 │       ├── tasks.py         # Glavni pipeline (Faze 1-7)
-│       ├── downloader.py    # YouTube/S3 preuzimanje
-│       ├── audio_sep.py     # Demucs separacija vokala
+│       ├── downloader.py    # Preuzimanje materijala
+│       ├── audio_sep.py     # Separacija vokala
 │       ├── preprocessor.py  # Vizuelni kontekst (frejmovi)
-│       ├── transcriber.py   # RunPod Whisper transkripcija
-│       ├── translator.py    # RunPod vLLM prevod (TOON format)
-│       ├── tts_engine.py    # RunPod Fish Speech sinteza
-│       ├── merger.py        # FFmpeg spajanje
-│       ├── lipsync.py       # Wav2Lip detekcija/sinhronizacija
+│       ├── transcriber.py   # GPU transkripcija
+│       ├── translator.py    # LLM prevod (TOON format)
+│       ├── tts_engine.py    # AI sinteza glasa
+│       ├── merger.py        # Spajanje audio/video fajlova
+│       ├── lipsync.py       # Detekcija/sinhronizacija usana
 │       └── hw_monitor.py    # Hardverski monitoring
 ├── frontend/
 │   └── src/
@@ -133,16 +134,6 @@ sinhronizuj.me/
 ├── PLAN_ARHITEKTURE_V2.md   # Detaljan plan arhitekture
 └── istorija_izrade.md       # Hronološki dnevnik razvoja
 ```
-
----
-
-## 🐛 Poznati Problemi (In Progress)
-
-| RunPod 401 Unauthorized | ✅ Rešen/Testiranje | Problem rešen eksplicitnim učitavanjem `.env` fajla u worker procesima (dotenv) i mapiranjem environment varijabli u `docker-compose.yml`. |
-| CORS za MinIO PUT | ✅ Rešen | Implementiran `cors.json` koji dozvoljava klijentski upload sa svih origin-a (*). |
-| Wav2Lip Izolacija | ✅ Rešen | Wav2Lip prebačen u Serverless arhitekturu (izolovan Docker imidž sa FastAPI serverom) radi optimizacije resursa na Hetzneru. |
-| Demucs shebang putanje | ✅ Rešen | Skripte u venv-u su imale zastarele putanje od starog naziva projekta (daca_dub). Popravljeno. |
-| torchcodec zavisnost | ✅ Rešen | Instaliran `torchcodec` paket koji je nova zavisnost za `torchaudio`. |
 
 ---
 
