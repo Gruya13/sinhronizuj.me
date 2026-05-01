@@ -217,4 +217,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - *Rešen problem:* `flash-attn` biblioteka inače traje 40 minuta za kompajliranje, što obično uzrokuje timeout i pad GitHub Actions CI/CD procesa. Rešenje je primenjeno eksplicitnim povlačenjem `pre-compiled wheel` arhiva sa interneta (`flash_attn-2.6.3+cu121torch2.4...`), čime se instalacija skraćuje na par sekundi.
 - **Lazy Loading (Handler):** U oba handlera implementirana logika (`ensure_model_exists`) koja proverava `/runpod-volume/models` direktorijum pri startu (Cold Start) pre nego što pokrene API. Ako model fali, povlači ga sa Hugging Face-a.
 
+### 01.05.2026. 07:31 — Produkcijska Integracija Endpointa i CI/CD Pipeline
+- **STT & LLM Handler:** Kompletiran kod u `runpod_workers/stt_llm/handler.py`. Ubačena je napredna alokacija memorije (`gpu_memory_utilization=0.85` za vLLM) kako bi Whisper i Qwen mogli bezbedno da dele istu grafičku (npr. A6000) bez OOM grešaka. Ubačena je podrška za `transcribe`, `translate` i `both` zadatke sa Base64 obradom audio fajlova i frejmova.
+- **TTS Handler:** Kompletiran `runpod_workers/tts/handler.py` sa Base64 obradom ulaznog referentnog audia i izlaznog generisanog fajla, spreman za pozivanje Fish Speech `tools.generate` komande.
+- **CI/CD Automatizacija:** Kreiran `.github/workflows/runpod-builder.yml`. Ovaj workflow se okida samo pri promenama unutar `runpod_workers/` foldera (*Path filtering*). Prijavljuje se na `ghcr.io`, prepoznaje repozitorijum, vrši `buildx` optimizaciju uz GitHub Actions caching (čime sledeći buildovi traju drastično kraće) i automatski push-uje gotove Docker imidže.
+- **Status:** Custom RunPod infrastruktura je tehnički zaokružena i endpointi su spremni za testno podizanje na RunPod platformi iz `ghcr.io` registra.
+
 
