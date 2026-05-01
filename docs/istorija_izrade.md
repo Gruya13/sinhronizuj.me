@@ -228,6 +228,7 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Rešenje 1 (Disk Space):** Dodat `jlumbroso/free-disk-space@main` korak u `.github/workflows/runpod-builder.yml` koji briše neiskorišćene Android, .NET i Haskell keš fajlove na GitHub runner-u, oslobađajući dodatnih ~25-30GB pre početka build-a.
 - **Rešenje 2 (Flash-attn Dependency Order):** Unutar `runpod_workers/stt_llm/Dockerfile` ukinut je multi-stage build u korist jednostavnijeg single-stage pristupa sa rigoroznim redosledom instalacije: 1) Instalira se `torch` izolovano, 2) Zatim se instalira *pre-compiled* `flash-attn` wheel koji zahteva prethodno prisustvo torch-a, 3) Na kraju se okida `pip install -r requirements.txt`. Kada instalacija dođe do `vLLM`, pip vidi da je `flash-attn` već tu i elegantno preskače zloglasni 40-minutni source build.
 
-
-
-
+### 01.05.2026. 07:50 — Debugging: Flash-attn Wheel 404 Error
+- **Problem:** GitHub Actions log je prikazao 404 Not Found grešku pri preuzimanju `flash-attn` pre-compiled wheel-a za `v2.6.3` i `cu121`.
+- **Analiza:** Proverom zvaničnih GitHub izdanja (Releases) `Dao-AILab/flash-attention` repozitorijuma, ustanovljeno je da `v2.6.3` sadrži isključivo `cu118` i `cu123` pakete, te da ne postoji specifičan build za `cu121` sa `torch 2.4.0`.
+- **Rešenje:** Odluka je pala na nadogradnju preuzimanja na stabilno izdanje `v2.8.3` koje obezbeđuje univerzalni `cu12torch2.4` wheel (`flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl`), unazad kompatibilan sa `nvidia/cuda:12.1.1-devel` bazom imidža i vLLM kontejnerom. Ažuriran `Dockerfile` i gurnute izmene na GitHub čime je build uspešno nastavljen.
