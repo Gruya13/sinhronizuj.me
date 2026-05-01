@@ -232,3 +232,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Problem:** GitHub Actions log je prikazao 404 Not Found grešku pri preuzimanju `flash-attn` pre-compiled wheel-a za `v2.6.3` i `cu121`.
 - **Analiza:** Proverom zvaničnih GitHub izdanja (Releases) `Dao-AILab/flash-attention` repozitorijuma, ustanovljeno je da `v2.6.3` sadrži isključivo `cu118` i `cu123` pakete, te da ne postoji specifičan build za `cu121` sa `torch 2.4.0`.
 - **Rešenje:** Odluka je pala na nadogradnju preuzimanja na stabilno izdanje `v2.8.3` koje obezbeđuje univerzalni `cu12torch2.4` wheel (`flash_attn-2.8.3+cu12torch2.4cxx11abiFALSE-cp310-cp310-linux_x86_64.whl`), unazad kompatibilan sa `nvidia/cuda:12.1.1-devel` bazom imidža i vLLM kontejnerom. Ažuriran `Dockerfile` i gurnute izmene na GitHub čime je build uspešno nastavljen. Naknadno (07:54) primenjena ista popravka i za `tts` radnika (obzirom da je prva izmena obuhvatila samo `stt_llm`).
+
+### 01.05.2026. 18:49 — Uspešan Build i Push na ghcr.io
+- **Status:** Nakon primene zakrpa, GitHub Actions pipeline je prošao bez ikakvih grešaka. Trajanje build procesa: STT/LLM radnik (~12 min), TTS radnik (~10 min).
+- **Infrastruktura:** Obe slike (image) su uspešno izgrađene (build) i gurnute (push) u `ghcr.io/Gruya13/sinhronizuj.me` repozitorijum.
+- **Sledeći koraci:** Konfigurisanje novih *Serverless Endpoint*-a na RunPod portalu koristeći upravo isporučene Docker slike. Sistem je sada tehnički spreman za testiranje inference end-to-end (E2E).
