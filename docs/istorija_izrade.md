@@ -226,7 +226,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 ### 01.05.2026. 07:42 — Debugging: Pad GitHub Actions CI/CD Pipeline-a
 - **Problem:** Inicijalni GitHub Actions run je pukao zbog dva česta razloga za teške ML kontejnere: nedostatak prostora na disku za runner-a (GitHub daje samo ~14GB slobodnog prostora po besplatnom runneru) i implicitno kompajliranje `flash-attn` modula pri instalaciji `vLLM` u `stt_llm` kontejneru.
 - **Rešenje 1 (Disk Space):** Dodat `jlumbroso/free-disk-space@main` korak u `.github/workflows/runpod-builder.yml` koji briše neiskorišćene Android, .NET i Haskell keš fajlove na GitHub runner-u, oslobađajući dodatnih ~25-30GB pre početka build-a.
-- **Rešenje 2 (Flash-attn u vLLM-u):** Unutar `runpod_workers/stt_llm/Dockerfile` dodat je međukorak koji instalira *pre-compiled* `flash-attn` wheel pre nego što se preuzme `vLLM` iz `requirements.txt`. Ovo zaustavlja instalaciju vLLM-a da trigeruje 40-minutno kompajliranje sa izvornog koda na GitHub mašini.
+- **Rešenje 2 (Flash-attn Dependency Order):** Unutar `runpod_workers/stt_llm/Dockerfile` ukinut je multi-stage build u korist jednostavnijeg single-stage pristupa sa rigoroznim redosledom instalacije: 1) Instalira se `torch` izolovano, 2) Zatim se instalira *pre-compiled* `flash-attn` wheel koji zahteva prethodno prisustvo torch-a, 3) Na kraju se okida `pip install -r requirements.txt`. Kada instalacija dođe do `vLLM`, pip vidi da je `flash-attn` već tu i elegantno preskače zloglasni 40-minutni source build.
+
 
 
 
