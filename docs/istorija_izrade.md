@@ -237,3 +237,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Status:** Nakon primene zakrpa, GitHub Actions pipeline je prošao bez ikakvih grešaka. Trajanje build procesa: STT/LLM radnik (~12 min), TTS radnik (~10 min).
 - **Infrastruktura:** Obe slike (image) su uspešno izgrađene (build) i gurnute (push) u `ghcr.io/Gruya13/sinhronizuj.me` repozitorijum.
 - **Sledeći koraci:** Konfigurisanje novih *Serverless Endpoint*-a na RunPod portalu koristeći upravo isporučene Docker slike. Sistem je sada tehnički spreman za testiranje inference end-to-end (E2E).
+
+### 01.05.2026. 19:51 — Ažuriranje Konfiguracije (.env)
+- **Akcija:** Izvršeno ažuriranje lokalnog `.env` fajla na VPS-u sa novim RunPod Endpoint ID-jevima.
+- **Konfiguracija:**
+    - `RUNPOD_WHISPER_ID` postavljeno na `qzwshltrfg459a` (novi STT-LLM worker).
+    - `RUNPOD_TRANSLATOR_ID` postavljeno na `qzwshltrfg459a` (isti worker, sada objedinjen).
+    - `RUNPOD_TTS_ID` postavljeno na `65gfdt0pis4r49` (novi TTS worker).
+- **Status:** Backend je spreman da šalje zahteve na novu Serverless infrastrukturu. Sledi restart Celery worker-a radi primene novih varijabli okruženja.
