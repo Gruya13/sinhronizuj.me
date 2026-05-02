@@ -249,3 +249,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 ### 02.05.2026. 16:45 — Kreiranje Modal.com Skill-a
 - **Akcija:** Pročitana zvanična dokumentacija servisa Modal.com i kreiran lokalni agent skill (`modal_skill`).
 - **Status:** Skill je uspešno strukturiran i zapisan sa primerima za setup, deploy, method chaining za docker image i razumevanje `@app.function` i `@app.local_entrypoint` dekoratora.
+
+### 02.05.2026. 16:48 — Brainstorming i Planiranje Modal.com Arhitekture
+- **Akcija:** Izvršen brainstorming i kreiran zvanični plan migracije sa RunPod Serverless-a na Modal.com infrastrukturu.
+- **Dokumentacija:** Plan je zapisan u `docs/PLAN_MODAL_ARHITEKTURE.md`. Pokriva arhitekturu za STT/LLM i TTS radnike, promenu CI/CD procesa (izbacivanje Dockerfile i GitHub Actions-a) i strategiju keširanja modela preko `modal.Volume`.
+- **Status:** Sistem je spreman za razvoj `modal_workers` modula i brisanje starog `runpod_workers` repozitorijuma.
