@@ -2,58 +2,34 @@ import time
 import requests
 from backend.core.config import settings
 
-def wait_for_runpod_result(job_id: str, endpoint_id: str, timeout_seconds: int = 600, progress_callback=None) -> dict:
+def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 300, progress_callback=None) -> dict:
     """
-    Univerzalna polling petlja za RunPod Serverless poslove sa podrškom za mikro-statuse.
+    Poziva sinhroni Modal webhook endpoint (FastAPI) i čeka na rezultat.
+    Modal automatski održava konekciju otvorenom dok se zadatak ne izvrši (ili do timeout-a).
     """
-    status_url = f"https://api.runpod.ai/v2/{endpoint_id}/status/{job_id}"
     headers = {
-        "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
         "Content-Type": "application/json"
     }
     
-    start_time = time.time()
-    
-    print(f"[RUNPOD] Započinjem polling za posao: {job_id}")
-    
-    last_status = None
-    
-    while True:
-        elapsed = time.time() - start_time
-        if elapsed > timeout_seconds:
-            raise Exception(f"RunPod TIMEOUT: Model se nije podigao nakon {timeout_seconds/60} minuta. Proverite RunPod infrastrukturu.")
+    print(f"[MODAL] Pozivam endpoint: {url}")
+    if progress_callback:
+        progress_callback(detail="Slanje zahteva na Modal (Cold Start može trajati 10-20s)...")
+        
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)
+        response.raise_for_status()
+        result = response.json()
+        
+        if "error" in result:
+            raise Exception(f"Modal posao vratio grešku: {result['error']}")
             
-        try:
-            response = requests.get(status_url, headers=headers, timeout=30)
-            response.raise_for_status()
-            result = response.json()
+        print(f"[MODAL] Posao završen uspešno!")
+        if progress_callback:
+            progress_callback(detail="Zadatak na Modal-u je uspešno završen.")
             
-            status = result.get("status")
-            
-            if status != last_status:
-                last_status = status
-                if progress_callback:
-                    detail = ""
-                    if status == "IN_QUEUE":
-                        detail = "Cold Start: RunPod podiže radnika i učitava model u VRAM..."
-                    elif status == "IN_PROGRESS":
-                        detail = "Model je aktivan. Obrada podataka u toku..."
-                    
-                    if detail:
-                        progress_callback(detail=detail)
-            
-            if status == "COMPLETED":
-                print(f"[RUNPOD] Posao završen uspešno!")
-                if progress_callback:
-                    progress_callback(detail="Zadatak na RunPod-u je uspešno završen.")
-                return result["output"]
-            elif status == "FAILED":
-                error_msg = result.get("error", "Nepoznata greška")
-                raise Exception(f"RunPod posao nije uspeo: {error_msg}")
-            
-            # Čekamo malo pre sledeće provere
-            time.sleep(5)
-                
-        except requests.exceptions.RequestException as e:
-            print(f"[WARNING] Mrežna greška pri pollingu (pokušavam ponovo): {e}")
-            time.sleep(5)
+        return result
+        
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Mrežna greška pri komunikaciji sa Modalom: {e}"
+        print(f"[ERROR] {error_msg}")
+        raise Exception(error_msg)

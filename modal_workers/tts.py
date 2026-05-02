@@ -18,21 +18,21 @@ def download_models():
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git", "ffmpeg")
+    .apt_install("git", "ffmpeg", "portaudio19-dev")
     .run_commands("git clone https://github.com/fishaudio/fish-speech.git /opt/fish-speech")
     .run_commands("cd /opt/fish-speech && pip install -e .")
     .pip_install("huggingface-hub")
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
-@app.cls(image=image, gpu="L4", volumes={VOLUME_PATH: models_volume}, container_idle_timeout=300)
+@app.cls(image=image, gpu="L4", volumes={VOLUME_PATH: models_volume}, scaledown_window=300)
 class TTS_Worker:
     @modal.enter()
     def setup(self):
         self.fish_path = f"{VOLUME_PATH}/fish-speech-1.5"
         self.cwd = "/opt/fish-speech"
 
-    @modal.web_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST")
     def process_task(self, data: dict):
         text = data.get('text')
         ref_audio_b64 = data.get('reference_audio_base64')

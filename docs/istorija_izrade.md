@@ -260,4 +260,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Implementacija:** 
     - `stt_llm.py`: Klasa `STT_LLM_Worker` na A100 grafici. Method-chaining sa apt/pip instalacijama i definisan `download_models` build korak. Koristi `modal.web_endpoint` za transkripciju i prevod.
     - `tts.py`: Klasa `TTS_Worker` na L4 grafici. Instalira Fish Speech direktno sa git-a, čuva težine u istom `modal.Volume` i koristi `subprocess` za okidanje CLI generisanja.
-- **Status:** Cloud kod za Modal je napisan. U sledećem koraku je potrebno prilagoditi Hetzner backend da poziva nove Modal webhook-ove i odraditi `modal setup` autentifikaciju.
+### 02.05.2026. 17:08 — Implementacija Faze 3: Integracija Modal Endpoint-ova (Celery Backend)
+- **Akcija:** Izmenjena arhitektura Hetzner Celery radnika da napusti asinhroni MinIO S3 polling sistem i okrene se prema čistom Modal FastAPI web hook pozivanju.
+- **Implementacija:**
+    - `backend/core/config.py` i `.env`: Zamenjeni RunPod tokeni i API ID-jevi sa novim stalnim `MODAL_STT_LLM_URL` i `MODAL_TTS_URL`.
+    - `backend/worker/utils.py`: Izbačena fukncija `wait_for_runpod_result` (koja je stalno pingovala GET `/status`) i zamenjena univerzalnom sinhronom funkcijom `call_modal_endpoint` koja održava konekciju otvorenom dok zadatak traje (do 5 ili 10 minuta na Modalu).
+    - `backend/worker/transcriber.py`, `translator.py`, i `tts_engine.py`: Ažurirani da umesto upload-a na MinIO i slanja URL-ova, pretvaraju originalne audio (`vocals_path`) i vizuelne podatke u Base64 JSON i šalju direktno u zahtevu ka Modalu za maksimalnu brzinu cold-start prenosa.
+- **Status:** Celokupan kod je sada prepravljen. Celery pipeline sada u potpunosti koristi Modal.com za sve GPU procese.

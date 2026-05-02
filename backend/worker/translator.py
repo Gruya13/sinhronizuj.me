@@ -6,7 +6,7 @@ import os
 import time
 from typing import List, Dict
 from backend.core.config import settings
-from backend.worker.utils import wait_for_runpod_result
+from backend.worker.utils import call_modal_endpoint
 
 def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
     """
@@ -54,8 +54,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     if not segments:
         return {"status": "success", "translated_segments": []}
 
-    if not settings.RUNPOD_TRANSLATOR_ID:
-        print("[WARNING] RUNPOD_TRANSLATOR_ID nije definisan. Vraćam originalni tekst.")
+    if not settings.MODAL_STT_LLM_URL:
+        print("[WARNING] MODAL_STT_LLM_URL nije definisan. Vraćam originalni tekst.")
         return {
             "status": "success", 
             "translated_segments": [
@@ -77,55 +77,39 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             progress_callback(detail="Analiza vizuelnog konteksta (ekstrakcija frejmova)...")
         frames_b64 = extract_video_frames(video_path)
 
-    # Priprema multimodalnog content-a (OpenAI Vision format)
+    # Priprema multimodalnog content-a (Modal worker interno pakuje ovo)
     prompt_text = (
         f"Ovo je transkript videa: {' '.join(toon_input)}. "
         "Prevedi ga na srpski (latinica) koristeći isti [start|end|tekst] TOON format. "
         "Koristi priložene frejmove kao vizuelni kontekst za tačan prevod (pol govornika, emocije, objekti u sceni)."
     )
 
-    content = [{"type": "text", "text": prompt_text}]
-    for b64 in frames_b64:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
-        })
-
-    url = f"https://api.runpod.ai/v2/{settings.RUNPOD_TRANSLATOR_ID}/run"
-    headers = {
-        "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
     payload = {
-        "input": {
-            "messages": [
-                {"role": "user", "content": content}
-            ],
-            "target_lang": "sr-Latn",
-            "format": "toon"
-        }
+        "task": "translate",
+        "prompt": prompt_text,
+        "frames_base64": frames_b64
     }
 
-    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata + {len(frames_b64)} frejmova na RunPod (Asinhrono)...")
+    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata + {len(frames_b64)} frejmova na Modal (Sinhrono)...")
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        response.raise_for_status()
-        job_data = response.json()
-        job_id = job_data["id"]
+        output = call_modal_endpoint(
+            url=settings.MODAL_STT_LLM_URL, 
+            payload=payload, 
+            timeout_seconds=300,
+            progress_callback=progress_callback
+        )
         
-        # Čekamo rezultat (polling)
-        output = wait_for_runpod_result(job_id, settings.RUNPOD_TRANSLATOR_ID, progress_callback=progress_callback)
+        translated_toon_text = output.get("translation", "")
+        # Parsiranje TOON formata nazad u JSON objekte (vLLM obično vraća pun string, potrebno je parsirati)
+        # Očekujemo da prevod ima strukturu [0.0|2.0|Tekst] ...
+        import re
+        matches = re.findall(r'\[([^\]]+)\]', translated_toon_text)
         
-        translated_toon = output["translated_segments"]
-        
-        # Parsiranje TOON formata nazad u JSON objekte
         final_segments = []
-        for toon_str in translated_toon:
+        for match in matches:
             try:
-                clean = toon_str.strip("[]")
-                parts = clean.split("|")
+                parts = match.split("|")
                 if len(parts) >= 3:
                     final_segments.append({
                         "start": float(parts[0]),
@@ -135,9 +119,22 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             except:
                 continue
                 
+        # Ako regex ne izvuče ništa, možda je vratio bez zagrada, fallback:
+        if not final_segments and segments:
+            # U slučaju pada parsiranja, vracamo originalni sa translation string-om celim
+            print("[WARNING] Nije uspelo TOON parsiranje, koristimo raw text.")
+            return {
+                "status": "success",
+                "translated_segments": [
+                    {"start": segments[0]["start"], "end": segments[-1]["end"], "text": translated_toon_text}
+                ]
+            }
+                
         return {
             "status": "success",
             "translated_segments": final_segments
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}

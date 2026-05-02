@@ -1,27 +1,28 @@
 import os
-import requests
-from typing import Dict, Any
+import base64
 from backend.core.config import settings
-from backend.worker.preprocessor import upload_to_minio
 
 def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
     """
-    Poziva RunPod Serverless Whisper endpoint za transkripciju koristeći requests (stabilnije od httpx).
+    Poziva Modal STT/LLM webhook za transkripciju.
+    Šalje audio u base64 formatu.
     """
     if not os.path.exists(audio_path):
         return {"status": "error", "message": f"Fajl nije pronađen: {audio_path}"}
 
-    print(f"[TRANSCRIBER V2] Pripremam upload na MinIO za transkripciju...")
-    
-    # 1. Upload fajla na MinIO (RunPod-u treba URL)
-    audio_url = upload_to_minio(audio_path, bucket_name="input-audio")
-    
-    if not audio_url:
-        return {"status": "error", "message": "MinIO upload nije uspeo."}
+    # 1. Konverzija u Base64 (umesto MinIO uploada)
+    if progress_callback:
+        progress_callback(detail="Priprema audio fajla za Modal...")
+        
+    try:
+        with open(audio_path, "rb") as audio_file:
+            audio_base64 = base64.b64encode(audio_file.read()).decode('utf-8')
+    except Exception as e:
+        return {"status": "error", "message": f"Greška pri čitanju audia: {e}"}
 
-    # 2. Poziv RunPod-a
-    if not settings.RUNPOD_WHISPER_ID:
-        print("[WARNING] RUNPOD_WHISPER_ID nije definisan. Koristim mock transkripciju.")
+    # 2. Poziv Modal-a
+    if not settings.MODAL_STT_LLM_URL:
+        print("[WARNING] MODAL_STT_LLM_URL nije definisan. Koristim mock transkripciju.")
         return {
             "status": "success",
             "language": "en",
@@ -29,36 +30,27 @@ def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
             "segments": [{"start": 0.0, "end": 2.0, "text": "This is a mock transcription."}]
         }
 
-    from backend.worker.utils import wait_for_runpod_result
-    
-    url = f"https://api.runpod.ai/v2/{settings.RUNPOD_WHISPER_ID}/run"
-    headers = {
-        "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    from backend.worker.utils import call_modal_endpoint
     
     payload = {
-        "input": {
-            "audio": audio_url,
-            "model": "large-v3"
-        }
+        "task": "transcribe",
+        "audio_base64": audio_base64
     }
 
-    print(f"[TRANSCRIBER V2] Pozivam RunPod Whisper (Asinhrono, ID: {settings.RUNPOD_WHISPER_ID})...")
+    print(f"[TRANSCRIBER V2] Pozivam Modal STT...")
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        response.raise_for_status()
-        job_data = response.json()
-        job_id = job_data["id"]
-        
-        # Čekamo rezultat (polling)
-        output = wait_for_runpod_result(job_id, settings.RUNPOD_WHISPER_ID, progress_callback=progress_callback)
+        output = call_modal_endpoint(
+            url=settings.MODAL_STT_LLM_URL, 
+            payload=payload, 
+            timeout_seconds=300,
+            progress_callback=progress_callback
+        )
         
         return {
             "status": "success",
             "language": output.get("language", "unknown"),
-            "full_text": output.get("text", ""),
+            "full_text": " ".join([s["text"] for s in output.get("segments", [])]),
             "segments": output.get("segments", [])
         }
     except Exception as e:

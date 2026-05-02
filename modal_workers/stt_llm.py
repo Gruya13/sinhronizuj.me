@@ -27,15 +27,17 @@ image = (
     .apt_install("git", "ffmpeg", "libsm6", "libxext6")
     .pip_install(
         "huggingface-hub",
-        "faster-whisper==1.0.3",
-        "vllm==0.4.1", 
+        "faster-whisper",
+        "vllm", 
         "torch==2.4.0",
-        "opencv-python-headless"
+        "torchaudio==2.4.0",
+        "opencv-python-headless",
+        extra_index_url="https://download.pytorch.org/whl/cu121"
     )
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
-@app.cls(image=image, gpu="A100", volumes={VOLUME_PATH: models_volume}, container_idle_timeout=300)
+@app.cls(image=image, gpu="A100", volumes={VOLUME_PATH: models_volume}, scaledown_window=300)
 class STT_LLM_Worker:
     @modal.enter()
     def load_models(self):
@@ -86,7 +88,7 @@ class STT_LLM_Worker:
         
         return {"translation": outputs[0].outputs[0].text}
 
-    @modal.web_endpoint(method="POST")
+    @modal.fastapi_endpoint(method="POST")
     def process_task(self, data: dict):
         task_type = data.get('task')
         

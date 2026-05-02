@@ -8,10 +8,9 @@ class Settings:
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     RUNPOD_API_KEY: str = os.getenv("RUNPOD_API_KEY", "")
     
-    # RunPod Serverless Endpoints
-    RUNPOD_WHISPER_ID: str = os.getenv("RUNPOD_WHISPER_ID", "")
-    RUNPOD_TRANSLATOR_ID: str = os.getenv("RUNPOD_TRANSLATOR_ID", "")
-    RUNPOD_TTS_ID: str = os.getenv("RUNPOD_TTS_ID", "")
+    # Modal Serverless Endpoints
+    MODAL_STT_LLM_URL: str = os.getenv("MODAL_STT_LLM_URL", "")
+    MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
     
     # MinIO Storage
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
