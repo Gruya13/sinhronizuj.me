@@ -245,3 +245,7 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - `RUNPOD_TRANSLATOR_ID` postavljeno na `qzwshltrfg459a` (isti worker, sada objedinjen).
     - `RUNPOD_TTS_ID` postavljeno na `65gfdt0pis4r49` (novi TTS worker).
 - **Status:** Backend je spreman da šalje zahteve na novu Serverless infrastrukturu. Sledi restart Celery worker-a radi primene novih varijabli okruženja.
+
+### 02.05.2026. 16:45 — Kreiranje Modal.com Skill-a
+- **Akcija:** Pročitana zvanična dokumentacija servisa Modal.com i kreiran lokalni agent skill (`modal_skill`).
+- **Status:** Skill je uspešno strukturiran i zapisan sa primerima za setup, deploy, method chaining za docker image i razumevanje `@app.function` i `@app.local_entrypoint` dekoratora.
