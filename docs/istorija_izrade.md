@@ -254,3 +254,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Akcija:** Izvršen brainstorming i kreiran zvanični plan migracije sa RunPod Serverless-a na Modal.com infrastrukturu.
 - **Dokumentacija:** Plan je zapisan u `docs/PLAN_MODAL_ARHITEKTURE.md`. Pokriva arhitekturu za STT/LLM i TTS radnike, promenu CI/CD procesa (izbacivanje Dockerfile i GitHub Actions-a) i strategiju keširanja modela preko `modal.Volume`.
 - **Status:** Sistem je spreman za razvoj `modal_workers` modula i brisanje starog `runpod_workers` repozitorijuma.
+
+### 02.05.2026. 16:53 — Implementacija Faze 1 i 2 Modal Arhitekture
+- **Akcija:** Arhiviran je kompletan `runpod_workers` direktorijum i `.github/workflows/runpod-builder.yml`. Kreirani su novi Python moduli u `modal_workers/` folderu.
+- **Implementacija:** 
+    - `stt_llm.py`: Klasa `STT_LLM_Worker` na A100 grafici. Method-chaining sa apt/pip instalacijama i definisan `download_models` build korak. Koristi `modal.web_endpoint` za transkripciju i prevod.
+    - `tts.py`: Klasa `TTS_Worker` na L4 grafici. Instalira Fish Speech direktno sa git-a, čuva težine u istom `modal.Volume` i koristi `subprocess` za okidanje CLI generisanja.
+- **Status:** Cloud kod za Modal je napisan. U sledećem koraku je potrebno prilagoditi Hetzner backend da poziva nove Modal webhook-ove i odraditi `modal setup` autentifikaciju.
