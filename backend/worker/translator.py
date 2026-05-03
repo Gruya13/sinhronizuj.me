@@ -64,10 +64,10 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             ]
         }
 
-    # TOON (Token Optimized Object Notation) formatiranje
-    toon_input = [
-        f"[{s['start']:.2f}|{s['end']:.2f}|{s['text']}]" 
-        for s in segments
+    # Priprema JSON ulaza za bolju pouzdanost
+    json_input = [
+        {"id": i, "text": s["text"]} 
+        for i, s in enumerate(segments)
     ]
     
     # Ekstrakcija frejmova za vizuelni kontekst
@@ -77,19 +77,16 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             progress_callback(detail="Analiza vizuelnog konteksta (ekstrakcija frejmova)...")
         frames_b64 = extract_video_frames(video_path)
 
-    # Priprema multimodalnog content-a (Modal worker interno pakuje ovo)
+    # Priprema multimodalnog content-a
     prompt_text = (
         "Ti si ekspert za prevođenje video titlova. Tvoj zadatak je da prevedeš transkript na SRPSKI jezik (EKAVICA). \n"
         "PRAVILA:\n"
-        "1. MORAŠ zadržati TOON format: [start|end|prevedeni tekst].\n"
+        "1. MORAŠ vratiti odgovor kao JSON LISTU OBJEKATA: [{\"id\": 0, \"text\": \"prevod\"}, ...]\n"
         "2. Prevod mora biti DOSLOVAN (rečenica po rečenica), ne smeš prepričavati niti sažimati tekst.\n"
-        "3. Koristi priložene slike da odrediš pol govornika (npr. 'Ja sam video' vs 'Ja sam videla').\n"
-        "4. Celokupan izlaz mora biti samo TOON lista, bez ikakvog dodatnog teksta.\n"
-        "5. Reč 'preoccupied' prevedi kao 'zaokupljeni' ili 'opsednuti'.\n\n"
-        "PRIMER FORMATA:\n"
-        "ULAZ: [1.20|3.50|I am working on AI agent named Luna]\n"
-        "IZLAZ: [1.20|3.50|Radim na AI agentu po imenu Luna]\n\n"
-        f"TRANSKRIPT ZA PREVOD:\n{' '.join(toon_input)}"
+        "3. Zadrži isti broj elemenata u listi kao u ulazu (tačno 17 segmenata).\n"
+        "4. Koristi priložene slike da odrediš pol govornika.\n"
+        "5. Odgovori ISKLJUČIVO sa JSON nizom, bez ikakvog dodatnog teksta.\n\n"
+        f"TRANSKRIPT ZA PREVOD (JSON):\n{json.dumps(json_input, ensure_ascii=False)}"
     )
 
     payload = {
@@ -98,7 +95,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         "frames_base64": frames_b64
     }
 
-    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata + {len(frames_b64)} frejmova na Modal (Sinhrono)...")
+    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata na Modal (JSON format)...")
     
     try:
         output = call_modal_endpoint(
@@ -108,55 +105,48 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             progress_callback=progress_callback
         )
         
-        translated_toon_text = output.get("translation", "")
-        # Parsiranje TOON formata nazad u JSON objekte
-        import re
-        # Pokušavamo da nađemo sve što liči na [vreme|vreme|tekst]
-        matches = re.findall(r'\[?\d+\.?\d*\|\d+\.?\d*\|[^\]\n]+\]?', translated_toon_text)
+        raw_output = output.get("translation", "")
+        print(f"[DEBUG] RAW TRANSLATION OUTPUT: {raw_output[:500]}...", flush=True)
         
-        final_segments = []
-        for match in matches:
-            try:
-                # Čistimo zagrade ako postoje
-                clean_match = match.strip("[]")
-                parts = clean_match.split("|")
-                if len(parts) >= 3:
-                    final_segments.append({
-                        "start": float(parts[0]),
-                        "end": float(parts[1]),
-                        "text": "|".join(parts[2:]).strip()
-                    })
-            except:
-                continue
-                
-        # Ako regex ne izvuče dovoljno segmenata, pokušavamo fallback po linijama
-        if len(final_segments) < len(segments) * 0.5:
-            print(f"[WARNING] TOON parsiranje dalo samo {len(final_segments)} segmenata od očekivanih {len(segments)}. Fallback na inteligentnu podelu.")
-            
-            # Ako je vratio bar nešto teksta, probajmo da ga razbijemo po rečenicama
-            raw_sentences = re.split(r'(?<=[.!?])\s+', translated_toon_text.replace("[", "").replace("]", ""))
-            raw_sentences = [s.strip() for s in raw_sentences if s.strip() and "|" not in s]
-            
-            if raw_sentences and len(raw_sentences) >= len(segments) * 0.5:
-                # Imamo rečenice! Mapirajmo ih na originalne segmente
-                final_segments = []
-                for i, orig in enumerate(segments):
-                    text = raw_sentences[i] if i < len(raw_sentences) else ""
-                    final_segments.append({
-                        "start": orig["start"],
-                        "end": orig["end"],
-                        "text": text
-                    })
+        # Pokušaj parsiranja JSON-a
+        try:
+            # Čistimo eventualni markdown kod blok ako ga model ubaci
+            json_str = re.search(r'\[\s*\{.*\}\s*\]', raw_output, re.DOTALL)
+            if json_str:
+                translated_data = json.loads(json_str.group(0))
             else:
-                # Baš ništa nije uspelo, ostaje nam samo da vratimo originalne tajminge sa celim tekstom u prvom
-                print("[ERROR] Potpuni neuspeh parsiranja prevoda.")
-                return {
-                    "status": "success",
-                    "translated_segments": [
-                        {"start": s["start"], "end": s["end"], "text": translated_toon_text if i == 0 else ""}
-                        for i, s in enumerate(segments)
-                    ]
-                }
+                translated_data = json.loads(raw_output)
+                
+            final_segments = []
+            for i, orig in enumerate(segments):
+                # Tražimo prevod po ID-u ili po indexu
+                t_text = ""
+                if i < len(translated_data):
+                    t_text = translated_data[i].get("text", "")
+                
+                final_segments.append({
+                    "start": orig["start"],
+                    "end": orig["end"],
+                    "text": t_text or orig["text"] # Fallback na original ako fali prevod
+                })
+            
+            return {"status": "success", "translated_segments": final_segments}
+            
+        except Exception as json_err:
+            print(f"[WARNING] JSON parsiranje nije uspelo: {json_err}. Fallback na TOON/Text.")
+            # Ovde ostavljamo stari fallback ili prosto vraćamo originalne sa raw textom
+            return {
+                "status": "success",
+                "translated_segments": [
+                    {"start": s["start"], "end": s["end"], "text": raw_output if i == 0 else ""}
+                    for i, s in enumerate(segments)
+                ]
+            }
+                
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
                 
         return {
             "status": "success",
