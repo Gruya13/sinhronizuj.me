@@ -16,7 +16,7 @@ function App() {
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [hwStats, setHwStats] = useState(null);
-  const [runpodStatus, setRunpodStatus] = useState({ status: 'Učitavam...', active_workers: 0 });
+  const [modalStatus, setModalStatus] = useState({ status: 'Učitavam...', active_workers: 0 });
   const [visualContextUrl, setVisualContextUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
@@ -58,21 +58,21 @@ function App() {
         setHwStats(data);
       } catch (err) { /* Silent fail */ }
     };
-    const fetchRunpod = async () => {
+    const fetchModal = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/runpod-status`);
+        const res = await fetch(`${API_BASE_URL}/api/v1/modal-status`);
         if (!res.ok) throw new Error();
         const data = await res.json();
-        setRunpodStatus(data);
+        setModalStatus(data);
       } catch (err) { /* Silent fail */ }
     };
     fetchHw();
-    fetchRunpod();
+    fetchModal();
     const intervalHw = setInterval(fetchHw, 5000);
-    const intervalRp = setInterval(fetchRunpod, 15000);
+    const intervalMd = setInterval(fetchModal, 15000);
     return () => {
       clearInterval(intervalHw);
-      clearInterval(intervalRp);
+      clearInterval(intervalMd);
     };
   }, []);
 
@@ -265,10 +265,10 @@ function App() {
           <div className="monitor-divider" />
           <div className="monitor-section">
             <div className="monitor-label">
-              <Zap size={14} className={runpodStatus.status === "Active" ? "pulse-icon" : ""}/> 
-              RunPod Serverless 
-              <span className={`status-badge ${runpodStatus.status?.toLowerCase()}`}>
-                {runpodStatus.status === "Active" ? `AKTIVAN (${runpodStatus.active_workers})` : "SPAVA"}
+              <Zap size={14} className={modalStatus.status === "Spreman" ? "pulse-icon" : ""}/> 
+              Modal Serverless 
+              <span className={`status-badge ${modalStatus.status === "Spreman" ? 'active' : 'asleep'}`}>
+                {modalStatus.status === "Spreman" ? `AKTIVAN (${modalStatus.active_workers})` : "SPAVA"}
               </span>
             </div>
             <div className="monitor-status">
@@ -281,8 +281,8 @@ function App() {
 
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="logo-section">
-            <h1>Sinhronizuj.me <span className="version-badge">HIBRID V2</span></h1>
-            <p className="subtitle">AI Dubbing Studio: Hetzner Control + RunPod GPU</p>
+            <h1>Sinhronizuj.me <span className="version-badge">MODAL V1</span></h1>
+            <p className="subtitle">AI Dubbing Studio: Hetzner Control + Modal Serverless</p>
           </div>
         </motion.div>
 
@@ -332,7 +332,7 @@ function App() {
                            <><CloudUpload size={14} className="pulse-icon" style={{display: 'inline', marginRight: '8px'}}/> Upload na S3: {uploadProgress}%</>
                         ) : (
                           <>
-                            {status.includes("RunPod") && <Zap className="pulse-icon" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
+                             {status.includes("Modal") && <Zap className="pulse-icon" size={14} style={{display: 'inline', marginRight: '8px'}}/>}
                             {status}
                           </>
                         )}

@@ -8,7 +8,7 @@ from backend.worker.preprocessor import upload_to_minio
 
 def synthesize_audio(vocals_path: str, translated_segments: list, progress_callback=None) -> dict:
     """
-    Poziva RunPod Serverless Fish Speech (TTS) koristeći requests.
+    Poziva Modal Serverless Fish Speech (TTS) koristeći requests.
     """
     if not translated_segments:
         return {"status": "error", "message": "Nema segmenata za sintezu."}

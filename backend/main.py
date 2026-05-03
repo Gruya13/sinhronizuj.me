@@ -13,12 +13,7 @@ app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhr
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://178.104.214.78:8000",
-        "http://178.104.214.78",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -113,49 +108,18 @@ def get_task_status(task_id: str):
         response["error"] = str(task_result.info)
     return response
 
-@app.get("/api/v1/runpod-status")
-def get_runpod_global_status():
+@app.get("/api/v1/modal-status")
+def get_modal_global_status():
     """
-    Proverava broj aktivnih radnika na RunPod-u.
-    Ne budi instancu, samo čita metriku.
+    Vraća status Modal serverless radnika.
+    Budući da je Modal serverless, uvek je 'Spreman'.
     """
-    endpoints = {
-        "Whisper": settings.RUNPOD_WHISPER_ID,
-        "Translator": settings.RUNPOD_TRANSLATOR_ID,
-        "TTS": settings.RUNPOD_TTS_ID
+    return {
+        "status": "Spreman",
+        "active_workers": "Auto-Scale",
+        "platform": "Modal.com",
+        "timestamp": os.getpid()
     }
-    
-    headers = {
-        "Authorization": f"Bearer {settings.RUNPOD_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    overall_status = "Asleep"
-    active_count = 0
-    
-    try:
-        # Proveravamo samo Translator kao reprezentativni endpoint (ili sve ako želimo preciznost)
-        # Za sada ćemo proveriti sve i ako bilo koji ima > 0 radnika, sistem je "Budan"
-        for name, eid in endpoints.items():
-            if not eid: continue
-            
-            # RunPod health endpoint
-            health_url = f"https://api.runpod.ai/v2/{eid}/health"
-            res = requests.get(health_url, headers=headers, timeout=5)
-            if res.ok:
-                data = res.json()
-                workers = data.get("workerCount", 0)
-                if workers > 0:
-                    active_count += workers
-                    overall_status = "Active"
-        
-        return {
-            "status": overall_status,
-            "active_workers": active_count,
-            "timestamp": os.getpid() # placeholder za cache busting
-        }
-    except Exception as e:
-        return {"status": "Unknown", "error": str(e)}
 
 @app.get("/api/v1/hw-stats")
 async def hw_stats():

@@ -49,7 +49,7 @@ def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
 
 def translate_segments(segments: list, video_path: str = None, progress_callback=None) -> dict:
     """
-    Poziva RunPod Serverless Translator (Qwen-VL) koristeći multimodalni OpenAI Vision format.
+    Poziva Modal Serverless Translator (Qwen-VL) koristeći multimodalni OpenAI Vision format.
     """
     if not segments:
         return {"status": "success", "translated_segments": []}

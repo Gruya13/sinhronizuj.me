@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 @celery_app.task(bind=True, name="process_video_task")
 def process_video_task(self, video_url: str):
     """
-    Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom RunPod arhitekturom.
+    Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom Modal arhitekturom.
     """
     # Zadatak 1: Fallback učitavanje API ključa ako je izgubljen u forkovanom procesu
     if not settings.RUNPOD_API_KEY:
@@ -53,7 +53,7 @@ def process_video_task(self, video_url: str):
     update_progress(completed_step="Vokal izolovan")
     
     # --- FAZA 3: Transkripcija ---
-    update_progress("Prepoznavanje govora (Whisper RunPod)...", 40, detail="Inicijalizacija Whisper zahteva...")
+    update_progress("Prepoznavanje govora (Whisper Modal)...", 40, detail="Inicijalizacija Whisper zahteva...")
     from backend.worker.transcriber import transcribe_audio
     transcription_result = transcribe_audio(
         sep_result["vocals_path"],
@@ -81,7 +81,7 @@ def process_video_task(self, video_url: str):
         visual_context_url = upload_to_minio(preview_path)
         update_progress(visual_context_url=visual_context_url)
     
-    update_progress("Prevođenje (RunPod + Multimodal)...", 60, detail="Analiza vizuelnog konteksta i slanje segmenata na Qwen-VL...")
+    update_progress("Prevođenje (Modal + Multimodal)...", 60, detail="Analiza vizuelnog konteksta i slanje segmenata na Qwen-VL...")
     from backend.worker.translator import translate_segments
     
     translation_result = translate_segments(
@@ -99,7 +99,7 @@ def process_video_task(self, video_url: str):
     update_progress(completed_step="Tekst preveden", percentage=70, segments=segments_ui)
     
     # --- FAZA 5: Sinteza Govora ---
-    update_progress("Sinteza glasa (RunPod TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
+    update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
     from backend.worker.tts_engine import synthesize_audio
     
     tts_result = synthesize_audio(
