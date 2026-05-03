@@ -126,7 +126,7 @@ function App() {
           if (!res.ok) throw new Error("Server error");
           
           const data = await res.json();
-          consecutiveErrors.current = 0; // Resetujemo brojač grešaka pri uspešnom pozivu
+          consecutiveErrorsRef.current = 0; // Resetujemo brojač grešaka pri uspešnom pozivu
           
           if (data.status === 'SUCCESS') {
             setVideoUrl(`${API_BASE_URL}${data.video_url}`);
