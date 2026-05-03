@@ -267,3 +267,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - `backend/worker/utils.py`: Izbačena fukncija `wait_for_runpod_result` (koja je stalno pingovala GET `/status`) i zamenjena univerzalnom sinhronom funkcijom `call_modal_endpoint` koja održava konekciju otvorenom dok zadatak traje (do 5 ili 10 minuta na Modalu).
     - `backend/worker/transcriber.py`, `translator.py`, i `tts_engine.py`: Ažurirani da umesto upload-a na MinIO i slanja URL-ova, pretvaraju originalne audio (`vocals_path`) i vizuelne podatke u Base64 JSON i šalju direktno u zahtevu ka Modalu za maksimalnu brzinu cold-start prenosa.
 - **Status:** Celokupan kod je sada prepravljen. Celery pipeline sada u potpunosti koristi Modal.com za sve GPU procese.
+
+### 02.05.2026. 19:15 — Stabilizacija Fish Speech TTS i NFS Infrastrukture
+- **Akcija:** Izvršena serija od preko 80 iteracija testiranja i debagovanja `modal_workers/tts.py` radi rešavanja problema sa putanjama i sinhronizacijom modela.
+- **Implementacija:**
+    - **NFS Migracija:** Prešli smo sa `modal.Volume` na `modal.NetworkFileSystem` radi bolje performanse konkurentnog čitanja modela.
+    - **Unifikacija Modela:** Kreirana `download_models` rutina koja dinamički pronalazi `config.json` i `model.ckpt` (ili `.pth`) u HuggingFace snapshot-u i simlinkuje ih u unifikovanu strukturu.
+    - **Robusnost:** Uvedena `subprocess` metoda za CLI pozivanje Fish Speech-a radi izbegavanja Python import konflikata. Implementirano dinamičko `glob` pretraživanje za izlazne audio fajlove i automatska konverzija u Base64 za pouzdan povratak podataka ka Hetzneru.
+- **Status:** STT (Whisper) i LLM (Qwen) potvrđeni kao 100% operativni. TTS je u finalnoj fazi testiranja CLI argumenata za verziju 1.5.0.
+
+### 03.05.2026. 07:05 — Završna faza Modal integracije
+- **Status:** Svi Modal endpointi su testirani. STT i LLM prolaze sve testove. TTS worker je u toku finalne stabilizacije (rešavanje promene strukture modula u najnovijoj Fish Speech verziji).
+- **Sledeći korak:** Finalizacija TTS parametara i integracija sa `development` granom.
+### 03.05.2026. 05:12 — Stabilizacija TTS Pipeline-a na Modal.com (Fish Speech v1.1.0)
+- **Akcija:** Izvršena finalna stabilizacija TTS (Text-to-Speech) radnika nakon serije testova (v91 do v110).
+- **Tehničke Izmene:**
+    - **Verzija:** Prebačen repozitorijum na tag `v1.1.0` radi stabilnosti CLI argumenata.
+    - **Pipeline:** Implementiran trostepeni proces: 1. `VQGAN Encode` (Audio -> Tokens), 2. `LLAMA Generate` (Tokens -> Semantic), 3. `VQGAN Decode` (Semantic -> Audio).
+    - **Zavisnosti:** Dodati `torch` i `torchaudio` eksplicitno u sliku, uz postavljanje `PYTHONPATH` na `/opt/fish-speech`.
+    - **Checkpoints:** Konfigurisano korišćenje `model.pth` i `firefly-gan-vq-fsq-8x1024-21hz-generator.pth` unutar NFS-a.
+- **Status:** TTS worker je uspešno testiran i spreman za produkcionu integraciju sa Hetzner backendom.

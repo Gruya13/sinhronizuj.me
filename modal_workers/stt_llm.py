@@ -3,7 +3,7 @@ import os
 import base64
 import tempfile
 
-app = modal.App("sinhronizuj-me-stt-llm")
+app = modal.App("sm-stt")
 
 # Volume for caching Hugging Face models
 models_volume = modal.Volume.from_name("sinhronizuj-models", create_if_missing=True)
@@ -23,22 +23,29 @@ def download_models():
     snapshot_download(repo_id=QWEN_MODEL, local_dir=f"{VOLUME_PATH}/qwen2-vl-7b-awq")
 
 image = (
-    modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6")
+    modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev")
+    .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
+    .run_commands("python -m pip install --upgrade pip")
     .pip_install(
-        "huggingface-hub",
+        "vllm==0.6.3",
+        "transformers==4.46.1",
         "faster-whisper",
-        "vllm", 
-        "torch==2.4.0",
-        "torchaudio==2.4.0",
-        "opencv-python-headless",
-        extra_index_url="https://download.pytorch.org/whl/cu121"
+        "huggingface-hub",
+        "opencv-python-headless"
     )
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
-@app.cls(image=image, gpu="A100", volumes={VOLUME_PATH: models_volume}, scaledown_window=300)
-class STT_LLM_Worker:
+@app.cls(
+    image=image, 
+    gpu="A100", 
+    volumes={VOLUME_PATH: models_volume}, 
+    scaledown_window=300, 
+    timeout=600,
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
+)
+class Worker:
     @modal.enter()
     def load_models(self):
         from faster_whisper import WhisperModel
@@ -47,17 +54,17 @@ class STT_LLM_Worker:
         self.whisper_path = f"{VOLUME_PATH}/faster-whisper-v3"
         self.qwen_path = f"{VOLUME_PATH}/qwen2-vl-7b-awq"
         
-        print("Inicijalizacija Faster-Whisper modela...")
-        self.whisper_model = WhisperModel(self.whisper_path, device="cuda", compute_type="float16")
-        
         print("Inicijalizacija vLLM Qwen modela...")
         self.llm = LLM(
             model=self.qwen_path,
             quantization="awq",
-            gpu_memory_utilization=0.85,
-            max_model_len=4096,
-            tensor_parallel_size=1
+            gpu_memory_utilization=0.6,
+            max_model_len=2048,
+            enforce_eager=True
         )
+
+        print("Inicijalizacija Faster-Whisper modela...")
+        self.whisper_model = WhisperModel(self.whisper_path, device="cuda", compute_type="float16")
 
     def handle_transcribe(self, audio_b64: str):
         audio_data = base64.b64decode(audio_b64)
@@ -74,8 +81,20 @@ class STT_LLM_Worker:
     def handle_translate(self, prompt: str, frames_b64: list):
         from vllm import SamplingParams
         
+        from PIL import Image
+        from io import BytesIO
+        
         messages = [{"role": "user", "content": []}]
         for img_b64 in frames_b64:
+            # Decode and check dimensions
+            img_data = base64.b64decode(img_b64)
+            img = Image.open(BytesIO(img_data))
+            if img.width < 224 or img.height < 224:
+                img = img.resize((224, 224))
+                buffered = BytesIO()
+                img.save(buffered, format="JPEG")
+                img_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
             messages[0]["content"].append({
                 "type": "image_url", 
                 "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
@@ -89,7 +108,7 @@ class STT_LLM_Worker:
         return {"translation": outputs[0].outputs[0].text}
 
     @modal.fastapi_endpoint(method="POST")
-    def process_task(self, data: dict):
+    def task(self, data: dict):
         task_type = data.get('task')
         
         try:
