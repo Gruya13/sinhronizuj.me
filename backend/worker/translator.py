@@ -8,7 +8,7 @@ from typing import List, Dict
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
-def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
+def extract_video_frames(video_path: str, num_frames: int = 5) -> List[str]:
     """
     Izvlači num_frames frejmova iz videa i vraća ih kao Base64 stringove.
     """
