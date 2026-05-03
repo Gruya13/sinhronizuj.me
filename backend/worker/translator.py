@@ -79,11 +79,16 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Priprema multimodalnog content-a (Modal worker interno pakuje ovo)
     prompt_text = (
-        "Ti si profesionalni AI prevodilac. Tvoj zadatak je da prevedeš transkript videa na SRPSKI jezik (latinica). "
-        "Dobićeš transkript u TOON formatu: [start|end|originalni tekst]. "
-        "MORAŠ VRATITI PREVOD U ISTOM TOON FORMATU: [start|end|prevedeni tekst]. "
-        "NE SMERŠ menjati start i end vremena. NE SMEŠ dodavati nikakav dodatni tekst ili objašnjenja. "
-        "Koristi priložene slike (frejmove) da razumeš ko govori (muško/žensko) i kakva je atmosfera. \n\n"
+        "Ti si ekspert za prevođenje video titlova. Tvoj zadatak je da prevedeš transkript na SRPSKI jezik (EKAVICA). \n"
+        "PRAVILA:\n"
+        "1. MORAŠ zadržati TOON format: [start|end|prevedeni tekst].\n"
+        "2. Prevod mora biti DOSLOVAN (rečenica po rečenica), ne smeš prepričavati niti sažimati tekst.\n"
+        "3. Koristi priložene slike da odrediš pol govornika (npr. 'Ja sam video' vs 'Ja sam videla').\n"
+        "4. Celokupan izlaz mora biti samo TOON lista, bez ikakvog dodatnog teksta.\n"
+        "5. Reč 'preoccupied' prevedi kao 'zaokupljeni' ili 'opsednuti'.\n\n"
+        "PRIMER FORMATA:\n"
+        "ULAZ: [1.20|3.50|I am working on AI agent named Luna]\n"
+        "IZLAZ: [1.20|3.50|Radim na AI agentu po imenu Luna]\n\n"
         f"TRANSKRIPT ZA PREVOD:\n{' '.join(toon_input)}"
     )
 
