@@ -39,7 +39,7 @@ function App() {
     setUploadProgress(0);
     setVisualContextUrl(null);
     localStorage.removeItem('sinhronizuj_me_task_id');
-    consecutiveErrors.current = 0;
+    consecutiveErrorsRef.current = 0;
   };
 
   const STEPS = [
