@@ -181,6 +181,7 @@ function App() {
     setStatus('POVEZIVANJE SA KONTROLNOM TABLOM...');
 
     try {
+      console.log(`[SUBMIT] Slanje zadatka. Debugging: ${debuggingMode}, URL: ${targetUrl}`);
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

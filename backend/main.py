@@ -81,7 +81,8 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
     from backend.worker.tasks import process_video_task
-    task = process_video_task.delay(request.url, debugging_mode=request.debugging_mode)
+    # Koristimo striktno pozicione argumente radi Celery stabilnosti sa self (bind=True)
+    task = process_video_task.delay(request.url, request.debugging_mode)
     return {
         "status": "success",
         "message": "Zadatak za sinhronizaciju je predat radniku.",

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 @celery_app.task(bind=True, name="process_video_task")
 def process_video_task(self, video_url: str, debugging_mode: bool = False):
+    print(f"--- [CELERY TASK] Započeta obrada. Debugging mode: {debugging_mode} ---")
     """
     Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom Modal arhitekturom.
     """
