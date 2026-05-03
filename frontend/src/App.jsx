@@ -21,10 +21,13 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   
   const [terminalOpen, setTerminalOpen] = useState(true);
+  const [debuggingMode, setDebuggingMode] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
+  
   const feedRef = useRef(null);
   const terminalRef = useRef(null);
   const fileInputRef = useRef(null);
-  const consecutiveErrors = useRef(0);
+  const consecutiveErrorsRef = useRef(0);
 
   const resetStudio = () => {
     setTaskId(null);
@@ -176,7 +179,7 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl })
+        body: JSON.stringify({ url: targetUrl, debugging_mode: debuggingMode })
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -184,6 +187,20 @@ function App() {
         localStorage.setItem('sinhronizuj_me_task_id', data.task_id);
       } else { setError(data.message); setLoading(false); }
     } catch (err) { setError('Greška pri slanju zadatka. Proverite backend.'); setLoading(false); }
+  };
+
+  const handleContinue = async () => {
+    if (!taskId) return;
+    setIsContinuing(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/continue/${taskId}`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      // Polling će preuzeti promenu statusa
+    } catch (err) {
+      console.error("Greška pri slanju signala za nastavak");
+    } finally {
+      setTimeout(() => setIsContinuing(false), 2000);
+    }
   };
 
   const handleFileUpload = async (e) => {
@@ -316,6 +333,20 @@ function App() {
                 onChange={handleFileUpload}
             />
             <p className="upload-hint">Podržani formati: MP4, MKV, AVI. Max 500MB.</p>
+            
+            <div className="debug-toggle-container">
+              <label className="debug-label">
+                <Terminal size={14} /> Debugging Mode (Step-by-step)
+              </label>
+              <label className="switch">
+                <input 
+                  type="checkbox" 
+                  checked={debuggingMode} 
+                  onChange={(e) => setDebuggingMode(e.target.checked)} 
+                />
+                <span className="slider"></span>
+              </label>
+            </div>
           </div>
         )}
 
@@ -399,8 +430,20 @@ function App() {
                           </div>
                         </motion.div>
                       ))}
-                    </div>
-                  ) : (
+                    {progressData?.waiting_for_user && (
+                      <div className="continue-btn-container">
+                        <button 
+                          className="continue-btn" 
+                          onClick={handleContinue}
+                          disabled={isContinuing}
+                        >
+                          {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
+                          Nastavi na sledeći korak
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
                     <div className="waiting-studio">
                       <Loader2 className="spinner-large" />
                       <p>{uploadProgress > 0 ? 'Slanje fajla u oblak...' : 'Pripremam studio za obradu...'}</p>

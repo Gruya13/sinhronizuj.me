@@ -24,6 +24,7 @@ app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="video
 
 class VideoRequest(BaseModel):
     url: str
+    debugging_mode: bool = False
 
 @app.get("/")
 def read_root():
@@ -80,12 +81,26 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
     from backend.worker.tasks import process_video_task
-    task = process_video_task.delay(request.url)
+    task = process_video_task.delay(request.url, debugging_mode=request.debugging_mode)
     return {
         "status": "success",
         "message": "Zadatak za sinhronizaciju je predat radniku.",
         "task_id": task.id
     }
+
+@app.post("/api/v1/continue/{task_id}")
+def continue_task(task_id: str):
+    """
+    Signalizira Celery zadatku da nastavi sa sledećim korakom u debugging modu.
+    """
+    import redis
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    
+    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r.set(f"task:{task_id}:continue", "true", ex=3600)
+    return {"status": "success", "message": "Signal za nastavak poslat."}
 
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
@@ -98,10 +113,10 @@ def get_task_status(task_id: str):
         response["progress_data"] = task_result.info
     if task_result.status == "SUCCESS":
         result = task_result.result
-        if result.get("status") == "error":
+        if result and isinstance(result, dict) and result.get("status") == "error":
             response["status"] = "FAILURE"
             response["error"] = result.get("message")
-        else:
+        elif result and isinstance(result, dict) and "final_video_path" in result:
             video_filename = os.path.basename(result["final_video_path"])
             response["video_url"] = f"/videos/{video_filename}"
     elif task_result.status == "FAILURE":

@@ -53,10 +53,10 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("git", "ffmpeg", "portaudio19-dev")
     .run_commands(
-        "git clone --branch v1.1.0 https://github.com/fishaudio/fish-speech.git /opt/fish-speech",
+        "git clone --branch v1.4.0 https://github.com/fishaudio/fish-speech.git /opt/fish-speech",
         "cd /opt/fish-speech && pip install -e .",
     )
-    .pip_install("torch", "torchaudio", "huggingface-hub", "orjson", "matplotlib", "librosa", "soundfile")
+    .pip_install("torch", "torchaudio", "huggingface-hub", "orjson", "matplotlib", "librosa", "soundfile", "vector-quantize-pytorch", "torchcodec==0.11.1")
 )
 
 @app.cls(image=image, gpu="L4", network_file_systems={VOLUME_PATH: models_nfs}, scaledown_window=300, timeout=1200)
@@ -98,35 +98,51 @@ class WorkerV110:
                 f.write(base64.b64decode(ref_audio_b64))
             import glob
             # Fish Speech 1.5 koristi model.pth
-            llama_ckpt = f"{self.fish_path}/model.pth"
-            vqgan_ckpt = f"{self.fish_path}/firefly-gan-vq-fsq-8x1024-21hz-generator.pth"
+            # Tražimo ih rekurzivno jer snapshot_download može da ih stavi u podfoldere
+            llama_ckpt = next(glob.iglob(f"{self.fish_path}/**/model.pth", recursive=True), None)
+            vqgan_ckpt = next(glob.iglob(f"{self.fish_path}/**/firefly-gan-vq-fsq-8x1024-21hz-generator.pth", recursive=True), None)
             
-            if not os.path.exists(llama_ckpt):
-                return {"error": f"Llama checkpoint nije nađen: {llama_ckpt}"}
+            if not llama_ckpt or not vqgan_ckpt:
+                 # Pokušaj sa model.ckpt ako model.pth ne postoji (za starije verzije unutar 1.5)
+                 llama_ckpt = llama_ckpt or next(glob.iglob(f"{self.fish_path}/**/model.ckpt", recursive=True), None)
             
+            if not llama_ckpt or not vqgan_ckpt:
+                return {"error": f"Checkpointi nisu nađeni u {self.fish_path}. Nađeno: Llama={llama_ckpt}, VQGAN={vqgan_ckpt}"}
+            
+            print(f"[TTS] Koristim Llama: {llama_ckpt}")
+            print(f"[TTS] Koristim VQGAN: {vqgan_ckpt}")
+
+            # Dinamičko pronalaženje skripti unutar /opt/fish-speech
+            vqgan_script = next(glob.iglob(f"/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
+            llama_script = next(glob.iglob(f"/opt/fish-speech/**/llama/generate.py", recursive=True), None)
+            
+            if not vqgan_script or not llama_script:
+                return {"error": f"Skripte nisu nađene. VQGAN={vqgan_script}, Llama={llama_script}"}
+
+            print(f"[TTS] Koristim VQGAN skriptu: {vqgan_script}")
+            print(f"[TTS] Koristim Llama skriptu: {llama_script}")
+
             # Step 1: Encode (Audio -> Tokens)
-            # VQGAN detektuje .wav i radi encode
-            encode_cmd = ["python3", "tools/vqgan/inference.py", "-i", TMP_REF_AUDIO, "-o", "fake.npy", "--checkpoint-path", vqgan_ckpt]
+            encode_cmd = ["python3", vqgan_script, "-i", TMP_REF_AUDIO, "-o", "fake.npy", "--checkpoint-path", vqgan_ckpt]
             
             env = os.environ.copy()
             env["PYTHONPATH"] = f"/opt/fish-speech:{env.get('PYTHONPATH', '')}"
             
             p1 = subprocess.run(encode_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
             if p1.returncode != 0:
-                return {"error": f"Step 1 failed: {p1.stderr}\nSTDOUT: {p1.stdout}"}
+                return {"error": f"Step 1 (Encode) failed: {p1.stderr}\nSTDOUT: {p1.stdout}"}
                 
             # Step 2: Generate (Tokens -> Semantic Tokens)
-            gen_cmd = ["python3", "tools/llama/generate.py", "--text", text, "--prompt-text", ref_text, "--prompt-tokens", "fake.npy", "--checkpoint-path", llama_ckpt, "--num-samples", "1"]
+            gen_cmd = ["python3", llama_script, "--text", text, "--prompt-text", ref_text, "--prompt-tokens", "fake.npy", "--checkpoint-path", llama_ckpt, "--num-samples", "1"]
             p2 = subprocess.run(gen_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
             if p2.returncode != 0:
-                return {"error": f"Step 2 failed: {p2.stderr}\nSTDOUT: {p2.stdout}"}
+                return {"error": f"Step 2 (Generate) failed: {p2.stderr}\nSTDOUT: {p2.stdout}"}
                 
             # Step 3: Decode (Semantic Tokens -> Audio)
-            # VQGAN detektuje .npy i radi decode
-            decode_cmd = ["python3", "tools/vqgan/inference.py", "-i", "codes_0.npy", "-o", TMP_OUT_AUDIO, "--checkpoint-path", vqgan_ckpt]
+            decode_cmd = ["python3", vqgan_script, "-i", "codes_0.npy", "-o", TMP_OUT_AUDIO, "--checkpoint-path", vqgan_ckpt]
             p3 = subprocess.run(decode_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
             if p3.returncode != 0:
-                return {"error": f"Step 3 failed: {p3.stderr}\nSTDOUT: {p3.stdout}"}
+                return {"error": f"Step 3 (Decode) failed: {p3.stderr}\nSTDOUT: {p3.stdout}"}
             
             if not os.path.exists(TMP_OUT_AUDIO):
                 return {"error": "Finalni audio nije nađen."}

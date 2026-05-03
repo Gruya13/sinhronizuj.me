@@ -73,7 +73,7 @@ class Worker:
             tmp_audio.write(audio_data)
             tmp_audio_path = tmp_audio.name
         
-        segments, info = self.whisper_model.transcribe(tmp_audio_path, language="sr", beam_size=5)
+        segments, info = self.whisper_model.transcribe(tmp_audio_path, language=None, beam_size=5)
         result = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
         
         os.remove(tmp_audio_path)

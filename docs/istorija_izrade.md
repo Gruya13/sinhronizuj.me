@@ -1,5 +1,18 @@
 # Istorija izrade projekta Sinhronizuj.me
 
+## [03.05.2026] - Migracija na Modal Serverless i optimizacija pipeline-a
+- **Infrastruktura**: Završena migracija sa RunPod-a na Modal Serverless (Hetzner VPS orkestracija + Modal GPU radnici).
+- **UI/UX**: 
+    - Dodat "Cold Start" indikator sa progres barom za Modal radnike.
+    - Implementiran Modal-status indikator na dashboardu.
+- **Bug Fixes**:
+    - Rešen CORS problem na VPS-u (dozvoljeni svi origins za razvoj/test).
+    - Popravljen `Errno 2: demucs` korišćenjem apsolutnih putanja unutar Docker-a.
+    - Rešen "At most 1 image" problem na Qwen-VL modelu (fiksiran na 1 frejm radi stabilnosti).
+    - **Whisper**: Omogućena auto-detekcija jezika (uklonjen hardkodovani "sr") za ispravnu transkripciju engleskih videa.
+    - **TTS**: Nadograđen Fish Speech na verziju 1.5 i usklađeni checkpoint-i (Llama + VQGAN) radi eliminacije `size mismatch` greške.
+
+
 ## Trenutni Status:
 Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlova na MinIO S3 radi. Demucs separacija vokala radi lokalno. **Blokirano:** RunPod Whisper endpoint vraća 401 Unauthorized iz Celery worker-a (radi iz standalone skripte). Istraga u toku — verovatno problem sa env varijablama u Celery forked procesima.
 

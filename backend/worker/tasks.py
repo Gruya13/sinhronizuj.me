@@ -6,14 +6,16 @@ import shutil
 from datetime import datetime, timedelta, timezone
 
 @celery_app.task(bind=True, name="process_video_task")
-def process_video_task(self, video_url: str):
+def process_video_task(self, video_url: str, debugging_mode: bool = False):
     """
     Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom Modal arhitekturom.
     """
-    # Zadatak 1: Fallback učitavanje API ključa ako je izgubljen u forkovanom procesu
-    if not settings.RUNPOD_API_KEY:
-        settings.RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
-        print(f"[WORKER] Fallback: RUNPOD_API_KEY učitan iz os.environ (Dužina: {len(settings.RUNPOD_API_KEY)})")
+    import redis
+    import time
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    r_client = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
 
     progress_metadata = {
         'current_step': "Inicijalizacija...",
@@ -21,15 +23,17 @@ def process_video_task(self, video_url: str):
         'completed_steps': [],
         'segments': [],
         'detail': "Priprema radnog prostora...",
-        'logs': []
+        'logs': [],
+        'waiting_for_user': False
     }
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None, waiting=False):
         if step_name: progress_metadata['current_step'] = step_name
         if percentage is not None: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
+        progress_metadata['waiting_for_user'] = waiting
         if detail:
             progress_metadata['detail'] = detail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -39,11 +43,32 @@ def process_video_task(self, video_url: str):
         
         self.update_state(state='PROGRESS', meta=progress_metadata)
 
+    def wait_for_user(step_name):
+        if not debugging_mode:
+            return
+        
+        update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True)
+        
+        # Brišemo stari signal ako postoji
+        r_client.delete(f"task:{self.request.id}:continue")
+        
+        # Čekamo signal (max 30 minuta)
+        start_wait = time.time()
+        while time.time() - start_wait < 1800:
+            if r_client.get(f"task:{self.request.id}:continue"):
+                r_client.delete(f"task:{self.request.id}:continue")
+                update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False)
+                return
+            time.sleep(1)
+        
+        raise TimeoutError("Korisnik nije potvrdio nastavak u predviđenom roku.")
+
     # --- FAZA 1: Preuzimanje ---
     update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje media fajlova...")
     result = download_video(video_url)
     if result["status"] == "error": return result
     update_progress(completed_step="Preuzimanje završeno")
+    wait_for_user("Preuzimanje")
     
     # --- FAZA 2: Separacija Zvuka ---
     update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na CPU-u. Ovo može potrajati par minuta...")
@@ -51,6 +76,7 @@ def process_video_task(self, video_url: str):
     sep_result = separate_audio(result['audio_path'])
     if sep_result["status"] == "error": return sep_result
     update_progress(completed_step="Vokal izolovan")
+    wait_for_user("Separacija vokala")
     
     # --- FAZA 3: Transkripcija ---
     update_progress("Prepoznavanje govora (Whisper Modal)...", 40, detail="Inicijalizacija Whisper zahteva...")
@@ -70,6 +96,7 @@ def process_video_task(self, video_url: str):
             "status": "pending"
         })
     update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
+    wait_for_user("Transkripcija")
     
     # --- FAZA 4: Vizuelni Kontekst i Prevod ---
     update_progress("Generisanje vizuelnog konteksta...", 50, detail="Ekstrakcija ključnih frejmova za analizu...")
@@ -97,6 +124,7 @@ def process_video_task(self, video_url: str):
             segments_ui[i]["status"] = "translated"
             
     update_progress(completed_step="Tekst preveden", percentage=70, segments=segments_ui)
+    wait_for_user("Prevod")
     
     # --- FAZA 5: Sinteza Govora ---
     update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
@@ -109,6 +137,7 @@ def process_video_task(self, video_url: str):
     )
     if tts_result["status"] == "error": return tts_result
     update_progress(completed_step="Glas generisan", percentage=85)
+    wait_for_user("TTS Sinteza")
     
     # --- FAZA 6: Spajanje ---
     update_progress("Finalni Mix...", 90)
