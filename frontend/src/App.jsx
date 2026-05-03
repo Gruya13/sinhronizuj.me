@@ -185,7 +185,7 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl, debugging_mode: debuggingMode })
+        body: JSON.stringify({ url: targetUrl, debug: debuggingMode })
       });
       const data = await res.json();
       if (data.status === 'success') {

@@ -24,7 +24,7 @@ app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="video
 
 class VideoRequest(BaseModel):
     url: str
-    debugging_mode: bool = False
+    debug: bool = False
 
 @app.get("/")
 def read_root():
@@ -80,10 +80,10 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
-    print(f"--- [API RECEIVE] Primljen zahtev: url={request.url}, debug={request.debugging_mode}")
+    print(f"--- [API RECEIVE] Primljen zahtev: url={request.url}, debug={request.debug}", flush=True)
     from backend.worker.tasks import process_video_task
     # Koristimo striktno pozicione argumente
-    task = process_video_task.delay(request.url, request.debugging_mode)
+    task = process_video_task.delay(request.url, request.debug)
     return {
         "status": "success",
         "message": "Zadatak za sinhronizaciju je predat radniku.",

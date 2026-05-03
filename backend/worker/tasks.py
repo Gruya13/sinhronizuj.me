@@ -6,8 +6,8 @@ import shutil
 from datetime import datetime, timedelta, timezone
 
 @celery_app.task(bind=True, name="process_video_task")
-def process_video_task(self, video_url: str, debugging_mode: bool = False):
-    print(f"--- [CELERY TASK] Započeta obrada. Debugging mode: {debugging_mode} ---")
+def process_video_task(self, video_url: str, debug: bool = False):
+    print(f"--- [CELERY TASK] Započeta obrada. Debug: {debug} ---", flush=True)
     """
     Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom Modal arhitekturom.
     """
@@ -45,7 +45,7 @@ def process_video_task(self, video_url: str, debugging_mode: bool = False):
         self.update_state(state='PROGRESS', meta=progress_metadata)
 
     def wait_for_user(step_name):
-        if not debugging_mode:
+        if not debug:
             return
         
         update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True)
