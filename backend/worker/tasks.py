@@ -69,6 +69,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     result = download_video(video_url)
     if result["status"] == "error": return result
     update_progress(completed_step="Preuzimanje završeno")
+    time.sleep(1)
     wait_for_user("Preuzimanje")
     
     # --- FAZA 2: Separacija Zvuka ---
@@ -77,6 +78,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     sep_result = separate_audio(result['audio_path'])
     if sep_result["status"] == "error": return sep_result
     update_progress(completed_step="Vokal izolovan")
+    time.sleep(1)
     wait_for_user("Separacija vokala")
     
     # --- FAZA 3: Transkripcija ---
@@ -97,6 +99,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
             "status": "pending"
         })
     update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
+    time.sleep(2) # Dajemo vremena frontendu da oseti promenu pre nego što radnik blokira
     wait_for_user("Transkripcija")
     
     # --- FAZA 4: Vizuelni Kontekst i Prevod ---
