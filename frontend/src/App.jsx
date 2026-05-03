@@ -414,9 +414,26 @@ function App() {
                         <span>{progressData.detail}</span>
                       </div>
                     )}
+
+                    {progressData?.waiting_for_user && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="continue-btn-container"
+                      >
+                        <button 
+                          className="continue-btn" 
+                          onClick={handleContinue}
+                          disabled={isContinuing}
+                        >
+                          {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
+                          Nastavi na sledeći korak
+                        </button>
+                      </motion.div>
+                    )}
                   </div>
 
-                  {progressData?.segments?.length > 0 ? (
+                  {progressData?.segments?.length > 0 && (
                     <div className="segments-grid" ref={feedRef}>
                       <div className="grid-header">
                         <span>Originalni Transkript (Whisper)</span>
@@ -436,19 +453,8 @@ function App() {
                           </div>
                         </motion.div>
                       ))}
-                    {progressData?.waiting_for_user && (
-                      <div className="continue-btn-container">
-                        <button 
-                          className="continue-btn" 
-                          onClick={handleContinue}
-                          disabled={isContinuing}
-                        >
-                          {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
-                          Nastavi na sledeći korak
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 ) : (
                     <div className="waiting-studio">
                       <Loader2 className="spinner-large" />
