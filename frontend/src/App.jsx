@@ -142,11 +142,13 @@ function App() {
             clearInterval(interval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
             setError(data.error || 'Greška pri obradi.');
+            // Ne čistimo progressData ovde
             setLoading(false);
             localStorage.removeItem('sinhronizuj_me_task_id');
             clearInterval(interval);
           } else {
             if (data.progress_data) {
+              console.log(`[POLL] Status: ${data.status}, Segments: ${data.progress_data.segments?.length || 0}`, data.progress_data);
               setProgressData(data.progress_data);
               setStatus(data.progress_data.current_step);
               if (data.progress_data.visual_context_url) {

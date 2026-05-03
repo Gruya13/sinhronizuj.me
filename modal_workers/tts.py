@@ -123,30 +123,31 @@ class WorkerV110:
             print(f"[TTS] Koristim Llama skriptu: {llama_script}")
 
             # Step 1: Encode (Audio -> Tokens)
-            # U verziji 1.5, vqgan/inference.py uvek pokušava da zapiše i rekonstruisani audio
-            # pa mu dajemo .wav ekstenziju da ne bi pukao soundfile, a on će generisati i .npy
-            encode_cmd = ["python3", vqgan_script, "-i", TMP_REF_AUDIO, "-o", "fake.wav", "--checkpoint-path", vqgan_ckpt]
+            # Koristimo apsolutnu putanju u /tmp da izbegnemo probleme sa permisijama
+            out_wav = "/tmp/reconstructed.wav"
+            encode_cmd = ["python3", vqgan_script, "-i", TMP_REF_AUDIO, "-o", out_wav, "--checkpoint-path", vqgan_ckpt]
             
             env = os.environ.copy()
             env["PYTHONPATH"] = f"/opt/fish-speech:{env.get('PYTHONPATH', '')}"
             
             print(f"[TTS] Pokrećem Encode: {' '.join(encode_cmd)}")
-            result = subprocess.run(encode_cmd, capture_output=True, text=True, env=env)
+            result = subprocess.run(encode_cmd, capture_output=True, text=True, env=env, cwd="/tmp")
             if result.returncode != 0:
                  return {"error": f"Step 1 (Encode) failed: {result.stderr or result.stdout}"}
             
-            # Proveravamo da li je kreiran fake.npy (neki modeli kreiraju fake.wav.npy ili samo fake.npy)
-            ref_indices_path = "fake.npy"
+            # Proveravamo da li je kreiran .npy (Fish Speech dodaje .npy na -o putanju)
+            ref_indices_path = out_wav + ".npy"
             if not os.path.exists(ref_indices_path):
-                if os.path.exists("fake.wav.npy"):
-                    ref_indices_path = "fake.wav.npy"
+                # Backwards compatibility ako model ipak kreira samo fake.npy u /tmp
+                if os.path.exists("/tmp/fake.npy"):
+                    ref_indices_path = "/tmp/fake.npy"
                 else:
-                    return {"error": "Encode nije generisao .npy fajl sa indeksima (tokenima)."}
+                    return {"error": f"Encode nije generisao npy fajl. Traženo: {ref_indices_path}"}
 
             print(f"[TTS] Pronađeni indeksi na: {ref_indices_path}")
 
             # Step 2: Llama Generate (Prompt + Text -> New Tokens)
-            # Koristimo pronađene indekse kao referencu
+            out_codes = "/tmp/codes_0.npy"
             gen_cmd = [
                 "python3", llama_script,
                 "--text", text,
@@ -157,13 +158,22 @@ class WorkerV110:
                 "--compile"
             ]
             
-            p2 = subprocess.run(gen_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
+            print(f"[TTS] Pokrećem Generate: {' '.join(gen_cmd)}")
+            p2 = subprocess.run(gen_cmd, capture_output=True, text=True, env=env, cwd="/tmp")
             if p2.returncode != 0:
                 return {"error": f"Step 2 (Generate) failed: {p2.stderr}\nSTDOUT: {p2.stdout}"}
                 
             # Step 3: Decode (Semantic Tokens -> Audio)
-            decode_cmd = ["python3", vqgan_script, "-i", "codes_0.npy", "-o", TMP_OUT_AUDIO, "--checkpoint-path", vqgan_ckpt]
-            p3 = subprocess.run(decode_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
+            # Proveravamo gde je Llama zapravo izbacila kodove (obično u cwd ili fiksno codes_0.npy)
+            codes_path = "/tmp/codes_0.npy"
+            if not os.path.exists(codes_path):
+                # Llama nekada izbacuje u /opt/fish-speech ako se ne pazi na cwd
+                if os.path.exists("/opt/fish-speech/codes_0.npy"):
+                    codes_path = "/opt/fish-speech/codes_0.npy"
+            
+            decode_cmd = ["python3", vqgan_script, "-i", codes_path, "-o", TMP_OUT_AUDIO, "--checkpoint-path", vqgan_ckpt]
+            print(f"[TTS] Pokrećem Decode: {' '.join(decode_cmd)}")
+            p3 = subprocess.run(decode_cmd, capture_output=True, text=True, env=env, cwd="/tmp")
             if p3.returncode != 0:
                 return {"error": f"Step 3 (Decode) failed: {p3.stderr}\nSTDOUT: {p3.stdout}"}
             

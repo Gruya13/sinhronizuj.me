@@ -19,6 +19,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     r_client = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
 
     progress_metadata = {
+        'id': self.request.id,
         'current_step': "Inicijalizacija...",
         'percent': 0,
         'completed_steps': [],
@@ -98,6 +99,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
             "translated": "",
             "status": "pending"
         })
+    print(f"--- [DEBUG] Šaljem {len(segments_ui)} segmenata u update_progress", flush=True)
     update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
     time.sleep(2) # Dajemo vremena frontendu da oseti promenu pre nego što radnik blokira
     wait_for_user("Transkripcija")
