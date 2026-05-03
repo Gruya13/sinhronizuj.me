@@ -81,6 +81,7 @@ class Worker:
 
     def handle_translate(self, prompt: str, frames_b64: list):
         from vllm import SamplingParams
+        print(f"[QWEN] Primljeno {len(frames_b64)} slika za obradu.")
         
         from PIL import Image
         from io import BytesIO
