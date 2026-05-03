@@ -12,6 +12,7 @@
     - **Whisper**: Omogućena auto-detekcija jezika (uklonjen hardkodovani "sr") za ispravnu transkripciju engleskih videa.
     - **TTS**: Nadograđen Fish Speech na verziju 1.5 i usklađeni checkpoint-i (Llama + VQGAN) radi eliminacije `size mismatch` greške.
     - **Demucs**: Prebačeno na `python3 -m demucs.separate` pozivanje radi veće robusnosti u Docker okruženju (rešen `Errno 2`).
+    - **Config**: Dodat `REDIS_PASSWORD` u `Settings` model radi ispravne autentifikacije kod `wait_for_user` signala.
     - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a.
 
 

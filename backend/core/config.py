@@ -6,6 +6,7 @@ load_dotenv()
 class Settings:
     PROJECT_NAME: str = "Sinhronizuj.me"
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP")
     RUNPOD_API_KEY: str = os.getenv("RUNPOD_API_KEY", "")
     
     # Modal Serverless Endpoints
