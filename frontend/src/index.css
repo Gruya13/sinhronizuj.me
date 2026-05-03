@@ -601,3 +601,49 @@ body {
 .status-badge.učitavam... {
   opacity: 0.5;
 }
+
+.cold-start-indicator {
+  margin-top: 12px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-left: 3px solid #10b981;
+}
+
+.cold-start-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #10b981;
+}
+
+.cold-start-bar-container {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.cold-start-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #6ee7b7);
+  width: 0%;
+  animation: coldStartProgress 25s cubic-bezier(0.1, 0, 0.1, 1) forwards;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+@keyframes coldStartProgress {
+  0% { width: 0%; }
+  20% { width: 40%; }
+  50% { width: 70%; }
+  80% { width: 90%; }
+  100% { width: 98%; }
+}
+

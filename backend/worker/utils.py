@@ -13,7 +13,7 @@ def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 300, pro
     
     print(f"[MODAL] Pozivam endpoint: {url}")
     if progress_callback:
-        progress_callback(detail="Slanje zahteva na Modal (Cold Start može trajati 10-20s)...")
+        progress_callback(detail="Modal radnik se budi (Cold Start u toku)... ⏳")
         
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)

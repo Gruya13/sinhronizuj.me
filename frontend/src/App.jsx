@@ -348,6 +348,22 @@ function App() {
                         </button>
                       </div>
                     </div>
+
+                    {progressData?.detail?.includes("Cold Start") && (
+                      <div className="cold-start-indicator">
+                        <div className="cold-start-header">
+                          <div className="flex items-center gap-2">
+                             <Zap size={14} className="pulse-icon" />
+                             <span>MODAL_COLD_START: Podižem radno okruženje...</span>
+                          </div>
+                          <span className="opacity-60">Očekivano ~20s</span>
+                        </div>
+                        <div className="cold-start-bar-container">
+                          <div className="cold-start-bar-fill"></div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="progress-bar-container">
                       <motion.div 
                         className={`progress-bar-fill ${uploadProgress > 0 ? 'uploading' : ''}`} 
