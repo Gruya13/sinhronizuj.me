@@ -14,7 +14,8 @@
     - **Demucs**: Prebačeno na `python3 -m demucs.separate` pozivanje radi veće robusnosti u Docker okruženju (rešen `Errno 2`).
     - **Config**: Dodat `REDIS_PASSWORD` u `Settings` model radi ispravne autentifikacije kod `wait_for_user` signala.
     - **Frontend**: KOMPLETNO rešen `ReferenceError` (sve instance `consecutiveErrors` zamenjene sa `consecutiveErrorsRef`).
-    - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a.
+    - **FFMPEG**: Rešen bag sa neparnom visinom videa (HTH Error) korišćenjem `scale=320:-2`.
+    - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a. Dodati opsežni logovi na API i Worker nivou.
 
 
 ## Trenutni Status:

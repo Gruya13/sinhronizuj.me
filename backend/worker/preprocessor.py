@@ -19,7 +19,7 @@ def extract_visual_context(video_path: str, interval: int = 4) -> str:
     
     cmd = [
         "ffmpeg", "-y", "-i", video_path,
-        "-vf", f"fps=1/{interval},scale=320:-1",
+        "-vf", f"fps=1/{interval},scale=320:-2",
         "-an", # bez audija
         "-c:v", "libx264", "-crf", "30", "-preset", "veryfast",
         output_path
