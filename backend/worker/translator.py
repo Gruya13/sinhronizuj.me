@@ -4,6 +4,7 @@ import cv2
 import base64
 import os
 import time
+import re
 from typing import List, Dict
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
@@ -111,11 +112,15 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         # Pokušaj parsiranja JSON-a
         try:
             # Čistimo eventualni markdown kod blok ako ga model ubaci
-            json_str = re.search(r'\[\s*\{.*\}\s*\]', raw_output, re.DOTALL)
-            if json_str:
-                translated_data = json.loads(json_str.group(0))
-            else:
-                translated_data = json.loads(raw_output)
+            json_match = re.search(r'\[\s*\{.*\}\s*\]', raw_output, re.DOTALL)
+            json_str = json_match.group(0) if json_match else raw_output
+            
+            # Mala "hirurgija" za česte LLM greške (npr. zaboravljen navodnik pre zareza ili kraja)
+            # Tražimo : "tekst... } i menjamo u : "tekst..." }
+            json_str = re.sub(r':\s*"([^"]+)\s*\}', r': "\1" }', json_str)
+            json_str = re.sub(r':\s*"([^"]+)\s*\,', r': "\1" ,', json_str)
+            
+            translated_data = json.loads(json_str)
                 
             final_segments = []
             for i, orig in enumerate(segments):
