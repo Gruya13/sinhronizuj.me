@@ -79,9 +79,12 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Priprema multimodalnog content-a (Modal worker interno pakuje ovo)
     prompt_text = (
-        f"Ovo je transkript videa: {' '.join(toon_input)}. "
-        "Prevedi ga na srpski (latinica) koristeći isti [start|end|tekst] TOON format. "
-        "Koristi priložene frejmove kao vizuelni kontekst za tačan prevod (pol govornika, emocije, objekti u sceni)."
+        "Ti si profesionalni AI prevodilac. Tvoj zadatak je da prevedeš transkript videa na SRPSKI jezik (latinica). "
+        "Dobićeš transkript u TOON formatu: [start|end|originalni tekst]. "
+        "MORAŠ VRATITI PREVOD U ISTOM TOON FORMATU: [start|end|prevedeni tekst]. "
+        "NE SMERŠ menjati start i end vremena. NE SMEŠ dodavati nikakav dodatni tekst ili objašnjenja. "
+        "Koristi priložene slike (frejmove) da razumeš ko govori (muško/žensko) i kakva je atmosfera. \n\n"
+        f"TRANSKRIPT ZA PREVOD:\n{' '.join(toon_input)}"
     )
 
     payload = {
@@ -101,34 +104,54 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         )
         
         translated_toon_text = output.get("translation", "")
-        # Parsiranje TOON formata nazad u JSON objekte (vLLM obično vraća pun string, potrebno je parsirati)
-        # Očekujemo da prevod ima strukturu [0.0|2.0|Tekst] ...
+        # Parsiranje TOON formata nazad u JSON objekte
         import re
-        matches = re.findall(r'\[([^\]]+)\]', translated_toon_text)
+        # Pokušavamo da nađemo sve što liči na [vreme|vreme|tekst]
+        matches = re.findall(r'\[?\d+\.?\d*\|\d+\.?\d*\|[^\]\n]+\]?', translated_toon_text)
         
         final_segments = []
         for match in matches:
             try:
-                parts = match.split("|")
+                # Čistimo zagrade ako postoje
+                clean_match = match.strip("[]")
+                parts = clean_match.split("|")
                 if len(parts) >= 3:
                     final_segments.append({
                         "start": float(parts[0]),
                         "end": float(parts[1]),
-                        "text": "|".join(parts[2:])
+                        "text": "|".join(parts[2:]).strip()
                     })
             except:
                 continue
                 
-        # Ako regex ne izvuče ništa, možda je vratio bez zagrada, fallback:
-        if not final_segments and segments:
-            # U slučaju pada parsiranja, vracamo originalni sa translation string-om celim
-            print("[WARNING] Nije uspelo TOON parsiranje, koristimo raw text.")
-            return {
-                "status": "success",
-                "translated_segments": [
-                    {"start": segments[0]["start"], "end": segments[-1]["end"], "text": translated_toon_text}
-                ]
-            }
+        # Ako regex ne izvuče dovoljno segmenata, pokušavamo fallback po linijama
+        if len(final_segments) < len(segments) * 0.5:
+            print(f"[WARNING] TOON parsiranje dalo samo {len(final_segments)} segmenata od očekivanih {len(segments)}. Fallback na inteligentnu podelu.")
+            
+            # Ako je vratio bar nešto teksta, probajmo da ga razbijemo po rečenicama
+            raw_sentences = re.split(r'(?<=[.!?])\s+', translated_toon_text.replace("[", "").replace("]", ""))
+            raw_sentences = [s.strip() for s in raw_sentences if s.strip() and "|" not in s]
+            
+            if raw_sentences and len(raw_sentences) >= len(segments) * 0.5:
+                # Imamo rečenice! Mapirajmo ih na originalne segmente
+                final_segments = []
+                for i, orig in enumerate(segments):
+                    text = raw_sentences[i] if i < len(raw_sentences) else ""
+                    final_segments.append({
+                        "start": orig["start"],
+                        "end": orig["end"],
+                        "text": text
+                    })
+            else:
+                # Baš ništa nije uspelo, ostaje nam samo da vratimo originalne tajminge sa celim tekstom u prvom
+                print("[ERROR] Potpuni neuspeh parsiranja prevoda.")
+                return {
+                    "status": "success",
+                    "translated_segments": [
+                        {"start": s["start"], "end": s["end"], "text": translated_toon_text if i == 0 else ""}
+                        for i, s in enumerate(segments)
+                    ]
+                }
                 
         return {
             "status": "success",
