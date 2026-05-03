@@ -433,29 +433,32 @@ function App() {
                     )}
                   </div>
 
-                  {progressData?.segments?.length > 0 && (
-                    <div className="segments-grid" ref={feedRef}>
-                      <div className="grid-header">
-                        <span>Originalni Transkript (Whisper)</span>
-                        <span>AI Prevod (TOON Format)</span>
-                      </div>
-                      {progressData.segments.map((seg, idx) => (
-                        <motion.div 
-                          key={idx} 
-                          initial={{ opacity: 0, y: 10 }} 
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`segment-row ${seg.status}`}
-                        >
-                          <div className="seg-orig">{seg.original}</div>
-                          <div className="seg-arrow"><ArrowRight size={14} /></div>
-                          <div className="seg-trans">
-                            {seg.translated || <span className="waiting-text">Prevođenje...</span>}
+                  {progressData?.id || uploadProgress > 0 ? (
+                    <>
+                      {progressData?.segments?.length > 0 && (
+                        <div className="segments-grid" ref={feedRef}>
+                          <div className="grid-header">
+                            <span>Originalni Transkript (Whisper)</span>
+                            <span>AI Prevod (TOON Format)</span>
                           </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                ) : (
+                          {progressData.segments.map((seg, idx) => (
+                            <motion.div 
+                              key={idx} 
+                              initial={{ opacity: 0, y: 10 }} 
+                              animate={{ opacity: 1, y: 0 }}
+                              className={`segment-row ${seg.status}`}
+                            >
+                              <div className="seg-orig">{seg.original}</div>
+                              <div className="seg-arrow"><ArrowRight size={14} /></div>
+                              <div className="seg-trans">
+                                {seg.translated || <span className="waiting-text">Prevođenje...</span>}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
                     <div className="waiting-studio">
                       <Loader2 className="spinner-large" />
                       <p>{uploadProgress > 0 ? 'Slanje fajla u oblak...' : 'Pripremam studio za obradu...'}</p>
