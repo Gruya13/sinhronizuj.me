@@ -2,7 +2,7 @@ import time
 import requests
 from backend.core.config import settings
 
-def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 300, progress_callback=None) -> dict:
+def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 600, progress_callback=None) -> dict:
     """
     Poziva sinhroni Modal webhook endpoint (FastAPI) i čeka na rezultat.
     Modal automatski održava konekciju otvorenom dok se zadatak ne izvrši (ili do timeout-a).

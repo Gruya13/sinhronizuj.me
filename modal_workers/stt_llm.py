@@ -59,9 +59,9 @@ class Worker:
             model=self.qwen_path,
             quantization="awq",
             gpu_memory_utilization=0.6,
-            max_model_len=4096, # Povećano za više slika
+            max_model_len=8192,
             enforce_eager=True,
-            limit_mm_per_prompt={"image": 10}
+            limit_mm_per_prompt={"image": 1}
         )
 
         print("Inicijalizacija Faster-Whisper modela...")
