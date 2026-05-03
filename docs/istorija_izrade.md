@@ -13,6 +13,7 @@
     - **TTS**: Nadograđen Fish Speech na verziju 1.5 i usklađeni checkpoint-i (Llama + VQGAN) radi eliminacije `size mismatch` greške.
     - **Demucs**: Prebačeno na `python3 -m demucs.separate` pozivanje radi veće robusnosti u Docker okruženju (rešen `Errno 2`).
     - **Config**: Dodat `REDIS_PASSWORD` u `Settings` model radi ispravne autentifikacije kod `wait_for_user` signala.
+    - **Frontend**: Popravljen `ReferenceError` u polling mehanizmu (ispravljen naziv `consecutiveErrorsRef`).
     - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a.
 
 

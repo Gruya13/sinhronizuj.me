@@ -152,11 +152,11 @@ function App() {
             }
           }
         } catch (err) { 
-          consecutiveErrors.current += 1;
-          console.error(`Greška pri pollingu (${consecutiveErrors.current}/5):`, err);
+          consecutiveErrorsRef.current += 1;
+          console.error(`Greška pri pollingu (${consecutiveErrorsRef.current}/5):`, err);
           
           // Zadatak 1: Reset nakon 5 uzastopnih grešaka (npr. server ugašen ili Redis očišćen)
-          if (consecutiveErrors.current >= 5) {
+          if (consecutiveErrorsRef.current >= 5) {
             setError("Veza sa serverom je izgubljena. Zadatak je verovatno prekinut.");
             setTimeout(resetStudio, 3000); // Resetuj nakon 3 sekunde da korisnik vidi grešku
           }
