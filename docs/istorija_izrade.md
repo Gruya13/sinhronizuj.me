@@ -11,6 +11,8 @@
     - Rešen "At most 1 image" problem na Qwen-VL modelu (fiksiran na 1 frejm radi stabilnosti).
     - **Whisper**: Omogućena auto-detekcija jezika (uklonjen hardkodovani "sr") za ispravnu transkripciju engleskih videa.
     - **TTS**: Nadograđen Fish Speech na verziju 1.5 i usklađeni checkpoint-i (Llama + VQGAN) radi eliminacije `size mismatch` greške.
+    - **Demucs**: Prebačeno na `python3 -m demucs.separate` pozivanje radi veće robusnosti u Docker okruženju (rešen `Errno 2`).
+    - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a.
 
 
 ## Trenutni Status:
