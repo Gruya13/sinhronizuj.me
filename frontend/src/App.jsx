@@ -102,11 +102,12 @@ function App() {
     return () => clearInterval(timer);
   }, [loading, videoUrl, startTime]);
 
-  useEffect(() => {
-    if (feedRef.current) {
-      feedRef.current.scrollTop = feedRef.current.scrollHeight;
-    }
-  }, [progressData?.segments]);
+  // Isključujemo auto-scroll za segmente da bi korisnik mogao na miru da čita
+  // useEffect(() => {
+  //   if (feedRef.current) {
+  //     feedRef.current.scrollTop = feedRef.current.scrollHeight;
+  //   }
+  // }, [progressData?.segments]);
 
   useEffect(() => {
     if (terminalRef.current) {
