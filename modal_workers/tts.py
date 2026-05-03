@@ -123,17 +123,40 @@ class WorkerV110:
             print(f"[TTS] Koristim Llama skriptu: {llama_script}")
 
             # Step 1: Encode (Audio -> Tokens)
-            encode_cmd = ["python3", vqgan_script, "-i", TMP_REF_AUDIO, "-o", "fake.npy", "--checkpoint-path", vqgan_ckpt]
+            # U verziji 1.5, vqgan/inference.py uvek pokušava da zapiše i rekonstruisani audio
+            # pa mu dajemo .wav ekstenziju da ne bi pukao soundfile, a on će generisati i .npy
+            encode_cmd = ["python3", vqgan_script, "-i", TMP_REF_AUDIO, "-o", "fake.wav", "--checkpoint-path", vqgan_ckpt]
             
             env = os.environ.copy()
             env["PYTHONPATH"] = f"/opt/fish-speech:{env.get('PYTHONPATH', '')}"
             
-            p1 = subprocess.run(encode_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
-            if p1.returncode != 0:
-                return {"error": f"Step 1 (Encode) failed: {p1.stderr}\nSTDOUT: {p1.stdout}"}
-                
-            # Step 2: Generate (Tokens -> Semantic Tokens)
-            gen_cmd = ["python3", llama_script, "--text", text, "--prompt-text", ref_text, "--prompt-tokens", "fake.npy", "--checkpoint-path", llama_ckpt, "--num-samples", "1"]
+            print(f"[TTS] Pokrećem Encode: {' '.join(encode_cmd)}")
+            result = subprocess.run(encode_cmd, capture_output=True, text=True, env=env)
+            if result.returncode != 0:
+                 return {"error": f"Step 1 (Encode) failed: {result.stderr or result.stdout}"}
+            
+            # Proveravamo da li je kreiran fake.npy (neki modeli kreiraju fake.wav.npy ili samo fake.npy)
+            ref_indices_path = "fake.npy"
+            if not os.path.exists(ref_indices_path):
+                if os.path.exists("fake.wav.npy"):
+                    ref_indices_path = "fake.wav.npy"
+                else:
+                    return {"error": "Encode nije generisao .npy fajl sa indeksima (tokenima)."}
+
+            print(f"[TTS] Pronađeni indeksi na: {ref_indices_path}")
+
+            # Step 2: Llama Generate (Prompt + Text -> New Tokens)
+            # Koristimo pronađene indekse kao referencu
+            gen_cmd = [
+                "python3", llama_script,
+                "--text", text,
+                "--prompt-text", ref_text,
+                "--prompt-tokens", ref_indices_path,
+                "--checkpoint-path", llama_ckpt,
+                "--num-samples", "1",
+                "--compile"
+            ]
+            
             p2 = subprocess.run(gen_cmd, capture_output=True, text=True, env=env, cwd="/opt/fish-speech")
             if p2.returncode != 0:
                 return {"error": f"Step 2 (Generate) failed: {p2.stderr}\nSTDOUT: {p2.stdout}"}

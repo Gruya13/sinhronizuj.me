@@ -21,7 +21,12 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   
   const [terminalOpen, setTerminalOpen] = useState(true);
-  const [debuggingMode, setDebuggingMode] = useState(false);
+  const [debuggingMode, setDebuggingMode] = useState(() => localStorage.getItem('sinhronizuj_me_debug_mode') === 'true');
+  
+  useEffect(() => {
+    localStorage.setItem('sinhronizuj_me_debug_mode', debuggingMode);
+  }, [debuggingMode]);
+
   const [isContinuing, setIsContinuing] = useState(false);
   
   const feedRef = useRef(null);
