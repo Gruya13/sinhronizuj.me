@@ -19,7 +19,7 @@ def separate_audio(audio_path: str) -> dict:
     # -n htdemucs: Optimizovan model
     # --two-stems vocals: Izdvaja samo glas, a sve ostalo spaja u no_vocals
     import shutil
-    demucs_bin = shutil.which("demucs") or "demucs"
+    demucs_bin = shutil.which("demucs") or "/usr/local/bin/demucs"
     
     command = [
         demucs_bin,
