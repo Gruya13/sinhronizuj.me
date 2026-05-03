@@ -13,6 +13,7 @@ services:
       - redis
     volumes:
       - ./temp_workspace:/app/temp_workspace
+      - .:/app
 
   worker:
     build: .

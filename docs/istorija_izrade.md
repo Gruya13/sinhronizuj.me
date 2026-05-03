@@ -15,6 +15,7 @@
     - **Config**: Dodat `REDIS_PASSWORD` u `Settings` model radi ispravne autentifikacije kod `wait_for_user` signala.
     - **Frontend**: KOMPLETNO rešen `ReferenceError` (sve instance `consecutiveErrors` zamenjene sa `consecutiveErrorsRef`).
     - **FFMPEG**: Rešen bag sa neparnom visinom videa (HTH Error) korišćenjem `scale=320:-2`.
+    - **Docker**: Dodat `.:/app` volume u `api` servis, čime je rešen problem sa izvršavanjem starog kôda na serveru.
     - **Debugging Mode**: Implementiran prekidač za korak-po-korak kontrolu pipeline-a. Dodati opsežni logovi na API i Worker nivou.
 
 
