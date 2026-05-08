@@ -3,6 +3,7 @@
 ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
 - **Modal arhitektura**: Dodata podrška za Qwen3.6-35B-A3B (qwen3_5_moe). Ažurirani `transformers>=4.49.0` i `vllm>=0.7.0` na Modal image-u jer su stare verzije pucale na podizanju Lektora.
 - **Pipeline refaktorizacija**: Logika Lektora razdvojena iz `translator.py` u posebnu funkciju. U `tasks.py` dodat korak gde se UI prvo osveži grubim prevodom, a zatim ponovo lektorisanim tekstom ("Lektura završena").
+- **Debug Mode Fix**: Prilagođena pauza unutar `tasks.py` tako da se radnik uredno zaustavi i čeka odobrenje korisnika neposredno nakon "Tekst preveden", a tek potom prelazi na "Lektura završena".
 - **Bug Fix**: Povećan HTTP timeout prema Modal endpoint-ima sa 300 na 900 sekundi kako bi se izbeglo `Read timed out` pucanje na frontendu usled dužeg Cold Start vremena prilikom alokacije A100 GPU-a.
 
 ## [03.05.2026] - Migracija na Modal Serverless i optimizacija pipeline-a
