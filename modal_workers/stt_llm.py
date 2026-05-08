@@ -168,7 +168,7 @@ class Worker:
 
 @app.cls(
     image=image_lektor, 
-    gpu="H100", 
+    gpu="A100-80GB", 
     volumes={VOLUME_PATH: models_volume}, 
     scaledown_window=300, 
     timeout=600,
@@ -184,8 +184,9 @@ class LektorWorker:
         self.llm = LLM(
             model=self.lektor_path,
             trust_remote_code=True,
-            gpu_memory_utilization=0.9,
+            gpu_memory_utilization=0.98,
             max_model_len=8192,
+            limit_mm_per_prompt={"image": 1, "video": 0},
             enforce_eager=True
         )
 
