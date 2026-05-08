@@ -11,6 +11,7 @@ class Settings:
     
     # Modal Serverless Endpoints
     MODAL_STT_LLM_URL: str = os.getenv("MODAL_STT_LLM_URL", "")
+    MODAL_LEKTOR_URL: str = os.getenv("MODAL_LEKTOR_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
     
     # MinIO Storage

@@ -341,3 +341,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - Postavljeno strogo pravilo za praćenje roda i padeža u srpskom jeziku (npr. "kompanija" je ženskog roda, "agent" muškog).
     - Zadržana direktiva da se tehnički i IT pojmovi ostave u originalu.
 - **Status:** Prompt je uspešno ažuriran lokalno, komitovan i postavljen na produkcioni VPS. Očekuje se znatno viši kvalitet i prirodniji tok izgovora na srpskom (ekavica).
+
+### 08.05.2026. 09:30 — Implementacija "Sveti Gral" Lektor Faze (Qwen 35B)
+- **Cilj:** Podići kvalitet srpske gramatike, lekture i stila na najviši mogući nivo koristeći odvojeni masivni jezički model koji ispravlja grubi prevod Qwen-VL modela.
+- **Akcija:** Izmenjeni `modal_workers/stt_llm.py`, `backend/worker/translator.py` i `backend/core/config.py`.
+- **Tehničke Izmene:**
+    - Dodata nova klasa `LektorWorker` u Modal infrastrukturi koja preuzima masivni `Qwen/Qwen3.6-35B-A3B` model (koji zahteva oko 20+ GB VRAM-a, idealno za A100 GPU).
+    - U `config.py` definisan novi endpoint `MODAL_LEKTOR_URL`.
+    - U `translator.py` kreiran sistem od **2 prolaza (2-pass pipeline)**:
+      1. Prvi prolaz: `Qwen-VL-7B` gleda video frejmove i pravi "grubi" prevod (uzimajući u obzir rod zvučnika).
+      2. Drugi prolaz: Ako je `MODAL_LEKTOR_URL` prisutan, grubi prevod i engleski original se šalju 35B modelu koji isključivo pegla gramatiku, padeže, idiome ("Lektor faza").
+    - Implementiran "fallback" mehanizam – ukoliko Lektor propadne, sistem bezbedno nastavlja sa grubim prevodom.
+- **Status:** Kod je spreman. Da bi sistem proradio, korisnik mora lokalno uraditi deploy novog Modal workera i dodati dobijeni URL u `.env` fajl.

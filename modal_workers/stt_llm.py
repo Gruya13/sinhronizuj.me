@@ -11,6 +11,7 @@ VOLUME_PATH = "/models"
 
 WHISPER_MODEL = "Systran/faster-whisper-large-v3"
 QWEN_MODEL = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
+LEKTOR_MODEL = "Qwen/Qwen3.6-35B-A3B"
 
 def download_models():
     from huggingface_hub import snapshot_download
@@ -19,8 +20,10 @@ def download_models():
     
     print("Downloading Whisper...")
     snapshot_download(repo_id=WHISPER_MODEL, local_dir=f"{VOLUME_PATH}/faster-whisper-v3")
-    print("Downloading Qwen...")
+    print("Downloading Qwen VL...")
     snapshot_download(repo_id=QWEN_MODEL, local_dir=f"{VOLUME_PATH}/qwen2-vl-7b-awq")
+    print("Downloading Qwen Lektor (35B)...")
+    snapshot_download(repo_id=LEKTOR_MODEL, local_dir=f"{VOLUME_PATH}/qwen-35b-lektor")
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04")
@@ -145,6 +148,52 @@ class Worker:
             else:
                 return {"error": f"Nepoznat task_type: {task_type}"}
                 
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(e)}
+
+@app.cls(
+    image=image, 
+    gpu="A100", 
+    volumes={VOLUME_PATH: models_volume}, 
+    scaledown_window=300, 
+    timeout=600,
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
+)
+class LektorWorker:
+    @modal.enter()
+    def load_models(self):
+        from vllm import LLM
+        self.lektor_path = f"{VOLUME_PATH}/qwen-35b-lektor"
+        
+        print("Inicijalizacija vLLM Lektor modela (35B)...")
+        self.llm = LLM(
+            model=self.lektor_path,
+            trust_remote_code=True,
+            gpu_memory_utilization=0.9,
+            max_model_len=8192,
+            enforce_eager=True
+        )
+
+    def handle_lektor(self, prompt: str):
+        from vllm import SamplingParams
+        messages = [{"role": "user", "content": prompt}]
+        sampling_params = SamplingParams(temperature=0.2, max_tokens=2048)
+        outputs = self.llm.chat(messages, sampling_params=sampling_params)
+        return {"translation": outputs[0].outputs[0].text}
+
+    @modal.fastapi_endpoint(method="POST")
+    def task(self, data: dict):
+        task_type = data.get('task')
+        try:
+            if task_type == "lektor":
+                prompt = data.get("prompt")
+                if not prompt:
+                    return {"error": "Nedostaje prompt"}
+                return self.handle_lektor(prompt)
+            else:
+                return {"error": f"Nepoznat task_type: {task_type}"}
         except Exception as e:
             import traceback
             traceback.print_exc()

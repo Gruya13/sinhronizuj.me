@@ -135,6 +135,59 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     "end": orig["end"],
                     "text": t_text or orig["text"]
                 })
+                
+            # Lektor faza (Phase 2)
+            if hasattr(settings, 'MODAL_LEKTOR_URL') and settings.MODAL_LEKTOR_URL:
+                print(f"[TRANSLATOR VL] Pokrećem Lektor faza na {settings.MODAL_LEKTOR_URL}...")
+                if progress_callback:
+                    progress_callback(detail="Lektura prevoda (Qwen 35B)...")
+                    
+                lektor_input = ""
+                for i, seg in enumerate(final_segments):
+                    lektor_input += f"{i}|ENG: {segments[i]['text']} | SRB: {seg['text']}\n"
+                    
+                lektor_prompt = (
+                    "Ti si glavni lektor i korektor za srpski jezik (ekavica). Tvoj jedini zadatak je da pregledaš grubi prevod i ispraviš gramatiku, padeže, idiome i neprirodne izraze.\n\n"
+                    "PRAVILA ZA LEKTURU:\n"
+                    "1. Engleski tekst je dat samo kao kontekst. Tvoj izlaz mora biti SAMO korigovani SRPSKI tekst.\n"
+                    "2. Ispravi rogobatne prevode (npr. 'člankovi u korporaciju' prepravi u 'osnivački akti/dokumenta', a 'objavila zaposlenja' u 'objavila oglase za posao').\n"
+                    "3. Zadrži isti broj linija. Svaka linija mora početi sa ID| (npr. 0|Korigovani prevod).\n"
+                    "4. ZABRANJENO je objašnjavanje, vrati samo čiste korigovane redove.\n\n"
+                    f"TEKST ZA LEKTURU:\n{lektor_input}"
+                )
+                
+                try:
+                    lektor_payload = {
+                        "task": "lektor",
+                        "prompt": lektor_prompt
+                    }
+                    lektor_output = call_modal_endpoint(
+                        url=settings.MODAL_LEKTOR_URL,
+                        payload=lektor_payload,
+                        timeout_seconds=300,
+                        progress_callback=None
+                    )
+                    
+                    lektor_raw = lektor_output.get("translation", "")
+                    print(f"[DEBUG] LEKTOR OUTPUT: {lektor_raw[:500]}...", flush=True)
+                    
+                    parsed_lektor = []
+                    for line in lektor_raw.split('\n'):
+                        line = line.strip()
+                        if not line or '|' not in line:
+                            continue
+                        parts = line.split('|', 1)
+                        if len(parts) == 2:
+                            text = parts[1].strip()
+                            if text:
+                                parsed_lektor.append(text)
+                                
+                    if len(parsed_lektor) > 0:
+                        for i, seg in enumerate(final_segments):
+                            seg["text"] = parsed_lektor[i] if i < len(parsed_lektor) else seg["text"]
+                            
+                except Exception as lektor_err:
+                    print(f"[WARNING] Lektor faza nije uspela: {lektor_err}. Nastavljam sa grubim prevodom.")
             
             return {"status": "success", "translated_segments": final_segments}
             
@@ -148,15 +201,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 ]
             }
                 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "error", "message": str(e)}
-                
-        return {
-            "status": "success",
-            "translated_segments": final_segments
-        }
     except Exception as e:
         import traceback
         traceback.print_exc()
