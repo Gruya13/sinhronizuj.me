@@ -41,15 +41,19 @@ image_stt = (
 )
 
 image_lektor = (
-    modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04")
+    modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04")
     .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev")
     .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
     .run_commands("python -m pip install --upgrade pip")
     .pip_install(
-        "vllm>=0.7.0",
+        "torch==2.5.1",
+        "vllm==0.6.4.post1",
         "transformers>=4.49.0",
+        "flash-attn==2.6.3",
+        "accelerate",
         "huggingface-hub"
     )
+    .run_commands("pip install git+https://github.com/huggingface/transformers.git")
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
@@ -168,11 +172,11 @@ class Worker:
 
 @app.cls(
     image=image_lektor, 
-    gpu="A100-80GB", 
+    gpu="H100", 
     volumes={VOLUME_PATH: models_volume}, 
     scaledown_window=300, 
-    timeout=600,
-    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
+    timeout=1800,
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0", "VLLM_ENGINE_READY_TIMEOUT_S": "1200", "PYTORCH_JIT": "0"}
 )
 class LektorWorker:
     @modal.enter()
@@ -184,9 +188,9 @@ class LektorWorker:
         self.llm = LLM(
             model=self.lektor_path,
             trust_remote_code=True,
-            gpu_memory_utilization=0.98,
-            max_model_len=8192,
-            limit_mm_per_prompt={"image": 1, "video": 0},
+            gpu_memory_utilization=0.85,
+            max_model_len=2048,
+            limit_mm_per_prompt={"image": 0, "video": 0},
             enforce_eager=True
         )
 

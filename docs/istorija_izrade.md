@@ -361,3 +361,27 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
       2. Drugi prolaz: Ako je `MODAL_LEKTOR_URL` prisutan, grubi prevod i engleski original se šalju 35B modelu koji isključivo pegla gramatiku, padeže, idiome ("Lektor faza").
     - Implementiran "fallback" mehanizam – ukoliko Lektor propadne, sistem bezbedno nastavlja sa grubim prevodom.
 - **Status:** Kod je spreman. Da bi sistem proradio, korisnik mora lokalno uraditi deploy novog Modal workera i dodati dobijeni URL u `.env` fajl.
+
+### 08.05.2026. 12:00 — Stabilizacija Lektor modela (Qwen 35B) na Modal H100
+- **Problem**: Masivni Qwen 35B MoE model je bacao Segfault u vLLM V1 engine-u tokom inicijalizacije na H100 grafici.
+- **Debug**: Potvrđena nestabilnost V1 engine-a na CUDA 12.1.
+- **Rešenje**: 
+    - Downgrade vLLM na verziju `0.6.3.post1` radi stabilnosti V0 engine-a.
+    - Instalirana specifična verzija `flash-attn==2.6.3` optimizovana za H100.
+    - Eksplicitno onemogućen V1 engine preko `VLLM_USE_V1=0` u env varijablama.
+    - Uklonjen `gdn_prefill_backend="triton"` radi eliminacije JIT konflikata.
+    - Podešen `gpu_memory_utilization=0.85` za optimalno korišćenje 80GB VRAM-a.
+- **Status**: Deployment nove stabilne konfiguracije pokrenut.
+
+### 08.05.2026. 14:15 — Podrška za qwen3_5_moe i rešavanje infer_schema greške
+- **Problem**: Prethodna verzija `transformers` nije prepoznavala `qwen3_5_moe` arhitekturu, a `torch 2.4.0` je bacao `ValueError: infer_schema` u kombinaciji sa vLLM MoE kernelima.
+- **Rešenje**:
+    - Prebacivanje na `nvidia/cuda:12.4.1-devel-ubuntu22.04` bazni imidž.
+    - Nadogradnja na `torch==2.5.1` i `vllm==0.6.4.post1`.
+    - Instalacija `transformers` direktno sa GitHub master grane radi podrške za `qwen3_5_moe`.
+    - Osigurane env varijable: `VLLM_USE_V1=0`, `PYTORCH_JIT=0`, `VLLM_WORKER_MULTIPROC_METHOD=spawn`.
+    - Uklonjen `gdn_prefill_backend` iz LLM inicijalizacije.
+- **Status**: Kôd ažuriran, deploy započet.
+
+
+
