@@ -25,7 +25,7 @@ def download_models():
     print("Downloading Qwen Lektor (35B)...")
     snapshot_download(repo_id=LEKTOR_MODEL, local_dir=f"{VOLUME_PATH}/qwen-35b-lektor")
 
-image = (
+image_stt = (
     modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04")
     .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev")
     .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
@@ -40,8 +40,21 @@ image = (
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
+image_lektor = (
+    modal.Image.from_registry("nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev")
+    .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
+    .run_commands("python -m pip install --upgrade pip")
+    .pip_install(
+        "vllm>=0.7.0",
+        "transformers>=4.49.0",
+        "huggingface-hub"
+    )
+    .run_function(download_models, volumes={VOLUME_PATH: models_volume})
+)
+
 @app.cls(
-    image=image, 
+    image=image_stt, 
     gpu="A100", 
     volumes={VOLUME_PATH: models_volume}, 
     scaledown_window=300, 
@@ -154,8 +167,8 @@ class Worker:
             return {"error": str(e)}
 
 @app.cls(
-    image=image, 
-    gpu="A100", 
+    image=image_lektor, 
+    gpu="H100", 
     volumes={VOLUME_PATH: models_volume}, 
     scaledown_window=300, 
     timeout=600,
