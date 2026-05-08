@@ -110,9 +110,9 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         raw_output = output.get("translation", "")
         print(f"[DEBUG] RAW TRANSLATION OUTPUT: {raw_output[:500]}...", flush=True)
         
-        # Parsiranje tekstualnog izlaza (ID|Tekst)
+        # Parsiranje tekstualnog izlaza (Ignorišemo ID koji LLM vrati, uzimamo redom)
         try:
-            translated_data = {}
+            parsed_lines = []
             for line in raw_output.split('\n'):
                 line = line.strip()
                 if not line or '|' not in line:
@@ -120,17 +120,14 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 # Razdvajamo po prvom '|'
                 parts = line.split('|', 1)
                 if len(parts) == 2:
-                    idx_str, text = parts
-                    try:
-                        idx = int(idx_str.strip())
-                        translated_data[idx] = text.strip()
-                    except ValueError:
-                        continue
+                    text = parts[1].strip()
+                    if text:
+                        parsed_lines.append(text)
                         
             final_segments = []
             for i, orig in enumerate(segments):
-                # Ako LLM nije preveo dati ID, radimo fallback na originalni tekst
-                t_text = translated_data.get(i, "")
+                # Uzimamo prevedene linije redom, bez obzira da li je LLM krenuo od 0 ili 1
+                t_text = parsed_lines[i] if i < len(parsed_lines) else ""
                 final_segments.append({
                     "start": orig["start"],
                     "end": orig["end"],

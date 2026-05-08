@@ -327,3 +327,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - Spaja polovične delove (chunkove) u jednu kompletnu rečenicu, ili razdvaja jedan dugačak segment u više rečenica.
     - Prilagođava početna (`start`) i završna (`end`) vremena (kroz linearnu interpolaciju baziranu na broju karaktera).
 - **Status:** Sistem sada operiše i prevodi striktno na nivou rečenice, što donosi značajno preciznije i urednije rezultate. Izmene poslate na VPS server.
+
+### 08.05.2026. 09:14 — Rešavanje Off-By-One greške pri mapiranju prevoda
+- **Problem:** Nakon promene na tekstualni format (`ID|Tekst`), LLM je preveo sve segmente ispravno, ali je započeo numerisanje od `1` umesto od `0` kako je naloženo u promptu. Zbog ovoga je skripta mapirala prvi prevod na drugi segment (jer je očekivala ključ `0`), dok je nulti segment ostajao na engleskom (fallback).
+- **Akcija:** Ažuriran `backend/worker/translator.py`.
+- **Rešenje:** Parser sada namerno ignoriše sam broj (`ID`) koji LLM napiše. Umesto toga, linije koje sadrže znak `|` se izvlače redom i sekvencijalno dodeljuju segmentima. Ovim je trajno rešen problem LLM indeksiranja (bez obzira da li LLM krene da broji od 0, 1 ili koristi bullet pointove). Izmene gurnute na VPS.
