@@ -130,6 +130,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
             segments_ui[i]["status"] = "translated"
             
     update_progress(completed_step="Tekst preveden", percentage=65, segments=segments_ui)
+    wait_for_user("Prevod")
     
     if hasattr(settings, 'MODAL_LEKTOR_URL') and settings.MODAL_LEKTOR_URL:
         from backend.worker.translator import lektor_segments
@@ -149,7 +150,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
         # Prikazuje checkmark na frontendu čak i ako se lektor preskače
         update_progress(completed_step="Lektura završena", percentage=70)
         
-    wait_for_user("Prevod")
+    wait_for_user("Lektura")
     
     # --- FAZA 5: Sinteza Govora ---
     update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
