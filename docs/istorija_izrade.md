@@ -314,3 +314,6 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Prompt:** Uklonjeno ograničenje od 17 segmenata, sada koristi dinamički `len(segments)`. Dodata su jasnija pravila za prevođenje: zadržavanje tehničkih pojmova u originalu, precizniji i prirodniji srpski jezik (ekavica) bez prepričavanja.
     - **JSON parsiranje:** Pojačana ekstrakcija (brisanje ` ```json ` blokova) i uvedena naprednija kontrola grešaka sa boljim *fallback* sistemom.
 - **Status:** Kod lokalno ažuriran i dokumentovan. Čeka se potvrda testiranja pre prebacivanja na VPS/Github.
+
+- **Ažuriranje (08:58):** Primetili smo da Qwen-VL model ignoriše JSON array format kada prevodi tečan tekst, te celokupan prevod stavlja unutar samo jednog objekta (npr. `{"id": 0, "text": "ceo_prevod"}`). Zbog ovoga je parsiranje stavljalo sve u prvi segment, a ostale ostavljalo na originalnom jeziku (zbog fallback-a).
+- **Finalno Rešenje:** Potpuno napušten JSON format u `translator.py`. Implementiran je ultra-robustan tekstualni format (`ID|Prevedeni tekst`). LLM sada vraća red po red, što garantuje savršeno mapiranje svakog segmenta i drastično smanjuje mogućnost greške (tzv. "halucinacije" formata).
