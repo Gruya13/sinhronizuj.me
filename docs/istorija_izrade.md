@@ -332,3 +332,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Problem:** Nakon promene na tekstualni format (`ID|Tekst`), LLM je preveo sve segmente ispravno, ali je započeo numerisanje od `1` umesto od `0` kako je naloženo u promptu. Zbog ovoga je skripta mapirala prvi prevod na drugi segment (jer je očekivala ključ `0`), dok je nulti segment ostajao na engleskom (fallback).
 - **Akcija:** Ažuriran `backend/worker/translator.py`.
 - **Rešenje:** Parser sada namerno ignoriše sam broj (`ID`) koji LLM napiše. Umesto toga, linije koje sadrže znak `|` se izvlače redom i sekvencijalno dodeljuju segmentima. Ovim je trajno rešen problem LLM indeksiranja (bez obzira da li LLM krene da broji od 0, 1 ili koristi bullet pointove). Izmene gurnute na VPS.
+
+### 08.05.2026. 09:20 — Unapređenje prompta za prevod (gramatika i idiomi)
+- **Problem:** Iako su segmenti bili savršeno mapirani, Qwen-VL model je često vršio bukvalni prevod engleskih idioma (npr. "articles of incorporation" -> "člankovi u korporaciju") i pravio gramatičke greške vezane za rodove u srpskom jeziku (npr. "ovaj kompanija").
+- **Akcija:** Ažurirana pravila (prompt) u `backend/worker/translator.py`.
+- **Tehničke Izmene:**
+    - Dodato izričito pravilo za prevođenje *smisla*, a ne reč-po-reč, uz navedene konkretne primere grešaka koje je model pravio.
+    - Postavljeno strogo pravilo za praćenje roda i padeža u srpskom jeziku (npr. "kompanija" je ženskog roda, "agent" muškog).
+    - Zadržana direktiva da se tehnički i IT pojmovi ostave u originalu.
+- **Status:** Prompt je uspešno ažuriran lokalno, komitovan i postavljen na produkcioni VPS. Očekuje se znatno viši kvalitet i prirodniji tok izgovora na srpskom (ekavica).

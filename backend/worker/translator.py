@@ -79,11 +79,13 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Priprema multimodalnog content-a
     prompt_text = (
-        "Ti si vrhunski profesionalni prevodilac za video titlove. Tvoj zadatak je da prevedeš priloženi transkript na SRPSKI jezik (EKAVICA).\n\n"
+        "Ti si vrhunski profesionalni prevodilac i lektor za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
         "PRAVILA ZA PREVOD:\n"
-        "1. Prevod mora biti potpuno PRIRODAN u duhu srpskog jezika. Zadrži originalno značenje bez prepričavanja.\n"
-        "2. TEHNIČKI TERMINI: Imena kompanija, alata i IT termina (npr. AI agent, Zoom, LinkedIn, startup) zadrži u originalu. Nemoj ih prevoditi bukvalno.\n"
-        "3. POL GOVORNIKA: Pažljivo pogledaj priložene slike iz videa. Ako priča ženska osoba, glagole u prošlom vremenu prebaci u ženski rod (npr. 'rekla je', a ne 'rekao je').\n\n"
+        "1. ZNAČENJE, A NE BUKVALNI PREVOD: Prevod mora zvučati 100% prirodno izvornom govorniku srpskog jezika. Nikada ne prevodi idiome i pravne izraze bukvalno (npr. 'articles of incorporation' su 'osnivački akti' ili 'dokumentacija za firmu', a 'job listings' su 'oglasi za posao'). Prevedi smisao, a ne reč po reč.\n"
+        "2. GRAMATIKA I PADEŽI: Strogo pazi na rod, broj i padeže! Na primer, reč 'kompanija' je ženskog roda ('OVA kompanija', a ne 'ovaj kompanija'). 'AI agent' je muškog roda ('AI agentu', 'njemu'). Sve rečenice moraju biti gramatički ispravne.\n"
+        "3. TEHNIČKI TERMINI: Zadrži IT termine i imena u originalu (AI agent, Zoom, LinkedIn, Claude, Andon Labs).\n"
+        "4. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
+        "5. POL GOVORNIKA I LIKOVA: Prilagodi glagole u prošlom vremenu u zavisnosti od pola onoga ko govori ili o kome se govori (prema slikama i kontekstu).\n\n"
         "PRAVILA ZA FORMAT:\n"
         "1. ZABRANJEN JE JSON. Odgovor mora biti ISKLJUČIVO red po red, u sledećem formatu: ID|Prevedeni tekst\n"
         f"2. Tvoj odgovor mora sadržati TAČNO {len(segments)} redova, isto koliko ih ima na ulazu (od 0 do {len(segments)-1}).\n"
