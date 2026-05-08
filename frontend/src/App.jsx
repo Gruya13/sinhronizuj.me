@@ -52,6 +52,7 @@ function App() {
     "Vokal izolovan",
     "Govor prepoznat",
     "Tekst preveden",
+    "Lektura završena",
     "Glas generisan",
     "Video spojen",
     "Obrada završena"
