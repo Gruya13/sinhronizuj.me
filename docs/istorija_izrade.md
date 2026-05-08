@@ -5,6 +5,7 @@
 - **Pipeline refaktorizacija**: Logika Lektora razdvojena iz `translator.py` u posebnu funkciju. U `tasks.py` dodat korak gde se UI prvo osveži grubim prevodom, a zatim ponovo lektorisanim tekstom ("Lektura završena").
 - **Debug Mode Fix**: Prilagođena pauza unutar `tasks.py` tako da se radnik uredno zaustavi i čeka odobrenje korisnika neposredno nakon "Tekst preveden", a tek potom prelazi na "Lektura završena".
 - **OOM Crashloop Fix**: GPU za Lektora podignut sa `A100` (40GB) na `H100` (80GB) kako bi masivni Qwen 35B model mogao stabilno da stane u memoriju zajedno sa `max_model_len=8192`.
+- **VLM Segfault Fix**: Otkriveno da je Qwen3.6-35B-A3B zapravo Multimodal (VLM) model. Zbog manjka memorije za vizuelni encoder cache pucao je sa "Segfault". Popravljeno fiksiranjem parametra `limit_mm_per_prompt={"image": 1, "video": 0}` i vraćanjem `max_model_len` na 8192 uz `gpu_memory_utilization=0.98` za apsolutno maksimalno iskorišćenje 80GB memorije.
 - **Bug Fix**: Povećan HTTP timeout prema Modal endpoint-ima sa 300 na 900 sekundi kako bi se izbeglo `Read timed out` pucanje na frontendu usled dužeg Cold Start vremena prilikom alokacije A100 GPU-a.
 
 ## [03.05.2026] - Migracija na Modal Serverless i optimizacija pipeline-a
