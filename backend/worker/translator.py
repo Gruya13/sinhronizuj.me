@@ -80,14 +80,16 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Priprema multimodalnog content-a
     prompt_text = (
-        "Ti si ekspert za prevođenje video titlova. Tvoj zadatak je da prevedeš transkript na SRPSKI jezik (EKAVICA). \n"
-        "PRAVILA:\n"
-        "1. MORAŠ vratiti odgovor kao JSON LISTU OBJEKATA: [{\"id\": 0, \"text\": \"prevod\"}, ...]\n"
-        "2. Prevod mora biti DOSLOVAN (rečenica po rečenica), ne smeš prepričavati niti sažimati tekst.\n"
-        "3. Zadrži isti broj elemenata u listi kao u ulazu (tačno 17 segmenata).\n"
-        "4. Koristi priložene slike da odrediš pol govornika.\n"
-        "5. Odgovori ISKLJUČIVO sa JSON nizom, bez ikakvog dodatnog teksta.\n\n"
-        f"TRANSKRIPT ZA PREVOD (JSON):\n{json.dumps(json_input, ensure_ascii=False)}"
+        "Ti si vrhunski profesionalni prevodilac za video titlove. Tvoj zadatak je da prevedeš priloženi transkript na SRPSKI jezik (EKAVICA).\n\n"
+        "PRAVILA ZA PREVOD:\n"
+        "1. Prevod mora biti potpuno PRIRODAN u duhu srpskog jezika. Zadrži originalno značenje bez prepričavanja.\n"
+        "2. TEHNIČKI TERMINI: Imena kompanija, alata i IT termina (npr. AI agent, Zoom, LinkedIn, startup) zadrži u originalu. Nemoj ih prevoditi bukvalno.\n"
+        "3. POL GOVORNIKA: Pažljivo pogledaj priložene slike iz videa. Ako priča ženska osoba, glagole u prošlom vremenu prebaci u ženski rod (npr. 'rekla je', a ne 'rekao je').\n\n"
+        "PRAVILA ZA FORMAT:\n"
+        "1. Odgovor MORA BITI isključivo validan JSON niz objekata: [{\"id\": 0, \"text\": \"...\"}, ...]\n"
+        f"2. Tvoj odgovor mora sadržati TAČNO {len(segments)} segmenata, isto koliko ih ima na ulazu.\n"
+        "3. Zabranjen je bilo kakav dodatni tekst pre ili posle JSON-a. Ne koristi markdown (bez ```json), vrati samo čisti JSON string.\n\n"
+        f"TRANSKRIPT ZA PREVOD:\n{json.dumps(json_input, ensure_ascii=False)}"
     )
 
     payload = {
@@ -112,15 +114,25 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         # Pokušaj parsiranja JSON-a
         try:
             # Čistimo eventualni markdown kod blok ako ga model ubaci
-            json_match = re.search(r'\[\s*\{.*\}\s*\]', raw_output, re.DOTALL)
-            json_str = json_match.group(0) if json_match else raw_output
+            json_str = raw_output.strip()
+            if json_str.startswith("```json"):
+                json_str = json_str[7:]
+            elif json_str.startswith("```"):
+                json_str = json_str[3:]
+            if json_str.endswith("```"):
+                json_str = json_str[:-3]
+            json_str = json_str.strip()
+
+            json_match = re.search(r'\[\s*\{.*\}\s*\]', json_str, re.DOTALL)
+            json_str = json_match.group(0) if json_match else json_str
             
-            # Mala "hirurgija" za česte LLM greške (npr. zaboravljen navodnik pre zareza ili kraja)
-            # Tražimo : "tekst... } i menjamo u : "tekst..." }
-            json_str = re.sub(r':\s*"([^"]+)\s*\}', r': "\1" }', json_str)
-            json_str = re.sub(r':\s*"([^"]+)\s*\,', r': "\1" ,', json_str)
-            
-            translated_data = json.loads(json_str)
+            try:
+                translated_data = json.loads(json_str)
+            except json.JSONDecodeError:
+                # Mala "hirurgija" za česte LLM greške
+                json_str = re.sub(r':\s*"([^"]+)\s*\}', r': "\1" }', json_str)
+                json_str = re.sub(r':\s*"([^"]+)\s*\,', r': "\1" ,', json_str)
+                translated_data = json.loads(json_str)
                 
             final_segments = []
             for i, orig in enumerate(segments):
@@ -138,12 +150,11 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             return {"status": "success", "translated_segments": final_segments}
             
         except Exception as json_err:
-            print(f"[WARNING] JSON parsiranje nije uspelo: {json_err}. Fallback na TOON/Text.")
-            # Ovde ostavljamo stari fallback ili prosto vraćamo originalne sa raw textom
+            print(f"[WARNING] JSON parsiranje nije uspelo: {json_err}. Fallback na originalni tekst.")
             return {
                 "status": "success",
                 "translated_segments": [
-                    {"start": s["start"], "end": s["end"], "text": raw_output if i == 0 else ""}
+                    {"start": s["start"], "end": s["end"], "text": s["text"]}
                     for i, s in enumerate(segments)
                 ]
             }

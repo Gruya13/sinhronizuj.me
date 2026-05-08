@@ -306,3 +306,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Zavisnosti:** Dodati `torch` i `torchaudio` eksplicitno u sliku, uz postavljanje `PYTHONPATH` na `/opt/fish-speech`.
     - **Checkpoints:** Konfigurisano korišćenje `model.pth` i `firefly-gan-vq-fsq-8x1024-21hz-generator.pth` unutar NFS-a.
 - **Status:** TTS worker je uspešno testiran i spreman za produkcionu integraciju sa Hetzner backendom.
+
+### 08.05.2026. 08:42 — Optimizacija Qwen-VL Prompt-a i Popravka JSON Parsiranja
+- **Problem:** Modal prevodilac (Qwen-VL) je svrstavao celokupan prevod u prvi segment dok su ostali ostajali prazni. Uzrok je bio neuspešno parsiranje JSON formata zbog nepredvidivih izlaza LLM-a (markdown format) i hardkodovane vrednosti od 17 segmenata u promptu. Pored toga, korisnik je zahtevao veću preciznost prevoda i prirodniji srpski jezik.
+- **Akcija:** Ažuriran fajl `backend/worker/translator.py`.
+- **Tehničke Izmene:**
+    - **Prompt:** Uklonjeno ograničenje od 17 segmenata, sada koristi dinamički `len(segments)`. Dodata su jasnija pravila za prevođenje: zadržavanje tehničkih pojmova u originalu, precizniji i prirodniji srpski jezik (ekavica) bez prepričavanja.
+    - **JSON parsiranje:** Pojačana ekstrakcija (brisanje ` ```json ` blokova) i uvedena naprednija kontrola grešaka sa boljim *fallback* sistemom.
+- **Status:** Kod lokalno ažuriran i dokumentovan. Čeka se potvrda testiranja pre prebacivanja na VPS/Github.
