@@ -105,7 +105,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         output = call_modal_endpoint(
             url=settings.MODAL_STT_LLM_URL, 
             payload=payload, 
-            timeout_seconds=300,
+            timeout_seconds=900,
             progress_callback=progress_callback
         )
         
@@ -187,7 +187,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         lektor_output = call_modal_endpoint(
             url=settings.MODAL_LEKTOR_URL,
             payload=lektor_payload,
-            timeout_seconds=300,
+            timeout_seconds=900,
             progress_callback=None
         )
         

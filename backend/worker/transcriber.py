@@ -105,7 +105,7 @@ def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
         output = call_modal_endpoint(
             url=settings.MODAL_STT_LLM_URL, 
             payload=payload, 
-            timeout_seconds=300,
+            timeout_seconds=900,
             progress_callback=progress_callback
         )
         
