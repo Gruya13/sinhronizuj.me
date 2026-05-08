@@ -317,3 +317,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 
 - **Ažuriranje (08:58):** Primetili smo da Qwen-VL model ignoriše JSON array format kada prevodi tečan tekst, te celokupan prevod stavlja unutar samo jednog objekta (npr. `{"id": 0, "text": "ceo_prevod"}`). Zbog ovoga je parsiranje stavljalo sve u prvi segment, a ostale ostavljalo na originalnom jeziku (zbog fallback-a).
 - **Finalno Rešenje:** Potpuno napušten JSON format u `translator.py`. Implementiran je ultra-robustan tekstualni format (`ID|Prevedeni tekst`). LLM sada vraća red po red, što garantuje savršeno mapiranje svakog segmenta i drastično smanjuje mogućnost greške (tzv. "halucinacije" formata).
+
+### 08.05.2026. 09:08 — Segmentacija originalnih transkripata po rečenicama
+- **Problem:** Whisper model često iseče segmente na pola rečenice (zbog pauza u govoru) ili spoji dve brze rečenice u jedan segment. Ovo otežava prevođenje i vizuelno praćenje teksta.
+- **Akcija:** Implementirana funkcija `segment_by_sentences` u fajlu `backend/worker/transcriber.py`.
+- **Tehničke Izmene:**
+    - Postprocessing faza nakon što se transkript vrati sa Modala (STT).
+    - Funkcija rastavlja sve postojeće segmente na nivo rečenice prateći interpunkcijske znake (`.`, `!`, `?`).
+    - Spaja polovične delove (chunkove) u jednu kompletnu rečenicu, ili razdvaja jedan dugačak segment u više rečenica.
+    - Prilagođava početna (`start`) i završna (`end`) vremena (kroz linearnu interpolaciju baziranu na broju karaktera).
+- **Status:** Sistem sada operiše i prevodi striktno na nivou rečenice, što donosi značajno preciznije i urednije rezultate. Izmene poslate na VPS server.
