@@ -48,12 +48,12 @@ image_lektor = (
     .pip_install(
         "torch==2.5.1",
         "vllm==0.6.4.post1",
-        "transformers>=4.49.0",
-        "flash-attn==2.6.3",
-        "accelerate",
-        "huggingface-hub"
+        "huggingface-hub",
+        "accelerate"
     )
-    .run_commands("pip install git+https://github.com/huggingface/transformers.git")
+    .pip_install("flash-attn==2.6.3", extra_options="--no-build-isolation")
+    # Forsirana instalacija najnovije verzije sa GitHub-a radi podrške za qwen3_5_moe
+    .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})
 )
 
@@ -176,7 +176,12 @@ class Worker:
     volumes={VOLUME_PATH: models_volume}, 
     scaledown_window=300, 
     timeout=1800,
-    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0", "VLLM_ENGINE_READY_TIMEOUT_S": "1200", "PYTORCH_JIT": "0"}
+    env={
+        "VLLM_WORKER_MULTIPROC_METHOD": "spawn", 
+        "VLLM_ENGINE_READY_TIMEOUT_S": "1200", 
+        "PYTORCH_JIT": "0",
+        "VLLM_USE_V1": "0"  # Isključivanje nestabilnog V1 engine-a
+    }
 )
 class LektorWorker:
     @modal.enter()
@@ -188,7 +193,7 @@ class LektorWorker:
         self.llm = LLM(
             model=self.lektor_path,
             trust_remote_code=True,
-            gpu_memory_utilization=0.85,
+            gpu_memory_utilization=0.9,
             max_model_len=2048,
             limit_mm_per_prompt={"image": 0, "video": 0},
             enforce_eager=True

@@ -373,15 +373,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - Podešen `gpu_memory_utilization=0.85` za optimalno korišćenje 80GB VRAM-a.
 - **Status**: Deployment nove stabilne konfiguracije pokrenut.
 
-### 08.05.2026. 14:15 — Podrška za qwen3_5_moe i rešavanje infer_schema greške
-- **Problem**: Prethodna verzija `transformers` nije prepoznavala `qwen3_5_moe` arhitekturu, a `torch 2.4.0` je bacao `ValueError: infer_schema` u kombinaciji sa vLLM MoE kernelima.
+### 08.05.2026. 14:30 — Hitna rekonstrukcija LektorWorker-a za qwen3_5_moe
+- **Problem**: Detektovana zastarela verzija `transformers` biblioteke u Modal keširanim slojevima i nekompatibilnost sa `qwen3_5_moe` arhitekturom.
 - **Rešenje**:
-    - Prebacivanje na `nvidia/cuda:12.4.1-devel-ubuntu22.04` bazni imidž.
-    - Nadogradnja na `torch==2.5.1` i `vllm==0.6.4.post1`.
-    - Instalacija `transformers` direktno sa GitHub master grane radi podrške za `qwen3_5_moe`.
-    - Osigurane env varijable: `VLLM_USE_V1=0`, `PYTORCH_JIT=0`, `VLLM_WORKER_MULTIPROC_METHOD=spawn`.
-    - Uklonjen `gdn_prefill_backend` iz LLM inicijalizacije.
-- **Status**: Kôd ažuriran, deploy započet.
+    - **Rekonstrukcija imidža**: Korišćenje `nvidia/cuda:12.4.1-devel-ubuntu22.04` i **forsirana** instalacija `transformers` direktno sa GitHub mastera (`--force-reinstall`).
+    - **Stabilizacija Kernela**: Razdvajanje instalacije `flash-attn` (v2.6.3) sa `--no-build-isolation` nakon `torch 2.5.1`.
+    - **Optimizacija H100**: Podešen `gpu_memory_utilization=0.9` i isključen V1 engine preko `VLLM_USE_V1=0`.
+    - **Env fiks**: Postavljen `VLLM_ENGINE_READY_TIMEOUT_S=1200` i `PYTORCH_JIT=0`.
+- **Status**: Kôd push-ovan na development, deploy u toku.
+
 
 
 
