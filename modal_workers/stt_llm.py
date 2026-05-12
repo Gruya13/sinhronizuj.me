@@ -51,7 +51,6 @@ image_lektor = (
         "huggingface-hub",
         "accelerate"
     )
-    .pip_install("flash-attn==2.6.3", extra_options="--no-build-isolation")
     # Forsirana instalacija najnovije verzije sa GitHub-a radi podrške za qwen3_5_moe
     .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
     .run_function(download_models, volumes={VOLUME_PATH: models_volume})

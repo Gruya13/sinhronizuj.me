@@ -1,4 +1,11 @@
 # Istorija izrade projekta Sinhronizuj.me
+ 
++## [12.05.2026] - Deploy i aktivacija Lektor radnika (Modal.com)
++- **Deploy**: Uspešno izvršen `modal deploy` za `modal_workers/stt_llm.py`. Aktiviran `LektorWorker` na H100 GPU-u.
++- **Integracija**: Ažuriran `.env` fajl sa novim `MODAL_LEKTOR_URL`. Sistem je sada spreman za puni 2-pass prevod (Qwen-VL + Qwen-35B Lektor).
++- **Čišćenje**: Sinhronizovane lokalne izmene u `stt_llm.py` (uklanjanje redundantne `flash-attn` instalacije koja je usporavala build).
++
+ ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
 
 ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
 - **Modal arhitektura**: Dodata podrška za Qwen3.6-35B-A3B (qwen3_5_moe). Ažurirani `transformers>=4.49.0` i `vllm>=0.7.0` na Modal image-u jer su stare verzije pucale na podizanju Lektora.
