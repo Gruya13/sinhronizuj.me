@@ -392,3 +392,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 
 
 
+
+### 12.05.2026. 08:30 — Stabilizacija Lektor radnika (FP8 + H100)
+- **Model**: Prelazak na `Qwen/Qwen3.6-27B-FP8`. FP8 kvantizacija značajno smanjuje VRAM otisak uz zadržavanje performansi.
+- **Hardware**: Migracija na `H100` (80GB VRAM) radi eliminacije `RuntimeError` i `Segfault` problema (peak memory issue).
+- **Infrastruktura**:
+    - Rešen race condition pri download-u na NFS (dodata provera postojanja i korišćenje `/tmp` za keširanje).
+    - Onemogućen eksperimentalni `VLLM_USE_V1` engine (stabilizacija preko V0).
+    - Optimizovana memorija: `gpu_memory_utilization=0.7`, `max_model_len=4096`.
+- **Status**: Deployment uspešan, inicijalizacija u toku (stabilno na 14% bez grešaka).
