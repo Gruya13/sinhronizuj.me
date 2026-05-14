@@ -6,56 +6,31 @@ import time
 VOLUME_PATH = "/models"
 models_volume = modal.NetworkFileSystem.from_name("sinhronizuj-models", create_if_missing=True)
 
-# Konstante modela
+# Konstante modela - Prelazak na STABILNI 32B AWQ model
 STT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
-LEKTOR_MODEL = "Qwen/Qwen3.6-27B-FP8"
+LEKTOR_MODEL = "Qwen/Qwen2.5-32B-Instruct-AWQ"
 
 def download_models():
     from huggingface_hub import snapshot_download
     import os
-    import traceback
-
-    try:
-        # Provera STT modela
-        stt_dir = f"{VOLUME_PATH}/qwen-vl-7b"
-        if not os.path.exists(stt_dir):
-            print(f"Preuzimanje STT modela: {STT_MODEL}")
-            snapshot_download(STT_MODEL, local_dir=stt_dir)
-        else:
-            print("STT model vec postoji, preskacem download.")
+    
+    # Provera STT modela
+    stt_dir = f"{VOLUME_PATH}/qwen-vl-7b"
+    if not os.path.exists(stt_dir):
+        print(f"Preuzimanje STT modela: {STT_MODEL}")
+        snapshot_download(STT_MODEL, local_dir=stt_dir)
+    
+    # Provera Lektor modela (32B AWQ) - STABILNA ARHITEKTURA
+    lektor_dir = f"{VOLUME_PATH}/qwen-32b-awq"
+    if not os.path.exists(os.path.join(lektor_dir, "config.json")):
+        print(f"Preuzimanje Lektor modela: {LEKTOR_MODEL}")
+        os.makedirs(lektor_dir, exist_ok=True)
+        snapshot_download(repo_id=LEKTOR_MODEL, local_dir=lektor_dir)
         
-        # Provera Lektor modela (27B FP8)
-        lektor_dir = f"{VOLUME_PATH}/qwen-27b-fp8"
-        if not os.path.exists(os.path.join(lektor_dir, "config.json")):
-            print(f"Preuzimanje Lektor modela: {LEKTOR_MODEL}")
-            os.makedirs(lektor_dir, exist_ok=True)
-            snapshot_download(repo_id=LEKTOR_MODEL, local_dir=lektor_dir, cache_dir="/tmp/hf_cache")
-            print("Download Lektora zavrsen.")
-        else:
-            print("Lektor model vec postoji, preskacem download.")
-            
-        print("Sve provereno uspesno.")
-    except Exception as e:
-        print("GRESKA TOKOM DOWNLOAD-A:")
-        traceback.print_exc()
-        if "File exists" not in str(e):
-            raise e
+    print("Sve provereno uspesno.")
 
-image_stt = (
-    modal.Image.from_registry("nvidia/cuda:12.1.1-devel-ubuntu22.04")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev")
-    .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
-    .run_commands("python -m pip install --upgrade pip")
-    .pip_install(
-        "torch==2.4.0",
-        "vllm==0.6.3.post1",
-        "huggingface-hub",
-        "accelerate"
-    )
-    .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
-)
-
-image_lektor = (
+# Koristimo stabilan vLLM 0.6.4.post1 koji je 'zlatni standard' za AWQ modele
+image_base = (
     modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04")
     .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "python3.11-dev", "ninja-build")
     .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
@@ -64,7 +39,7 @@ image_lektor = (
     .pip_install(
         "huggingface-hub",
         "accelerate",
-        "vllm>=0.7.0"
+        "vllm==0.6.4.post1"
     )
     .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
     .run_function(download_models, network_file_systems={VOLUME_PATH: models_volume})
@@ -73,9 +48,9 @@ image_lektor = (
 app = modal.App("sm-stt")
 
 @app.cls(
-    gpu="A100",  # Vraceno na standardni A100 radi ustede
+    gpu="A100", 
     network_file_systems={VOLUME_PATH: models_volume}, 
-    image=image_stt, 
+    image=image_base, 
     timeout=600,
     scaledown_window=300
 )
@@ -86,7 +61,6 @@ class Worker:
     @modal.enter()
     def load_models(self):
         from vllm import LLM
-        print("Inicijalizacija vLLM STT modela...")
         self.llm = LLM(
             model=self.stt_path,
             trust_remote_code=True,
@@ -113,32 +87,26 @@ class Worker:
         return {"error": "Unknown task"}
 
 @app.cls(
-    gpu="A100", # Najjeftinija opcija
+    gpu="H100", 
     network_file_systems={VOLUME_PATH: models_volume}, 
-    image=image_lektor, 
+    image=image_base, 
     timeout=1200,
-    scaledown_window=300,
-    env={
-        "VLLM_USE_V1": "0", # KLJUČNO: Koristimo stabilni V0 engine
-        "VLLM_WORKER_MULTIPROC_METHOD": "spawn", 
-        "VLLM_ENGINE_READY_TIMEOUT_S": "1200"
-    }
+    scaledown_window=300
 )
 class LektorWorker:
     def __init__(self):
-        self.lektor_path = f"{VOLUME_PATH}/qwen-27b-fp8"
+        self.lektor_path = f"{VOLUME_PATH}/qwen-32b-awq"
 
     @modal.enter()
     def load_models(self):
         from vllm import LLM
-        print("Inicijalizacija vLLM Lektor modela (27B FP8) na A100...")
+        print("Inicijalizacija 32B AWQ Lektora na H100...")
         self.llm = LLM(
             model=self.lektor_path,
             trust_remote_code=True,
-            gpu_memory_utilization=0.8, # Konzervativno radi sprecavanja OOM
-            max_model_len=4096,
-            quantization="fp8",
-            enforce_eager=True # Smanjuje memorijski peak
+            gpu_memory_utilization=0.9, # H100 80GB ima previse mesta za 32B AWQ
+            max_model_len=8192,
+            quantization="awq"
         )
 
     @modal.method()
@@ -159,7 +127,7 @@ class LektorWorker:
 def test_lektor_init():
     lektor = LektorWorker()
     try:
-        result = lektor.handle_lektor.remote("test")
-        print(f"USPEH! Rezultat: {result}")
+        result = lektor.handle_lektor.remote("Dobar dan, ja sam Lektor. Kako vam mogu pomoci?")
+        print(f"KONACNI USPEH! Odgovor: {result}")
     except Exception as e:
         print(f"GRESKA: {e}")
