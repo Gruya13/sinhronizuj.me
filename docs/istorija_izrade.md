@@ -5,6 +5,7 @@
 - **Ubrzanje inferencije:** Prebačeno na `awq_marlin` kvantizaciju i aktiviran FlashAttention-2 (uklanjanjem XFORMERS backenda na A100).
 - **Matematička stabilizacija:** Usklađen `max-model-len` (12288) sa brojem slika (3 frejma) radi eliminacije `RuntimeError` kod multimodalnog procesora.
 - **Preglednost logova:** Dodat `--disable-log-stats` za utišavanje periodičnih statusnih poruka.
+- **Pametna Segmentacija:** Unapređen `transcriber.py` na Hetzneru – dodat limit od 15 reči/8 sekundi po segmentu kako bi se sprečilo "lepljenje" teksta u jedan blok kada Whisper izostavi interpunkciju.
 - **Infrastruktura:** Restartovani Redis, API i Worker na Hetzneru; očišćen `temp_workspace`.
 
 ## [15.05.2026] - Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a

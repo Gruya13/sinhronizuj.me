@@ -11,8 +11,11 @@ vllm_image = (
         "accelerate==1.1.1",
         "sentencepiece",
         "requests",
-        "qwen-vl-utils"
+        "qwen-vl-utils",
+        "wheel",
+        "ninja"
     )
+    .run_commands("pip install flash-attn --no-build-isolation")
 )
 
 app = modal.App("sm-translator")
@@ -33,24 +36,48 @@ model_volume = modal.Volume.from_name("sinhronizuj-models", create_if_missing=Tr
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
     import subprocess
-    import time
+    import os
+    from huggingface_hub import snapshot_download
     
     model_path = "/models/qwen-vl-7b-awq"
+    model_id = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
     
-    print(f"Pokretanje optimizovanog vLLM 0.6.3 servera za Translator (Qwen2-VL)")
+    # 1. Provera stanja volumena
+    if not os.path.exists(model_path) or not os.listdir(model_path):
+        print(f"🔄 Model nije pronađen ili je volumen prazan. Započinjem preuzimanje {model_id}...")
+        
+        # 2. Automatsko preuzimanje modela
+        snapshot_download(
+            repo_id=model_id,
+            local_dir=model_path,
+            local_dir_use_symlinks=False,
+            ignore_patterns=["*.msgpack", "*.h5", "*.ot"]
+        )
+        
+        # 3. Trajno čuvanje izmena na volumen
+        print("💾 Komitujem preuzete podatke na Modal Volume...")
+        model_volume.commit()
+        print("✅ Model je spreman.")
+    else:
+        print("📂 Model je pronađen na volumenu. Preskačem preuzimanje.")
+
+    print("====================================================")
+    print("🔥 NOVA AUTONOMNA VERZIJA RADNIKA: 15.05.2026. 🔥")
+    print("Optimizacije: Marlin, FA2, Auto-Download, No-Stats")
+    print("====================================================")
     
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
         "--model", model_path,
         "--served-model-name", "qwen-vl",
-        "--quantization", "awq_marlin",  # Optimizovano prema instrukcijama
-        "--trust-remote_code",
+        "--quantization", "awq_marlin",
+        "--trust-remote-code",
         "--gpu-memory-utilization", "0.7",
-        "--max-model-len", "12288",       # Zadržavamo stabilan context
-        "--limit-mm-per-prompt", "image=3", # Zadržavamo stabilan broj slika
+        "--max-model-len", "12288",
+        "--limit-mm-per-prompt", "image=3",
         "--enforce-eager",
-        "--disable-frontend-multiprocessing", # Rešava problem duplog pokretanja
-        "--disable-log-stats",                # Utišava periodične metrike (0.0 tokens/s)
+        "--disable-frontend-multiprocessing",
+        "--disable-log-stats",
         "--port", "8000"
     ]
     
@@ -63,17 +90,9 @@ def serve():
 )
 def download_vlm():
     from huggingface_hub import snapshot_download
-    
     model_id = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
     model_path = "/models/qwen-vl-7b-awq"
     
     if not os.path.exists(model_path):
-        print(f"Preuzimanje modela {model_id}...")
-        snapshot_download(
-            model_id,
-            local_dir=model_path,
-            ignore_patterns=["*.msgpack", "*.h5", "*.ot"]
-        )
+        snapshot_download(model_id, local_dir=model_path)
         model_volume.commit()
-    else:
-        print("Model već postoji na volumenu.")
