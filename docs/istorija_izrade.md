@@ -1,4 +1,11 @@
 # Istorija izrade projekta Sinhronizuj.me
+
+## [15.05.2026] - Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a
+- Obrisana klasa `LektorWorker` iz `modal_workers/stt_llm.py` koja je koristila stari AWQ model i pripadajuće preuzimanje modela.
+- Radnik `sm-stt` (STT Worker) uspešno je ponovo pokrenut na Modal-u čime je stari lektor pogašen.
+- Deploy-ovan je novi openai-kompatibilan radnik `lektor_worker.py`.
+- Ažurirana URL adresa `MODAL_LEKTOR_URL` u `.env` fajlu.
+- Ažurirana `lektor_segments` funkcija u `backend/worker/translator.py` da ispravno komunicira sa `/v1/chat/completions` API-jem novog Lektor endpoint-a.
  
 +## [12.05.2026] - Deploy i aktivacija Lektor radnika (Modal.com)
 +- **Deploy**: Uspešno izvršen `modal deploy` za `modal_workers/stt_llm.py`. Aktiviran `LektorWorker` na H100 GPU-u.
