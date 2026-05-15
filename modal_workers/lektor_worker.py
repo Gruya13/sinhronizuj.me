@@ -38,6 +38,7 @@ def serve():
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
         "--model", "Qwen/Qwen2.5-32B-Instruct",
+        "--served-model-name", "qwen-lektor",
         "--tensor-parallel-size", "1",
         "--gpu-memory-utilization", "0.95",
         "--max-model-len", "32768",

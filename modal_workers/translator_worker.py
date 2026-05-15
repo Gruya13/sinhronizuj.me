@@ -1,67 +1,79 @@
 import modal
 import os
 
-VOLUME_PATH = "/models"
-models_volume = modal.NetworkFileSystem.from_name("sinhronizuj-models", create_if_missing=True)
-
-MODEL_NAME = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
-
-def download_vlm():
-    from huggingface_hub import snapshot_download
-    import os
-    stt_dir = f"{VOLUME_PATH}/qwen-vl-7b-awq"
-    if not os.path.exists(stt_dir):
-        print(f"Preuzimanje VLM modela: {MODEL_NAME}")
-        snapshot_download(MODEL_NAME, local_dir=stt_dir)
-
-image_vlm = (
-    modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "python3.11", "python3-pip", "ninja-build")
-    .run_commands("ln -s /usr/bin/python3.11 /usr/local/bin/python")
-    # Prelazak na provereno stabilnu kombinaciju verzija za Qwen2-VL
-    .pip_install("torch==2.4.0", "torchvision", "xformers==0.0.27.post2", index_url="https://download.pytorch.org/whl/cu124")
+# Definicija slike sa svim potrebnim zavisnostima
+vllm_image = (
+    modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.11")
+    .apt_install("git", "git-lfs")
     .pip_install(
         "vllm==0.6.3.post1",
         "transformers==4.45.2",
-        "opencv-python-headless",
-        "huggingface-hub",
-        "fastapi",
-        "uvicorn"
+        "accelerate==1.1.1",
+        "sentencepiece",
+        "requests",
+        "qwen-vl-utils"
     )
-    .run_function(download_vlm, network_file_systems={VOLUME_PATH: models_volume})
 )
 
 app = modal.App("sm-translator")
 
+# Volumen za čuvanje modela
+model_volume = modal.Volume.from_name("sinhronizuj-models", create_if_missing=True)
+
 @app.function(
-    gpu="A100", 
-    network_file_systems={VOLUME_PATH: models_volume}, 
-    image=image_vlm, 
-    timeout=3600,
+    image=vllm_image,
+    volumes={"/models": model_volume},
+    gpu="A100",
+    timeout=1800,
     scaledown_window=300,
     env={
-        "VLLM_WORKER_MULTIPROC_METHOD": "spawn", 
-        "VLLM_USE_V1": "0",
-        "VLLM_ATTENTION_BACKEND": "XFORMERS"
+        "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
     }
 )
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
     import subprocess
+    import time
     
-    stt_path = f"{VOLUME_PATH}/qwen-vl-7b-awq"
+    model_path = "/models/qwen-vl-7b-awq"
+    
+    print(f"Pokretanje optimizovanog vLLM 0.6.3 servera za Translator (Qwen2-VL)")
     
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", stt_path,
+        "--model", model_path,
         "--served-model-name", "qwen-vl",
-        "--quantization", "awq", # Vraćamo na awq jer 0.6.3 možda nema punu podršku za marlin na Qwen2-VL
+        "--quantization", "awq_marlin",  # Optimizovano prema instrukcijama
         "--trust-remote_code",
-        "--gpu-memory-utilization", "0.8",
-        "--max-model-len", "4096", # Smanjeno na 4096 radi uštede memorije i stabilnosti
-        "--limit-mm-per-prompt", "image=10",
+        "--gpu-memory-utilization", "0.7",
+        "--max-model-len", "12288",       # Zadržavamo stabilan context
+        "--limit-mm-per-prompt", "image=3", # Zadržavamo stabilan broj slika
+        "--enforce-eager",
+        "--disable-frontend-multiprocessing", # Rešava problem duplog pokretanja
+        "--disable-log-stats",                # Utišava periodične metrike (0.0 tokens/s)
         "--port", "8000"
     ]
     
-    print(f"Pokretanje stabilnog vLLM 0.6.3 servera za Translator (Qwen2-VL)")
     subprocess.run(cmd, check=True)
+
+@app.function(
+    image=vllm_image,
+    volumes={"/models": model_volume},
+    timeout=3600
+)
+def download_vlm():
+    from huggingface_hub import snapshot_download
+    
+    model_id = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
+    model_path = "/models/qwen-vl-7b-awq"
+    
+    if not os.path.exists(model_path):
+        print(f"Preuzimanje modela {model_id}...")
+        snapshot_download(
+            model_id,
+            local_dir=model_path,
+            ignore_patterns=["*.msgpack", "*.h5", "*.ot"]
+        )
+        model_volume.commit()
+    else:
+        print("Model već postoji na volumenu.")

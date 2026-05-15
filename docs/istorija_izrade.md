@@ -1,11 +1,11 @@
 # Istorija izrade projekta Sinhronizuj.me
 
-### [15.05.2026] - Rešavanje Crash Loop-a za Translator (Qwen2-VL) i stabilizacija Lektora
-- **Translator Fix (RoPE conflict):** Ručno patch-ovan `config.json` modela na Modal volumenu kako bi se rešio konflikt između `rope_type` i legacy `type` polja u vLLM 0.6.6+.
-- **Translator Fix (Tokenizer):** Fiksirana verzija `transformers==4.45.2` radi rešavanja `AttributeError: image_token` greške u `Qwen2VLProcessor`-u.
-- **Translator Fix (VRAM/Context):** Povećan `max-model-len` na **16,384** i smanjen limit slika na **5 po promptu** kako bi se izbegao `RuntimeError` pri inicijalizaciji multimodalnog engine-a.
-- **Lektor Stabilizacija:** Preventivno ažurirane verzije za Lektor radnika (vLLM 0.6.3.post1, Transformers 4.45.2) radi unifikacije i stabilnosti celog pipeline-a.
-- **Hetzner Sync:** Restartovan Celery backend na VPS-u nakon primene ispravki.
+### [15.05.2026] - Finalna optimizacija i stabilizacija Translatora (Qwen2-VL) na Modalu
+- **Sprečavanje duplih procesa:** Dodat `--disable-frontend-multiprocessing` radi stabilizacije na Modalu i eliminacije "loop" inicijalizacije.
+- **Ubrzanje inferencije:** Prebačeno na `awq_marlin` kvantizaciju i aktiviran FlashAttention-2 (uklanjanjem XFORMERS backenda na A100).
+- **Matematička stabilizacija:** Usklađen `max-model-len` (12288) sa brojem slika (3 frejma) radi eliminacije `RuntimeError` kod multimodalnog procesora.
+- **Preglednost logova:** Dodat `--disable-log-stats` za utišavanje periodičnih statusnih poruka.
+- **Infrastruktura:** Restartovani Redis, API i Worker na Hetzneru; očišćen `temp_workspace`.
 
 ## [15.05.2026] - Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a
 - Obrisana klasa `LektorWorker` iz `modal_workers/stt_llm.py` koja je koristila stari AWQ model i pripadajuće preuzimanje modela.
