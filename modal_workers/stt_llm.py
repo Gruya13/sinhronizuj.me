@@ -40,9 +40,9 @@ image_base = (
         "accelerate",
         "vllm==0.6.4.post1",
         "faster-whisper",
-        "opencv-python-headless"
+        "opencv-python-headless",
+        "transformers==4.46.1"
     )
-    .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
     .run_function(download_models, network_file_systems={VOLUME_PATH: models_volume})
 )
 
