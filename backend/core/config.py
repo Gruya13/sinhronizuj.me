@@ -10,7 +10,8 @@ class Settings:
     RUNPOD_API_KEY: str = os.getenv("RUNPOD_API_KEY", "")
     
     # Modal Serverless Endpoints
-    MODAL_STT_LLM_URL: str = os.getenv("MODAL_STT_LLM_URL", "")
+    MODAL_STT_URL: str = os.getenv("MODAL_STT_URL", "")
+    MODAL_TRANSLATOR_URL: str = os.getenv("MODAL_TRANSLATOR_URL", "")
     MODAL_LEKTOR_URL: str = os.getenv("MODAL_LEKTOR_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
     
