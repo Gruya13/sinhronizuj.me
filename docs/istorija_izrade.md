@@ -1,5 +1,12 @@
 # Istorija izrade projekta Sinhronizuj.me
 
+### [15.05.2026] - Rešavanje Crash Loop-a za Translator (Qwen2-VL) i stabilizacija Lektora
+- **Translator Fix (RoPE conflict):** Ručno patch-ovan `config.json` modela na Modal volumenu kako bi se rešio konflikt između `rope_type` i legacy `type` polja u vLLM 0.6.6+.
+- **Translator Fix (Tokenizer):** Fiksirana verzija `transformers==4.45.2` radi rešavanja `AttributeError: image_token` greške u `Qwen2VLProcessor`-u.
+- **Translator Fix (VRAM/Context):** Povećan `max-model-len` na **16,384** i smanjen limit slika na **5 po promptu** kako bi se izbegao `RuntimeError` pri inicijalizaciji multimodalnog engine-a.
+- **Lektor Stabilizacija:** Preventivno ažurirane verzije za Lektor radnika (vLLM 0.6.3.post1, Transformers 4.45.2) radi unifikacije i stabilnosti celog pipeline-a.
+- **Hetzner Sync:** Restartovan Celery backend na VPS-u nakon primene ispravki.
+
 ## [15.05.2026] - Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a
 - Obrisana klasa `LektorWorker` iz `modal_workers/stt_llm.py` koja je koristila stari AWQ model i pripadajuće preuzimanje modela.
 - Radnik `sm-stt` (STT Worker) uspešno je ponovo pokrenut na Modal-u čime je stari lektor pogašen.
@@ -7,12 +14,10 @@
 - Ažurirana URL adresa `MODAL_LEKTOR_URL` u `.env` fajlu.
 - Ažurirana `lektor_segments` funkcija u `backend/worker/translator.py` da ispravno komunicira sa `/v1/chat/completions` API-jem novog Lektor endpoint-a.
  
-+## [12.05.2026] - Deploy i aktivacija Lektor radnika (Modal.com)
-+- **Deploy**: Uspešno izvršen `modal deploy` za `modal_workers/stt_llm.py`. Aktiviran `LektorWorker` na H100 GPU-u.
-+- **Integracija**: Ažuriran `.env` fajl sa novim `MODAL_LEKTOR_URL`. Sistem je sada spreman za puni 2-pass prevod (Qwen-VL + Qwen-35B Lektor).
-+- **Čišćenje**: Sinhronizovane lokalne izmene u `stt_llm.py` (uklanjanje redundantne `flash-attn` instalacije koja je usporavala build).
-+
- ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
+## [12.05.2026] - Deploy i aktivacija Lektor radnika (Modal.com)
+- **Deploy**: Uspešno izvršen `modal deploy` za `modal_workers/stt_llm.py`. Aktiviran `LektorWorker` na H100 GPU-u.
+- **Integracija**: Ažuriran `.env` fajl sa novim `MODAL_LEKTOR_URL`. Sistem je sada spreman za puni 2-pass prevod (Qwen-VL + Qwen-35B Lektor).
+- **Čišćenje**: Sinhronizovane lokalne izmene u `stt_llm.py` (uklanjanje redundantne `flash-attn` instalacije koja je usporavala build).
 
 ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
 - **Modal arhitektura**: Dodata podrška za Qwen3.6-35B-A3B (qwen3_5_moe). Ažurirani `transformers>=4.49.0` i `vllm>=0.7.0` na Modal image-u jer su stare verzije pucale na podizanju Lektora.
