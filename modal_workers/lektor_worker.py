@@ -1,18 +1,18 @@
 import modal
 
 # Inicijalizacija perzistentnog volumena za keširanje modela sa Hugging Face-a
-# Montira se na /root/.cache/huggingface kako bi se izbeglo ponovno preuzimanje težina (cca 65GB+)
 huggingface_cache = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 
 # Definicija slike kontejnera optimizovana za vLLM i NVIDIA A100 hardver
-# Koristi se CUDA 12.9.0 i Python 3.12 za maksimalne performanse i kompatibilnost
+# Koristimo stabilne verzije biblioteka
 image = (
-    modal.Image.from_registry("nvidia/cuda:12.9.0-devel-ubuntu22.04", add_python="3.12")
-    .env({"HF_XET_HIGH_PERFORMANCE": "1"})
-    .uv_pip_install(
-        "vllm==0.19.1",
-        "huggingface-hub==1.5.0",
-        "transformers==5.5.1"
+    modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.11")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6")
+    .pip_install("torch==2.5.1", "torchvision", index_url="https://download.pytorch.org/whl/cu124")
+    .pip_install(
+        "vllm==0.6.6.post1",
+        "huggingface-hub",
+        "transformers==4.46.3"
     )
 )
 
@@ -24,12 +24,12 @@ app = modal.App("sinhronizuj-lektor")
     volumes={"/root/.cache/huggingface": huggingface_cache},
     scaledown_window=1800, # Kontejner ostaje topao 30 minuta nakon poslednjeg zahteva
     timeout=3600,
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
 )
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
     """
     Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct model.
-    Implementirana je robusna obrada grešaka za CUDA Xid 94 događaje.
     """
     import subprocess
     from modal.experimental import stop_fetching_inputs
@@ -49,18 +49,14 @@ def serve():
     print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-32B-Instruct")
     
     try:
-        # Pokretanje servera i čekanje na završetak ili grešku
         subprocess.run(cmd, check=True)
     except RuntimeError as e:
-        # Specifično hvatanje CUDA grešaka (npr. Xid 94) prema zahtevu
         error_msg = str(e)
         if "Xid 94" in error_msg or "CUDA" in error_msg:
             print(f"Kritična CUDA greška detektovana: {error_msg}")
-            # Modal procedura za oporavak: prestani sa preuzimanjem novih inputa i dozvoli gašenje instance
             stop_fetching_inputs()
         raise e
     except Exception as e:
-        # Opšta obrada ostalih kritičnih grešaka
         print(f"Sistemska greška u radniku: {e}")
         raise e
 
