@@ -16,9 +16,9 @@ def download_whisper():
         print(f"Preuzimanje Whisper modela: {WHISPER_MODEL}")
         snapshot_download(WHISPER_MODEL, local_dir=whisper_dir)
 
-# Lagan image bez vLLM-a
+# Koristimo CUDA image umesto debian_slim kako bismo imali libcublas.so.12 i ostale CUDA biblioteke
 image_stt = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.from_registry("nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04", add_python="3.11")
     .apt_install("git", "ffmpeg")
     .pip_install(
         "faster-whisper",
@@ -45,7 +45,9 @@ class STTWorker:
     def load_model(self):
         from faster_whisper import WhisperModel
         print("Učitavanje Faster-Whisper modela na T4...")
-        self.whisper_model = WhisperModel(f"{VOLUME_PATH}/faster-whisper-v3", device="cuda", compute_type="float16")
+        # Putanja do modela na perzistentnom volumenu
+        model_path = f"{VOLUME_PATH}/faster-whisper-v3"
+        self.whisper_model = WhisperModel(model_path, device="cuda", compute_type="float16")
 
     @modal.asgi_app()
     def task(self):
