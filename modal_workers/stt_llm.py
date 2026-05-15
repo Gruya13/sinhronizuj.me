@@ -6,8 +6,8 @@ import time
 VOLUME_PATH = "/models"
 models_volume = modal.NetworkFileSystem.from_name("sinhronizuj-models", create_if_missing=True)
 
-# Konstante modela - Prelazak na STABILNI 32B AWQ model
-STT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
+# Konstante modela
+STT_MODEL = "Qwen/Qwen2-VL-7B-Instruct-AWQ"
 WHISPER_MODEL = "Systran/faster-whisper-large-v3"
 
 def download_models():
@@ -15,7 +15,7 @@ def download_models():
     import os
     
     # Provera STT modela
-    stt_dir = f"{VOLUME_PATH}/qwen-vl-7b"
+    stt_dir = f"{VOLUME_PATH}/qwen-vl-7b-awq"
     if not os.path.exists(stt_dir):
         print(f"Preuzimanje STT modela: {STT_MODEL}")
         snapshot_download(STT_MODEL, local_dir=stt_dir)
@@ -53,11 +53,12 @@ app = modal.App("sm-stt")
     network_file_systems={VOLUME_PATH: models_volume}, 
     image=image_base, 
     timeout=600,
-    scaledown_window=300
+    scaledown_window=300,
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
 )
 class Worker:
     def __init__(self):
-        self.stt_path = f"{VOLUME_PATH}/qwen-vl-7b"
+        self.stt_path = f"{VOLUME_PATH}/qwen-vl-7b-awq"
         self.whisper_path = f"{VOLUME_PATH}/faster-whisper-v3"
 
     @modal.enter()
@@ -65,13 +66,14 @@ class Worker:
         from faster_whisper import WhisperModel
         from vllm import LLM
         
-        print("Inicijalizacija vLLM Qwen modela...")
+        print("Inicijalizacija vLLM Qwen modela (AWQ)...")
         self.llm = LLM(
             model=self.stt_path,
+            quantization="awq",
             trust_remote_code=True,
-            gpu_memory_utilization=0.8,
+            gpu_memory_utilization=0.6,
             max_model_len=4096,
-            limit_mm_per_prompt={"image": 1, "video": 0}
+            limit_mm_per_prompt={"image": 10, "video": 0}
         )
 
         print("Inicijalizacija Faster-Whisper modela...")
