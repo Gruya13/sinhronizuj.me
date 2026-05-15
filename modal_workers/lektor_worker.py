@@ -25,7 +25,7 @@ app = modal.App("sinhronizuj-lektor")
     scaledown_window=1800, # Kontejner ostaje topao 30 minuta nakon poslednjeg zahteva
     timeout=3600,
 )
-@modal.web_server(port=8000)
+@modal.web_server(port=8000, startup_timeout=600)
 def serve():
     """
     Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct model.

@@ -39,7 +39,7 @@ app = modal.App("sm-translator")
     timeout=3600,
     env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
 )
-@modal.web_server(port=8000)
+@modal.web_server(port=8000, startup_timeout=600)
 def serve():
     import subprocess
     

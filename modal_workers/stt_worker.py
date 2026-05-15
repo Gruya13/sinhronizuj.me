@@ -37,7 +37,8 @@ app = modal.App("sm-stt-only")
     gpu="T4", 
     network_file_systems={VOLUME_PATH: models_volume}, 
     image=image_stt, 
-    timeout=600
+    timeout=600,
+    scaledown_window=300
 )
 class STTWorker:
     @modal.enter()
@@ -46,35 +47,38 @@ class STTWorker:
         print("Učitavanje Faster-Whisper modela na T4...")
         self.whisper_model = WhisperModel(f"{VOLUME_PATH}/faster-whisper-v3", device="cuda", compute_type="float16")
 
-    @modal.method()
-    def transcribe(self, audio_b64: str):
-        import base64
-        import tempfile
-        import os
+    @modal.asgi_app()
+    def task(self):
+        from fastapi import FastAPI, Request
+        web_app = FastAPI()
         
-        audio_data = base64.b64decode(audio_b64)
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_audio:
-            tmp_audio.write(audio_data)
-            tmp_audio_path = tmp_audio.name
+        @web_app.post("/")
+        async def handle_request(request: Request):
+            import base64
+            import tempfile
+            import os
+            
+            data = await request.json()
+            audio_b64 = data.get("audio_base64")
+            if not audio_b64:
+                return {"error": "audio_base64 is required"}
+                
+            audio_data = base64.b64decode(audio_b64)
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_audio:
+                tmp_audio.write(audio_data)
+                tmp_audio_path = tmp_audio.name
+            
+            try:
+                # Koristimo već učitan model unutar iste instance (self)
+                print(f"Transkribujem fajl: {tmp_audio_path}")
+                segments, info = self.whisper_model.transcribe(tmp_audio_path, language=None, beam_size=5)
+                result = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+                return {"language": info.language, "segments": result}
+            except Exception as e:
+                print(f"Greška pri transkripciji: {e}")
+                return {"error": str(e)}
+            finally:
+                if os.path.exists(tmp_audio_path):
+                    os.remove(tmp_audio_path)
         
-        try:
-            segments, info = self.whisper_model.transcribe(tmp_audio_path, language=None, beam_size=5)
-            result = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
-            return {"language": info.language, "segments": result}
-        finally:
-            if os.path.exists(tmp_audio_path):
-                os.remove(tmp_audio_path)
-
-@app.function(image=image_stt, gpu="T4", network_file_systems={VOLUME_PATH: models_volume})
-@modal.web_server(port=8000)
-def task():
-    from fastapi import FastAPI, Request
-    web_app = FastAPI()
-    
-    @web_app.post("/")
-    async def handle_request(request: Request):
-        data = await request.json()
-        worker = STTWorker()
-        return worker.transcribe.remote(data.get("audio_base64"))
-    
-    return web_app
+        return web_app
