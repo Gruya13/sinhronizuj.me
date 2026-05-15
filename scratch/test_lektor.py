@@ -26,9 +26,13 @@ prompt = (
 )
 
 payload = {
-    "task": "lektor",
-    "prompt": prompt
+    "model": "Qwen/Qwen2.5-32B-Instruct",
+    "messages": [{"role": "user", "content": prompt}],
+    "temperature": 0.2,
+    "max_tokens": 2048
 }
+
+URL = f"{URL.rstrip('/')}/v1/chat/completions"
 
 print("Saljem zahtev (ovo moze potrajati zbog Cold Start-a)...")
 try:

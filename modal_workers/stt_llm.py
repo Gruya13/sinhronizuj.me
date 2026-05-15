@@ -8,7 +8,6 @@ models_volume = modal.NetworkFileSystem.from_name("sinhronizuj-models", create_i
 
 # Konstante modela - Prelazak na STABILNI 32B AWQ model
 STT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
-LEKTOR_MODEL = "Qwen/Qwen2.5-32B-Instruct-AWQ"
 
 def download_models():
     from huggingface_hub import snapshot_download
@@ -20,13 +19,7 @@ def download_models():
         print(f"Preuzimanje STT modela: {STT_MODEL}")
         snapshot_download(STT_MODEL, local_dir=stt_dir)
     
-    # Provera Lektor modela (32B AWQ) - STABILNA ARHITEKTURA
-    lektor_dir = f"{VOLUME_PATH}/qwen-32b-awq"
-    if not os.path.exists(os.path.join(lektor_dir, "config.json")):
-        print(f"Preuzimanje Lektor modela: {LEKTOR_MODEL}")
-        os.makedirs(lektor_dir, exist_ok=True)
-        snapshot_download(repo_id=LEKTOR_MODEL, local_dir=lektor_dir)
-        
+
     print("Sve provereno uspesno.")
 
 # Koristimo stabilan vLLM 0.6.4.post1 koji je 'zlatni standard' za AWQ modele
@@ -86,48 +79,3 @@ class Worker:
             return self.handle_translate(data.get("prompt"), data.get("frames_base64", []))
         return {"error": "Unknown task"}
 
-@app.cls(
-    gpu="H100", 
-    network_file_systems={VOLUME_PATH: models_volume}, 
-    image=image_base, 
-    timeout=1200,
-    scaledown_window=300
-)
-class LektorWorker:
-    def __init__(self):
-        self.lektor_path = f"{VOLUME_PATH}/qwen-32b-awq"
-
-    @modal.enter()
-    def load_models(self):
-        from vllm import LLM
-        print("Inicijalizacija 32B AWQ Lektora na H100...")
-        self.llm = LLM(
-            model=self.lektor_path,
-            trust_remote_code=True,
-            gpu_memory_utilization=0.9, # H100 80GB ima previse mesta za 32B AWQ
-            max_model_len=8192,
-            quantization="awq"
-        )
-
-    @modal.method()
-    def handle_lektor(self, prompt: str):
-        from vllm import SamplingParams
-        messages = [{"role": "user", "content": prompt}]
-        sampling_params = SamplingParams(temperature=0.2, max_tokens=2048)
-        outputs = self.llm.chat(messages, sampling_params=sampling_params)
-        return {"translation": outputs[0].outputs[0].text}
-
-    @modal.fastapi_endpoint(method="POST")
-    def task(self, data: dict):
-        if data.get("task") == "lektor":
-            return self.handle_lektor(data.get("prompt"))
-        return {"error": "Unknown task"}
-
-@app.local_entrypoint()
-def test_lektor_init():
-    lektor = LektorWorker()
-    try:
-        result = lektor.handle_lektor.remote("Dobar dan, ja sam Lektor. Kako vam mogu pomoci?")
-        print(f"KONACNI USPEH! Odgovor: {result}")
-    except Exception as e:
-        print(f"GRESKA: {e}")

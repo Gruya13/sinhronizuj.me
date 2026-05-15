@@ -180,18 +180,24 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     
     try:
         lektor_payload = {
-            "task": "lektor",
-            "prompt": lektor_prompt
+            "model": "Qwen/Qwen2.5-32B-Instruct",
+            "messages": [{"role": "user", "content": lektor_prompt}],
+            "temperature": 0.2,
+            "max_tokens": 2048
         }
         from backend.worker.utils import call_modal_endpoint
+        url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
         lektor_output = call_modal_endpoint(
-            url=settings.MODAL_LEKTOR_URL,
+            url=url,
             payload=lektor_payload,
             timeout_seconds=900,
             progress_callback=None
         )
         
-        lektor_raw = lektor_output.get("translation", "")
+        try:
+            lektor_raw = lektor_output["choices"][0]["message"]["content"]
+        except (KeyError, IndexError):
+            lektor_raw = lektor_output.get("translation", "")
         print(f"[DEBUG] LEKTOR OUTPUT: {lektor_raw[:500]}...", flush=True)
         
         parsed_lektor = []
