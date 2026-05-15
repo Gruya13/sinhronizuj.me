@@ -8,6 +8,7 @@ models_volume = modal.NetworkFileSystem.from_name("sinhronizuj-models", create_i
 
 # Konstante modela - Prelazak na STABILNI 32B AWQ model
 STT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
+WHISPER_MODEL = "Systran/faster-whisper-large-v3"
 
 def download_models():
     from huggingface_hub import snapshot_download
@@ -18,7 +19,12 @@ def download_models():
     if not os.path.exists(stt_dir):
         print(f"Preuzimanje STT modela: {STT_MODEL}")
         snapshot_download(STT_MODEL, local_dir=stt_dir)
-    
+        
+    # Provera Whisper modela
+    whisper_dir = f"{VOLUME_PATH}/faster-whisper-v3"
+    if not os.path.exists(whisper_dir):
+        print(f"Preuzimanje Whisper modela: {WHISPER_MODEL}")
+        snapshot_download(WHISPER_MODEL, local_dir=whisper_dir)
 
     print("Sve provereno uspesno.")
 
@@ -32,7 +38,9 @@ image_base = (
     .pip_install(
         "huggingface-hub",
         "accelerate",
-        "vllm==0.6.4.post1"
+        "vllm==0.6.4.post1",
+        "faster-whisper",
+        "opencv-python-headless"
     )
     .run_commands("python -m pip install git+https://github.com/huggingface/transformers.git --force-reinstall")
     .run_function(download_models, network_file_systems={VOLUME_PATH: models_volume})
@@ -50,17 +58,40 @@ app = modal.App("sm-stt")
 class Worker:
     def __init__(self):
         self.stt_path = f"{VOLUME_PATH}/qwen-vl-7b"
+        self.whisper_path = f"{VOLUME_PATH}/faster-whisper-v3"
 
     @modal.enter()
     def load_models(self):
+        from faster_whisper import WhisperModel
         from vllm import LLM
+        
+        print("Inicijalizacija vLLM Qwen modela...")
         self.llm = LLM(
             model=self.stt_path,
             trust_remote_code=True,
-            gpu_memory_utilization=0.9,
+            gpu_memory_utilization=0.8,
             max_model_len=4096,
             limit_mm_per_prompt={"image": 1, "video": 0}
         )
+
+        print("Inicijalizacija Faster-Whisper modela...")
+        self.whisper_model = WhisperModel(self.whisper_path, device="cuda", compute_type="float16")
+
+    def handle_transcribe(self, audio_b64: str):
+        import base64
+        import tempfile
+        import os
+        
+        audio_data = base64.b64decode(audio_b64)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_audio:
+            tmp_audio.write(audio_data)
+            tmp_audio_path = tmp_audio.name
+        
+        segments, info = self.whisper_model.transcribe(tmp_audio_path, language=None, beam_size=5)
+        result = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+        
+        os.remove(tmp_audio_path)
+        return {"language": info.language, "segments": result}
 
     @modal.method()
     def handle_translate(self, prompt: str, frames_base64: list):
@@ -75,7 +106,41 @@ class Worker:
 
     @modal.fastapi_endpoint(method="POST")
     def task(self, data: dict):
-        if data.get("task") == "translate":
-            return self.handle_translate(data.get("prompt"), data.get("frames_base64", []))
-        return {"error": "Unknown task"}
+        task_type = data.get('task')
+        try:
+            if task_type == "transcribe":
+                audio_b64 = data.get("audio_base64")
+                if not audio_b64:
+                    return {"error": "Nedostaje audio_base64"}
+                return self.handle_transcribe(audio_b64)
+                
+            elif task_type == "translate":
+                prompt = data.get("prompt")
+                frames_b64 = data.get("frames_base64", [])
+                if not prompt:
+                    return {"error": "Nedostaje prompt"}
+                return self.handle_translate(prompt, frames_b64)
+                
+            elif task_type == "both":
+                audio_b64 = data.get("audio_base64")
+                prompt_template = data.get("prompt_template", "Prevedi ovaj srpski transkript na engleski uzimajuci u obzir vizuelni kontekst: {transcript}")
+                frames_b64 = data.get("frames_base64", [])
+                
+                stt_result = self.handle_transcribe(audio_b64)
+                transcript = " ".join([s["text"] for s in stt_result["segments"]])
+                
+                prompt = prompt_template.replace("{transcript}", transcript)
+                translation_result = self.handle_translate(prompt, frames_b64)
+                
+                return {
+                    "transcript": stt_result["segments"],
+                    "translation": translation_result["translation"]
+                }
+            else:
+                return {"error": f"Unknown task: {task_type}"}
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {"error": str(e)}
 
