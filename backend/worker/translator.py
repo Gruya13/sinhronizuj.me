@@ -105,7 +105,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         "max_tokens": 4096
     }
 
-    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata na Modal Translator (vLLM API)...")
+    print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata na Modal Translator: {settings.MODAL_TRANSLATOR_URL}")
     
     try:
         url = f"{settings.MODAL_TRANSLATOR_URL.rstrip('/')}/chat/completions"

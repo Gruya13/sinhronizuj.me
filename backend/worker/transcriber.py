@@ -99,7 +99,7 @@ def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
         "audio_base64": audio_base64
     }
 
-    print(f"[TRANSCRIBER V2] Pozivam Modal STT...")
+    print(f"[TRANSCRIBER V2] Pozivam Modal STT endpoint: {settings.MODAL_STT_URL}")
     
     try:
         output = call_modal_endpoint(
