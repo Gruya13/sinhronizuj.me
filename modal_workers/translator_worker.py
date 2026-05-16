@@ -4,11 +4,12 @@ import os
 # Definicija slike sa svim potrebnim zavisnostima
 vllm_image = (
     modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.11")
-    .apt_install("git", "git-lfs")
+    .apt_install("git", "git-lfs", "ffmpeg", "libsm6", "libxext6")
+    .pip_install("torch==2.5.1", "torchvision", index_url="https://download.pytorch.org/whl/cu124")
     .pip_install(
-        "vllm==0.6.3.post1",
-        "transformers==4.45.2",
-        "accelerate==1.1.1",
+        "vllm==0.6.6.post1",
+        "transformers==4.46.3",
+        "accelerate",
         "sentencepiece",
         "requests",
         "qwen-vl-utils",
@@ -72,12 +73,11 @@ def serve():
         "--served-model-name", "qwen-vl",
         "--quantization", "awq_marlin",
         "--trust-remote-code",
-        "--gpu-memory-utilization", "0.7",
+        "--gpu-memory-utilization", "0.85",
         "--max-model-len", "12288",
-        "--limit-mm-per-prompt", "image=3",
+        "--limit-mm-per-prompt", "image=10",
         "--enforce-eager",
-        "--disable-frontend-multiprocessing",
-        "--disable-log-stats",
+        "--host", "0.0.0.0",
         "--port", "8000"
     ]
     

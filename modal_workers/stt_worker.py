@@ -71,10 +71,30 @@ class STTWorker:
                 tmp_audio_path = tmp_audio.name
             
             try:
-                # Koristimo već učitan model unutar iste instance (self)
+                # Forsiramo interpunkciju kroz initial_prompt
                 print(f"Transkribujem fajl: {tmp_audio_path}")
-                segments, info = self.whisper_model.transcribe(tmp_audio_path, language=None, beam_size=5)
-                result = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+                segments, info = self.whisper_model.transcribe(
+                    tmp_audio_path, 
+                    language=None, 
+                    beam_size=5,
+                    word_timestamps=True, # Dobijamo vreme svake reči
+                    initial_prompt="This is a clear speech. Please use punctuation: dots, commas, and capital letters."
+                )
+                
+                result = []
+                for s in segments:
+                    # Izvlačimo reči sa njihovim timestamp-ovima
+                    words = []
+                    if s.words:
+                        for w in s.words:
+                            words.append({"start": w.start, "end": w.end, "word": w.word})
+                    
+                    result.append({
+                        "start": s.start, 
+                        "end": s.end, 
+                        "text": s.text,
+                        "words": words
+                    })
                 return {"language": info.language, "segments": result}
             except Exception as e:
                 print(f"Greška pri transkripciji: {e}")

@@ -7,79 +7,72 @@ def segment_by_sentences(segments):
     if not segments:
         return []
         
-    # 1. Prvo splitujemo segmente koji sadrže interpunkciju
-    flat_pieces = []
+    # 1. Izvlačimo sve reči u jedan linearan niz radi lakše analize pauza
+    all_words = []
     for s in segments:
-        text = s["text"].strip()
-        if not text:
-            continue
-            
-        parts = re.split(r'(?<=[.!?])\s+', text)
-        parts = [p.strip() for p in parts if p.strip()]
-        
-        if len(parts) == 1:
-            flat_pieces.append(s)
+        if "words" in s and s["words"]:
+            all_words.extend(s["words"])
         else:
-            duration = s["end"] - s["start"]
-            total_chars = sum(len(p) for p in parts)
-            curr_start = s["start"]
-            for p in parts:
-                p_dur = (len(p) / total_chars) * duration if total_chars > 0 else 0
-                flat_pieces.append({
-                    "start": curr_start,
-                    "end": curr_start + p_dur,
-                    "text": p
+            # Fallback ako nema word_timestamps: podeli tekst segmenta na reči (manje precizno)
+            words = s["text"].split()
+            if not words: continue
+            dur = (s["end"] - s["start"]) / len(words)
+            for i, w in enumerate(words):
+                all_words.append({
+                    "start": s["start"] + i*dur,
+                    "end": s["start"] + (i+1)*dur,
+                    "word": w
                 })
-                curr_start += p_dur
-                
-    # 2. Spajamo delove u rečenice, ali dodajemo limit na dužinu (max 15 reči ili 8 sekundi)
+
+    if not all_words:
+        return []
+
+    # 2. Grupišemo reči u rečenice na osnovu interpunkcije I pauza
     sentence_segments = []
-    curr_start = None
-    curr_end = None
-    curr_text = ""
+    curr_words = []
     
-    for p in flat_pieces:
-        if curr_start is None:
-            curr_start = p["start"]
-            
-        curr_text += (" " + p["text"] if curr_text else p["text"])
-        curr_end = p["end"]
+    for i in range(len(all_words)):
+        w = all_words[i]
+        curr_words.append(w)
         
-        word_count = len(curr_text.split())
-        duration = curr_end - curr_start
+        word_text = w["word"].strip()
         
-        # Uslovi za kraj segmenta: 
-        # a) Ima tačku/upitnik/uzvičnik na kraju
-        # b) Predugačko je (više od 15 reči)
-        # c) Predugo traje (više od 8 sekundi)
-        has_punctuation = any(curr_text.strip().endswith(punct) for punct in ['.', '!', '?'])
-        is_too_long = word_count >= 15
-        is_too_timed = duration >= 8.0
+        # Provera interpunkcije na samoj reči
+        has_punct = any(word_text.endswith(p) for p in ['.', '!', '?', '...'])
         
-        if has_punctuation or is_too_long or is_too_timed:
+        # Provera pauze do sledeće reči
+        has_pause = False
+        if i < len(all_words) - 1:
+            pause_duration = all_words[i+1]["start"] - w["end"]
+            if pause_duration > 0.45: # Pauza duža od 0.45s je obično kraj rečenice
+                has_pause = True
+        
+        # Opušteniji limit: režemo tek na 40 reči ako baš nema ni tačke ni pauze.
+        # Ako ima zarez a prešli smo 20 reči, režemo tu da sprečimo gigantske segmente.
+        is_too_long = len(curr_words) >= 40
+        has_comma_and_long = word_text.endswith(',') and len(curr_words) >= 20
+        
+        if has_punct or has_pause or is_too_long or has_comma_and_long:
+            text = " ".join([cw["word"].strip() for cw in curr_words])
             sentence_segments.append({
-                "start": round(curr_start, 2),
-                "end": round(curr_end, 2),
-                "text": curr_text.strip()
+                "start": round(curr_words[0]["start"], 2),
+                "end": round(curr_words[-1]["end"], 2),
+                "text": text
             })
-            curr_start = None
-            curr_text = ""
+            curr_words = []
             
-    # Dodajemo preostali tekst
-    if curr_text:
+    # Dodajemo preostale reči
+    if curr_words:
+        text = " ".join([cw["word"].strip() for cw in curr_words])
         sentence_segments.append({
-            "start": round(curr_start, 2),
-            "end": round(curr_end, 2),
-            "text": curr_text.strip()
+            "start": round(curr_words[0]["start"], 2),
+            "end": round(curr_words[-1]["end"], 2),
+            "text": text
         })
         
     return sentence_segments
 
 def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
-    """
-    Poziva Modal STT/LLM webhook za transkripciju.
-    Šalje audio u base64 formatu.
-    """
     if not os.path.exists(audio_path):
         return {"status": "error", "message": f"Fajl nije pronađen: {audio_path}"}
 
@@ -90,11 +83,7 @@ def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
         return {"status": "error", "message": f"Greška pri čitanju audia: {e}"}
 
     from backend.worker.utils import call_modal_endpoint
-    
-    payload = {
-        "task": "transcribe",
-        "audio_base64": audio_base64
-    }
+    payload = {"task": "transcribe", "audio_base64": audio_base64}
 
     try:
         output = call_modal_endpoint(
@@ -105,7 +94,6 @@ def transcribe_audio(audio_path: str, progress_callback=None) -> dict:
         )
         
         raw_segments = output.get("segments", [])
-        # Koristimo unapređenu funkciju za pametniju segmentaciju
         sentence_segments = segment_by_sentences(raw_segments)
         
         return {
