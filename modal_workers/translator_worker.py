@@ -9,6 +9,7 @@ vllm_image = (
         "vllm==0.6.3.post1",
         "transformers==4.45.2",
         "accelerate==1.1.1",
+        "torchvision",
         "sentencepiece",
         "requests",
         "qwen-vl-utils",
@@ -26,14 +27,15 @@ model_volume = modal.Volume.from_name("sinhronizuj-models", create_if_missing=Tr
 @app.function(
     image=vllm_image,
     volumes={"/models": model_volume},
-    gpu="A100",
+    gpu="A10G",
     timeout=1800,
     scaledown_window=300,
+    max_containers=1,
     env={
         "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
     }
 )
-@modal.web_server(port=8000, startup_timeout=600)
+@modal.web_server(port=8000, startup_timeout=1200)
 def serve():
     import subprocess
     import os
@@ -62,8 +64,7 @@ def serve():
         print("📂 Model je pronađen na volumenu. Preskačem preuzimanje.")
 
     print("====================================================")
-    print("🔥 NOVA AUTONOMNA VERZIJA RADNIKA: 15.05.2026. 🔥")
-    print("Optimizacije: Marlin, FA2, Auto-Download, No-Stats")
+    print("🔥 VERZIJA RADNIKA: 16.05.2026 v9 (A10G FINAL) 🔥")
     print("====================================================")
     
     cmd = [
@@ -72,12 +73,13 @@ def serve():
         "--served-model-name", "qwen-vl",
         "--quantization", "awq_marlin",
         "--trust-remote-code",
-        "--gpu-memory-utilization", "0.85",
-        "--max-model-len", "12288",
+        "--gpu-memory-utilization", "0.80",
+        "--max-model-len", "16384",
         "--limit-mm-per-prompt", "image=10",
         "--enforce-eager",
         "--disable-frontend-multiprocessing",
         "--disable-log-stats",
+        "--host", "0.0.0.0",
         "--port", "8000"
     ]
     
