@@ -108,7 +108,11 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     print(f"[TRANSLATOR VL] Šaljem {len(segments)} segmenata na Modal Translator: {settings.MODAL_TRANSLATOR_URL}")
     
     try:
-        url = f"{settings.MODAL_TRANSLATOR_URL.rstrip('/')}/chat/completions"
+        base_url = settings.MODAL_TRANSLATOR_URL.rstrip('/')
+        if not base_url.endswith('/v1'):
+            base_url += '/v1'
+        url = f"{base_url}/chat/completions"
+        
         output = call_modal_endpoint(
             url=url, 
             payload=payload, 
