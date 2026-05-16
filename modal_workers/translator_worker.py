@@ -5,11 +5,10 @@ import os
 vllm_image = (
     modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.11")
     .apt_install("git", "git-lfs", "ffmpeg", "libsm6", "libxext6")
-    .pip_install("torch==2.5.1", "torchvision", index_url="https://download.pytorch.org/whl/cu124")
     .pip_install(
-        "vllm==0.6.6.post1",
-        "transformers==4.46.3",
-        "accelerate",
+        "vllm==0.6.3.post1",
+        "transformers==4.45.2",
+        "accelerate==1.1.1",
         "sentencepiece",
         "requests",
         "qwen-vl-utils",
