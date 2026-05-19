@@ -12,7 +12,8 @@ image = (
     .pip_install(
         "vllm==0.6.6.post1",
         "huggingface-hub",
-        "transformers==4.46.3"
+        "transformers==4.46.3",
+        "git+https://github.com/nicta/pyairports.git"
     )
 )
 
@@ -48,18 +49,7 @@ def serve():
     ]
 
     print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-32B-Instruct")
-    
-    try:
-        subprocess.run(cmd, check=True)
-    except RuntimeError as e:
-        error_msg = str(e)
-        if "Xid 94" in error_msg or "CUDA" in error_msg:
-            print(f"Kritična CUDA greška detektovana: {error_msg}")
-            stop_fetching_inputs()
-        raise e
-    except Exception as e:
-        print(f"Sistemska greška u radniku: {e}")
-        raise e
+    subprocess.Popen(cmd)
 
 if __name__ == "__main__":
     app.run()

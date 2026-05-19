@@ -14,7 +14,8 @@ vllm_image = (
         "requests",
         "qwen-vl-utils",
         "wheel",
-        "ninja"
+        "ninja",
+        "git+https://github.com/nicta/pyairports.git"
     )
     .run_commands("pip install flash-attn --no-build-isolation")
 )
@@ -83,7 +84,7 @@ def serve():
         "--port", "8000"
     ]
     
-    subprocess.run(cmd, check=True)
+    subprocess.Popen(cmd)
 
 @app.function(
     image=vllm_image,
