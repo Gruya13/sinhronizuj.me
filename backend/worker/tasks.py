@@ -169,11 +169,28 @@ def process_video_task(self, video_url: str, debug: bool = False):
     
     # --- FAZA 6: Spajanje ---
     update_progress("Finalni Mix...", 90)
+    
+    # Ucitavanje podesavanja miksera iz Redisa ako postoje
+    background_vol = -5.0
+    dubbed_vol = 0.0
+    try:
+        mixer_bytes = r_client.get(f"task:{self.request.id}:mixer_settings")
+        if mixer_bytes:
+            import json
+            mixer_data = json.loads(mixer_bytes)
+            background_vol = float(mixer_data.get("background_volume", -5.0))
+            dubbed_vol = float(mixer_data.get("dubbed_volume", 0.0))
+            print(f"[DEBUG] Primena jacina iz Redisa: bg={background_vol}dB, dub={dubbed_vol}dB", flush=True)
+    except Exception as e:
+        print(f"Greska pri ucitavanju podesavanja miksera: {e}", flush=True)
+
     from backend.worker.merger import merge_audio_and_video
     merge_result = merge_audio_and_video(
         result["video_path"], 
         sep_result["no_vocals_path"], 
-        tts_result["dubbed_audio_path"]
+        tts_result["dubbed_audio_path"],
+        background_vol=background_vol,
+        dubbed_vol=dubbed_vol
     )
     if merge_result["status"] == "error": return merge_result
     update_progress(completed_step="Video spojen")

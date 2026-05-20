@@ -4,7 +4,7 @@ import uuid
 from pydub import AudioSegment
 from backend.core.config import settings
 
-def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: str) -> dict:
+def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: str, background_vol: float = -5.0, dubbed_vol: float = 0.0) -> dict:
     """
     Spaja originalnu pozadinsku muziku/efekte sa nasim novim srpskim glasom.
     Zatim, zamenjuje originalni zvuk videa ovim novim "Final Mix-om" pomocu FFmpeg-a.
@@ -13,14 +13,17 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
         return {"status": "error", "message": "Neki od potrebnih fajlova za spajanje ne postoje."}
 
     try:
-        print("[FAZA 6] Miksam pozadinu i srpski glas u Final Mix...")
+        print(f"[FAZA 6] Miksam pozadinu ({background_vol}dB) i srpski glas ({dubbed_vol}dB) u Final Mix...")
         
         # Ucitavamo audio fajlove u memoriju
         bg_audio = AudioSegment.from_wav(background_path)
         dub_audio = AudioSegment.from_wav(dubbed_path)
         
-        # Audio inzenjering: blago utisavamo pozadinu (za 5 decibela) kako bi glas bio jasniji
-        bg_audio = bg_audio - 5
+        # Audio inzenjering: podesavamo jacinu prema parametrima
+        if background_vol != 0.0:
+            bg_audio = bg_audio + background_vol
+        if dubbed_vol != 0.0:
+            dub_audio = dub_audio + dubbed_vol
         
         # Stapanje (overlay)
         final_mix = bg_audio.overlay(dub_audio)

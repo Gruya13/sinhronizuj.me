@@ -22,6 +22,11 @@ function App() {
   
   const [terminalOpen, setTerminalOpen] = useState(true);
   const [debuggingMode, setDebuggingMode] = useState(() => localStorage.getItem('sinhronizuj_me_debug_mode') === 'true');
+
+  // Interaktivni Studio v2 state-ovi
+  const [editedSegments, setEditedSegments] = useState([]);
+  const [bgVolume, setBgVolume] = useState(-5);
+  const [dubVolume, setDubVolume] = useState(0);
   
   useEffect(() => {
     localStorage.setItem('sinhronizuj_me_debug_mode', debuggingMode);
@@ -45,6 +50,7 @@ function App() {
     setVisualContextUrl(null);
     localStorage.removeItem('sinhronizuj_me_task_id');
     consecutiveErrorsRef.current = 0;
+    setEditedSegments([]);
   };
 
   const STEPS = [
@@ -102,6 +108,18 @@ function App() {
     }
     return () => clearInterval(timer);
   }, [loading, videoUrl, startTime]);
+
+  useEffect(() => {
+    if (progressData?.waiting_for_user && progressData.segments && editedSegments.length === 0) {
+      console.log("[STUDIO] Ucitavam segmente za izmenu:", progressData.segments.length);
+      setEditedSegments(progressData.segments.map(s => ({
+        id: s.id,
+        original: s.original,
+        translated: s.translated || '',
+        status: s.status
+      })));
+    }
+  }, [progressData?.waiting_for_user, progressData?.segments, editedSegments]);
 
   // Isključujemo auto-scroll za segmente da bi korisnik mogao na miru da čita
   // useEffect(() => {
@@ -203,11 +221,32 @@ function App() {
     if (!taskId) return;
     setIsContinuing(true);
     try {
+      // 1. Ako je korisnik vrsio izmene na segmentima, posalji ih backendu
+      if (editedSegments.length > 0) {
+        console.log("[STUDIO] Snimam izmenjene segmente...", editedSegments);
+        await fetch(`${API_BASE_URL}/api/v1/edit-segments/${taskId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments: editedSegments })
+        });
+      }
+      
+      // 2. Posalji podesavanja miksera
+      console.log("[STUDIO] Snimam podesavanja miksera...", { background_volume: bgVolume, dubbed_volume: dubVolume });
+      await fetch(`${API_BASE_URL}/api/v1/mixer-settings/${taskId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ background_volume: bgVolume, dubbed_volume: dubVolume })
+      });
+
+      // 3. Posalji signal za nastavak
       const res = await fetch(`${API_BASE_URL}/api/v1/continue/${taskId}`, { method: 'POST' });
       if (!res.ok) throw new Error();
-      // Polling će preuzeti promenu statusa
+      
+      // Resetujemo lokalne izmene za sledecu pauzu
+      setEditedSegments([]);
     } catch (err) {
-      console.error("Greška pri slanju signala za nastavak");
+      console.error("Greska pri slanju podataka i nastavku:", err);
     } finally {
       setTimeout(() => setIsContinuing(false), 2000);
     }
@@ -424,14 +463,49 @@ function App() {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="continue-btn-container"
+                        style={{ flexDirection: 'column', alignItems: 'center', gap: '16px' }}
                       >
+                        <div className="mixer-panel">
+                          <h4 className="mixer-title">🎛️ Audio Mikser za Finalni Mix</h4>
+                          <div className="mixer-controls">
+                            <div className="mixer-control">
+                              <label>
+                                <span>🎵 Jačina originalne pozadine:</span>
+                                <strong>{bgVolume > 0 ? `+${bgVolume}` : bgVolume} dB</strong>
+                              </label>
+                              <input 
+                                type="range" 
+                                min="-30" 
+                                max="10" 
+                                step="1"
+                                value={bgVolume} 
+                                onChange={(e) => setBgVolume(parseInt(e.target.value))} 
+                              />
+                            </div>
+                            <div className="mixer-control">
+                              <label>
+                                <span>🎙️ Jačina novog srpskog AI glasa:</span>
+                                <strong>{dubVolume > 0 ? `+${dubVolume}` : dubVolume} dB</strong>
+                              </label>
+                              <input 
+                                type="range" 
+                                min="-15" 
+                                max="15" 
+                                step="1"
+                                value={dubVolume} 
+                                onChange={(e) => setDubVolume(parseInt(e.target.value))} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+
                         <button 
                           className="continue-btn" 
                           onClick={handleContinue}
                           disabled={isContinuing}
                         >
                           {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
-                          Nastavi na sledeći korak
+                          Potvrdi prevod i pokreni sintezu
                         </button>
                       </motion.div>
                     )}
@@ -445,20 +519,35 @@ function App() {
                             <span>Originalni Transkript (Whisper)</span>
                             <span>AI Prevod (TOON Format)</span>
                           </div>
-                          {progressData.segments.map((seg, idx) => (
-                            <motion.div 
-                              key={idx} 
-                              initial={{ opacity: 0, y: 10 }} 
-                              animate={{ opacity: 1, y: 0 }}
-                              className={`segment-row ${seg.status}`}
-                            >
-                              <div className="seg-orig">{seg.original}</div>
-                              <div className="seg-arrow"><ArrowRight size={14} /></div>
-                              <div className="seg-trans">
-                                {seg.translated || <span className="waiting-text">Prevođenje...</span>}
-                              </div>
-                            </motion.div>
-                          ))}
+                          {progressData.segments.map((seg, idx) => {
+                            const isReview = progressData?.waiting_for_user && editedSegments.length > 0;
+                            return (
+                              <motion.div 
+                                key={idx} 
+                                initial={{ opacity: 0, y: 10 }} 
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`segment-row ${isReview ? 'waiting-review' : seg.status}`}
+                              >
+                                <div className="seg-orig">{seg.original}</div>
+                                <div className="seg-arrow"><ArrowRight size={14} /></div>
+                                <div className="seg-trans">
+                                  {isReview ? (
+                                    <textarea
+                                      value={editedSegments[idx]?.translated ?? ''}
+                                      onChange={(e) => {
+                                        const newVal = e.target.value;
+                                        setEditedSegments(prev => prev.map((item, i) => i === idx ? { ...item, translated: newVal } : item));
+                                      }}
+                                      className="edit-segment-textarea"
+                                      placeholder="Unesite prevod..."
+                                    />
+                                  ) : (
+                                    seg.translated || <span className="waiting-text">Prevođenje...</span>
+                                  )}
+                                </div>
+                              </motion.div>
+                            );
+                          })}
                         </div>
                       )}
                     </>

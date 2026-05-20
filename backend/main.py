@@ -90,6 +90,13 @@ def process_video(request: VideoRequest):
         "task_id": task.id
     }
 
+class EditedSegmentsRequest(BaseModel):
+    segments: list
+
+class MixerSettingsRequest(BaseModel):
+    background_volume: float
+    dubbed_volume: float
+
 @app.post("/api/v1/continue/{task_id}")
 def continue_task(task_id: str):
     """
@@ -103,6 +110,33 @@ def continue_task(task_id: str):
     r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
     r.set(f"task:{task_id}:continue", "true", ex=3600)
     return {"status": "success", "message": "Signal za nastavak poslat."}
+
+@app.post("/api/v1/edit-segments/{task_id}")
+def edit_segments(task_id: str, request: EditedSegmentsRequest):
+    import redis
+    import json
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    
+    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r.set(f"task:{task_id}:edited_segments", json.dumps(request.segments), ex=3600)
+    return {"status": "success", "message": "Segmenti uspešno sačuvani."}
+
+@app.post("/api/v1/mixer-settings/{task_id}")
+def save_mixer_settings(task_id: str, request: MixerSettingsRequest):
+    import redis
+    import json
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    
+    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r.set(f"task:{task_id}:mixer_settings", json.dumps({
+        "background_volume": request.background_volume,
+        "dubbed_volume": request.dubbed_volume
+    }), ex=3600)
+    return {"status": "success", "message": "Podešavanja miksera sačuvana."}
 
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
