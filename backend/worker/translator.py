@@ -80,19 +80,42 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Priprema multimodalnog content-a za Qwen2-VL (OpenAI format)
     prompt_text = (
-        "Ti si vrhunski profesionalni prevodilac i lektor za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
+        "Ti si vrhunski profesionalni prevodilac za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
         "PRAVILA ZA PREVOD:\n"
-        "1. ZNAČENJE, A NE BUKVALNI PREVOD: Prevod mora zvučati 100% prirodno. Koristi srpske idiome i termine (npr. 'articles of incorporation' su 'osnivački akti').\n"
-        "2. GRAMATIKA I PADEŽI: Strogo pazi na rod, broj i padeže! Sve rečenice moraju biti gramatički ispravne.\n"
-        "3. TEHNIČKI TERMINI: Zadrži IT termine i imena u originalu (AI agent, Zoom, LinkedIn).\n"
-        "4. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
-        "5. POL GOVORNIKA: Prilagodi glagole u prošlom vremenu u zavisnosti od pola (vidi priložene slike).\n\n"
+        "1. ZNAČENJE, A NE BUKVALNI PREVOD: Prevod mora zvučati 100% prirodno. Koristi srpske idiome i termine (npr. 'articles of incorporation' su 'osnivački akti' ili 'registracioni dokumenti', a ne 'članci u korporaciju').\n"
+        "2. PRIPREMA TEKSTA ZA TTS (SINTEZU GLASA) - ZLATNA PRAVILA:\n"
+        "   - BROJEVI SLOVIMA: Sve brojeve, cifre i procente obavezno piši SLOVIMA (npr. 'sto hiljada dolara' umesto '100.000 dolara', 'tri godine' umesto '3 godine', 'pet minuta' umesto '5 minuta'). Godine (npr. 'dve hiljade dvadeset šesta') takođe piši slovima.\n"
+        "   - FONETSKI STRANI BRENDOVI: Sve strane brendove, platforme i lična imena piši isključivo FONETSKI, tj. onako kako se izgovaraju na srpskom (npr. 'Linkedinu' umesto 'LinkedIn-u', 'Indidu' umesto 'Indeed-u', 'Kregzlistu' umesto 'Craigslist-u', 'Zumu' umesto 'Zoom-u', 'Klodu' umesto 'Claude-u', 'Ej-Aj' umesto 'AI'). Ne ostavljaj engleski pravopis niti crtice.\n"
+        "3. GRAMATIKA I PRAVOPIS: Sve rečenice moraju biti gramatički ispravne. Posebno obrati pažnju:\n"
+        "   - Glagol 'raditi' u 3. licu množine prezenta je isključivo 'RADE' (nikada 'radu').\n"
+        "   - Množina imenice 'intervju' u akuzativu je 'INTERVJUE' (nikada 'intervjuove').\n"
+        "   - Ne izmišljaj reči. Koristi standardne glagole (npr. 'unajmiti/angažovati' umesto 'naimeniti', 'naslikati' umesto 'namalovati').\n"
+        "   - Strana imena i gradove prilagodi srpskom pravopisu (npr. 'u San Francisku' umesto 'u San Franciscu').\n"
+        "4. LOKALIZACIJA TERMINA: Reč 'store' prevodi kao 'prodavnica' ili 'lokal' (trgovina je privredna grana). 'Retail lease' je 'zakup lokala' ili 'zakup prostora'. Frazu 'they'd rather' prevedi kao 'oni bi radije' ili 'radije bi' (nikako ne mešaj sa 'radnja'). Poznate knjige prevedi ako postoji poznat prevod (npr. 'Brave New World' -> 'Vrli novi svet').\n"
+        "5. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
+        "6. POL GOVORNIKA: Prilagodi glagole u prošlom vremenu u zavisnosti od pola (vidi priložene slike).\n\n"
+        "PRIMER TRANSLACIJE:\n"
+        "Ulaz:\n"
+        "0|So this company just gave an AI agent $100 ,000, a credit card, and a three -year retail lease in San Francisco to see if he could run a store.\n"
+        "1|Andon Labs built the AI and they named it Luna on Claude and gave her one direction, turn a profit.\n"
+        "2|Within five minutes of turning on, she had posted job listings on LinkedIn, Indeed, and Craigslist, and even uploaded articles on incorporation to verify the business.\n"
+        "3|And what's crazy is that Luna actually conducted interviews over Zoom with her camera off.\n"
+        "4|They're doing it because they believe it's coming regardless, and they'd rather find out what could go wrong first.\n"
+        "Izlaz:\n"
+        "0|Ova kompanija je dala Ej-Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku kako bi videli da li može da vodi prodavnicu.\n"
+        "1|Andon Labs je kreirao ovaj Ej-Aj i nazvao ga Luna (zasnovan na Klodu), a dali su joj samo jedno uputstvo: da ostvari profit.\n"
+        "2|U roku od pet minuta nakon uključivanja, ona je objavila oglase za posao na Linkedinu, Indidu i Kregzlistu, pa čak i podnela osnivačke akte kako bi registrovala firmu.\n"
+        "3|A najluđe od svega je to što je Luna zapravo vodila intervjue preko Zuma sa isključenom kamerom.\n"
+        "4|Rade to jer veruju da to svakako dolazi i radije bi da prvi saznaju šta sve može da pođe po zlu.\n\n"
         "PRAVILA ZA FORMAT:\n"
         "1. Odgovor mora biti ISKLJUČIVO red po red, u formatu: ID|Prevedeni tekst\n"
         f"2. Tvoj odgovor mora sadržati TAČNO {len(segments)} redova (0 do {len(segments)-1}).\n"
         "3. Ne dodaj nikakav uvod ni zaključak.\n\n"
         f"TRANSKRIPT ZA PREVOD:\n{transcript_text}"
     )
+
+
+
 
     content = [{"type": "text", "text": prompt_text}]
     for f in frames_b64:
@@ -172,14 +195,39 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         lektor_input += f"{i}|ENG: {original_segments[i]['text']} | SRB: {seg['text']}\n"
         
     lektor_prompt = (
-        "Ti si glavni lektor i korektor za srpski jezik (ekavica). Tvoj jedini zadatak je da pregledaš grubi prevod i ispraviš gramatiku, padeže, idiome i neprirodne izraze.\n\n"
+        "Ti si glavni lektor i korektor za srpski jezik (ekavica). Tvoj jedini zadatak je da detaljno pregledaš grubi prevod i ispraviš gramatiku, padeže, pravopis, idiome i neprirodne izraze.\n\n"
         "PRAVILA ZA LEKTURU:\n"
-        "1. Engleski tekst je dat kao kontekst. Tvoj izlaz mora biti SAMO korigovani SRPSKI tekst.\n"
-        "2. Ispravi rogobatne prevode (npr. 'člankovi u korporaciju' -> 'osnivački akti', 'objavila zaposlenja' -> 'objavila oglase za posao').\n"
-        "3. Zadrži isti broj linija. Svaka linija mora početi sa ID| (npr. 0|Korigovani prevod).\n"
-        "4. Vrati SAMO korigovane redove.\n\n"
+        "1. KORIGUJ GRAMATIKU I OBLIKE REČI:\n"
+        "   - Strogo ispravi izmišljene ili nepravilne oblike reči: 'radu' -> ispravi u 'rade', 'intervjuove' -> ispravi u 'intervjue', 'naimenila' -> 'unajmila/angažovala', 'namaluje' -> 'naslika/nacrta'.\n"
+        "   - Pazi na rod i slaganje zamenica (npr. 'logo koji je dizajnirala', a ne 'logo koju').\n"
+        "   - Strana imena i gradove moraju biti u srpskoj transkripciji (npr. 'u San Francisku' umesto 'u San Franciscu').\n"
+        "2. PRIPREMA TEKSTA ZA TTS (SINTEZU GLASA) - ZLATNA PRAVILA:\n"
+        "   - BROJEVI SLOVIMA: Sve brojeve i cifre obavezno ispravi tako da budu napisani SLOVIMA (npr. '100.000 dolara' ili '100,000' -> 'sto hiljada dolara', '3 godine' -> 'tri godine').\n"
+        "   - FONETSKI STRANI BRENDOVI: Sve strane brendove, platforme i lična imena obavezno ispravi da budu napisani isključivo FONETSKI, onako kako se izgovaraju na srpskom (npr. 'LinkedIn' ili 'LinkedIn-u' -> 'Linkedinu', 'Indeed' ili 'Indeed-u' -> 'Indidu', 'Craigslist' -> 'Kregzlistu', 'Zoom' -> 'Zumu', 'Claude' -> 'Klodu', 'AI' -> 'Ej-Aj'). Ukloni engleski pravopis, crtice i engleske nastavke.\n"
+        "3. POPRAVI SMISAO I BUKVALNE PREVODE:\n"
+        "   - Engleski tekst je dat kao kontekst (ENG). Ako je prevodilac napravio logičku grešku (npr. preveo 'they'd rather' kao 'radnja preferirala'), ti to obavezno ispravi u prirodan izraz ('oni bi radije' ili 'radije bi').\n"
+        "   - 'articles of incorporation' ispravi u 'osnivački akti' ili 'registracioni dokumenti'.\n"
+        "   - 'store' ispravi u 'prodavnica' ili 'lokal' (nikako 'trgovina').\n"
+        "4. Zadrži isti broj linija. Svaka linija mora početi sa ID| (npr. 0|Korigovani prevod).\n"
+        "5. Vrati SAMO korigovane redove, bez ikakvih uvoda ili komentara.\n\n"
+        "PRIMER LEKTURE:\n"
+        "Ulaz:\n"
+        "0|ENG: So this company just gave an AI agent $100 ,000, a credit card, and a three -year retail lease in San Francisco to see if he could run a store. | SRB: Ova kompanija je dala AI agenciji 100.000 dolara, kreditnu karticu i tri godine retail leasa u San Francisku kako bi provjerila da li je moguće voditi prodavnicu.\n"
+        "1|ENG: Andon Labs built the AI and they named it Luna on Claude and gave her one direction, turn a profit. | SRB: Andon Labs je izgradio AI i nazvali ga Luna na Claude-u, a ona je dobila jednu instrukciju: postići profit.\n"
+        "2|ENG: Within five minutes of turning on, she had posted job listings on LinkedIn, Indeed, and Craigslist, and even uploaded articles on incorporation to verify the business. | SRB: U pet minuta nakon uključivanja, ona je postavila oglase za zaposlenje na LinkedInu, Indeedu i Craigslistu, a i objavila članke u korporativnim medijima kako bi potvrdila legitimnost posla.\n"
+        "3|ENG: And what's crazy is that Luna actually conducted interviews over Zoom with her camera off. | SRB: Najzanimljivije je da Luna zapravo provodila intervjuove putem Zooma s kamerom isključenom.\n"
+        "4|ENG: They're doing it because they believe it's coming regardless, and they'd rather find out what could go wrong first. | SRB: Oni to radu zato što veruju da će to doći uvek, i da bi radnja preferirala da prvo saznaju šta može poći po zlu.\n"
+        "Izlaz:\n"
+        "0|Ova kompanija je dala Ej-Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku kako bi videli da li može da vodi prodavnicu.\n"
+        "1|Andon Labs je kreirao ovaj Ej-Aj i nazvao ga Luna (zasnovan na Klodu), a dali su joj samo jedno uputstvo: da ostvari profit.\n"
+        "2|U roku od pet minuta nakon uključivanja, ona je objavila oglase za posao na Linkedinu, Indidu i Kregzlistu, pa čak i podnela osnivačke akte kako bi registrovala firmu.\n"
+        "3|A najluđe od svega je to što je Luna zapravo vodila intervjue preko Zuma sa isključenom kamerom.\n"
+        "4|Rade to jer veruju da to svakako dolazi i radije bi da prvi saznaju šta sve može da pođe po zlu.\n\n"
         f"TEKST ZA LEKTURU:\n{lektor_input}"
     )
+
+
+
     
     try:
         lektor_payload = {

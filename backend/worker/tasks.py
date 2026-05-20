@@ -45,7 +45,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
         
         self.update_state(state='PROGRESS', meta=progress_metadata)
 
-    def wait_for_user(step_name):
+    def wait_for_user(step_name, segments_to_update=None):
         if not debug:
             return
         
@@ -59,11 +59,30 @@ def process_video_task(self, video_url: str, debug: bool = False):
         while time.time() - start_wait < 1800:
             if r_client.get(f"task:{self.request.id}:continue"):
                 r_client.delete(f"task:{self.request.id}:continue")
+                
+                # Provera da li postoje editovani segmenti u Redis-u
+                edited_bytes = r_client.get(f"task:{self.request.id}:edited_segments")
+                if edited_bytes and segments_to_update is not None:
+                    import json
+                    try:
+                        edited_data = json.loads(edited_bytes)
+                        print(f"[DEBUG] Primena editovanih segmenata iz Redisa: {len(edited_data)} stavki.", flush=True)
+                        for ed_seg in edited_data:
+                            idx = ed_seg.get("id")
+                            new_text = ed_seg.get("translated")
+                            if idx is not None and new_text is not None:
+                                if idx < len(segments_to_update):
+                                    segments_to_update[idx]["text"] = new_text
+                                    print(f"[DEBUG] Ažuriran segment [{idx}] na: {new_text}", flush=True)
+                    except Exception as e:
+                        print(f"Greška pri ažuriranju segmenata: {e}", flush=True)
+                
                 update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False)
                 return
             time.sleep(1)
         
         raise TimeoutError("Korisnik nije potvrdio nastavak u predviđenom roku.")
+
 
     # --- FAZA 1: Preuzimanje ---
     update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje media fajlova...")
@@ -102,7 +121,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     print(f"--- [DEBUG] Šaljem {len(segments_ui)} segmenata u update_progress", flush=True)
     update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
     time.sleep(2) # Dajemo vremena frontendu da oseti promenu pre nego što radnik blokira
-    wait_for_user("Transkripcija")
+    wait_for_user("Transkripcija", transcription_result["segments"])
     
     # --- FAZA 4: Vizuelni Kontekst i Prevod ---
     update_progress("Generisanje vizuelnog konteksta...", 50, detail="Ekstrakcija ključnih frejmova za analizu...")
@@ -130,6 +149,9 @@ def process_video_task(self, video_url: str, debug: bool = False):
             segments_ui[i]["status"] = "translated"
             
     update_progress(completed_step="Tekst preveden i lektorisan", percentage=70, segments=segments_ui)
+    time.sleep(2)
+    wait_for_user("Prevođenje", translation_result["translated_segments"])
+
 
     
     # --- FAZA 5: Sinteza Govora ---

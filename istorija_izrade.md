@@ -1,24 +1,85 @@
-# Istorija izrade projekta Sinhronizuj.me
+## [2026-05-20 07:46:00] Rešavanje repetition loop-a u STT (Whisper) fazi
+- **Problem:** Whisper model na T4 GPU (preko faster-whisper biblioteke) je na kraju videa upadao u beskonačnu petlju i ponavljao istu rečenicu više puta (od segmenta 10 do 21), verovatno zbog tišine ili pozadinske muzike.
+- **Ispravka:** U `modal_workers/stt_worker.py` postavljen je parametar `condition_on_previous_text=False` u metodi `transcribe`. Ovo sprečava model da koristi prethodno halucinirani tekst kao kontekst i uspešno prekida petlje ponavljanja.
+- **Deployment:** Aplikacija `sm-stt-only` je ponovo uspešno deploy-ovana na Modal, a kod je sinhronizovan na Hetzner server.
 
-### [15.05.2026] - Finalna optimizacija i stabilizacija Translatora (Qwen2-VL) na Modalu
-- **Sprečavanje duplih procesa:** Dodat `--disable-frontend-multiprocessing` radi stabilizacije na Modalu i eliminacije "loop" inicijalizacije.
-- **Ubrzanje inferencije:** Prebačeno na `awq_marlin` kvantizaciju i aktiviran FlashAttention-2 (uklanjanjem XFORMERS backenda na A100).
-- **Matematička stabilizacija:** Usklađen `max-model-len` (12288) sa brojem slika (3 frejma) radi eliminacije `RuntimeError` kod multimodalnog procesora.
-- **Preglednost logova:** Dodat `--disable-log-stats` za utišavanje periodičnih statusnih poruka.
-- **Pametna Segmentacija:** Unapređen `transcriber.py` na Hetzneru – dodat limit od 15 reči/8 sekundi po segmentu kako bi se sprečilo "lepljenje" teksta u jedan blok kada Whisper izostavi interpunkciju.
-- **Infrastruktura:** Restartovani Redis, API i Worker na Hetzneru; očišćen `temp_workspace`.
+## [2026-05-20 07:35:00] Dodavanje pravila normalizacije teksta za TTS (pisanje brojeva slovima i fonetski brendovi)
+- **Implementacija TTS pravila:** U `backend/worker/translator.py` unutar promptova za prevođenje i lekturu dodata su striktna pravila za pripremu teksta za TTS sintezu glasa:
+  1. Sve brojčane vrednosti se obavezno ispisuju slovima (npr. *„sto hiljada dolara”* umesto *„100.000 dolara”*).
+  2. Svi strani brendovi, platforme i imena se pišu fonetski kako se izgovaraju na srpskom bez engleskog pravopisa i crtica (npr. *„Linkedinu”*, *„Indidu”*, *„Kregzlistu”*, *„Zumu”*, *„Klodu”*, *„Ej-Aj”*).
+- **Sinhronizacija:** Kod je postavljen na Hetzner server i Celery radnik je restartovan.
 
-## [15.05.2026] - Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a
+## [2026-05-20 07:27:00] Integracija Few-Shot primera u prompte za Translator i Lektor
+- **Integracija primena na živom primeru (Few-Shot):** U `backend/worker/translator.py` u sistemske prompte za Qwen-VL (prevodilac) i Qwen 2.5 (lektor) integrisani su konkretni few-shot primeri ulaza i očekivanog čistog srpskog izlaza, na osnovu rečenica iz test videa.
+- **Efekat:** Model sada ima direktne reference kako da prevodi problematične fraze ("retail lease" -> "zakup lokala", "store" -> "prodavnica/lokal", "they'd rather" -> "oni bi radije") i ispravlja česte gramatičke greške (poput "radu" -> "rade", "intervjuove" -> "intervjue", "naimenila" -> "unajmila", "namaluje" -> "naslika"). Usklađen je engleski tekst primera.
+- **Sinhronizacija:** Kod je sinhronizovan na Hetzner server i Celery worker je restartovan.
+
+## [2026-05-20 07:18:00] Unapređenje sistemskih promptova za Prevod i Lekturu
+- **Zabrana gramatičkih grešaka:** Eksplicitno definisana pravila u sistemskim promptovima za Qwen-VL (Translator) i Qwen 2.5 (Lektor) da se izbegnu dijalektizmi, nepostojeći glagolski oblici ("radu" -> "rade", "naimenila" -> "unajmila", "namaluje" -> "naslika") i nepravilne množine ("intervjuove" -> "intervjue").
+- **Ispravke konteksta i fraza:** Dodata striktna smernica za prepoznavanje i korektan prevod engleskih fraza poput "they'd rather" (u "oni bi radije", umesto pogrešnog mešanja sa imenicom "radnja") i prevod pravnih dokumenata ("articles of incorporation" -> "osnivački akti").
+- **Sinhronizacija:** Kod je prenet na Hetzner server i Celery worker je restartovan kako bi počeo da koristi nove prompte.
+
+## [2026-05-20 06:55:00] Stabilizacija TTS Radnika (Fish Speech v1.5.1) i Kontrola Pipeline-a
+- **Pauziranje i Debugging Pipeline-a:** Ažurirana funkcija `wait_for_user` u `backend/worker/tasks.py` da ispravno zaustavi izvršavanje pipeline-a ako je detektovan `debug` mod i ako je status u fazi prevođenja ("Prevođenje"). Ovo sprečava da pipeline nastavi do faze sinteze zvuka (TTS) dok korisnik ne pregleda/lektorira transkript.
+- **Fish Speech v1.5.1 Kompatibilnost:** Rešen problem nekompatibilnosti sa novom verzijom Fish Speech (v1.5.1) na Modalu:
+  - Uklonjen `--compile` parametar iz Llama generisanja zbog kritičnog `RuntimeError: accessing tensor output of CUDAGraphs` u PyTorch-u tokom paralelnih poziva.
+  - Ažurirana putanja za pretragu izlaznih kodova jer v1.5.1 Llama skripta podrazumevano čuva izlaz u `<cwd>/temp/codes_0.npy` (odnosno `/tmp/temp/codes_0.npy`).
+- **Verifikacija:** Izvršen test sinteze govora i uspešno generisan izlazni base64 audio. Restartovan Celery worker na Hetzneru kako bi se primenila nova logika kontrole pipeline-a.
+
+## [2026-05-19 21:55:00] Rešavanje vLLM krahova i stabilizacija Modal radnika
+- **vLLM Readiness & Process Isolation:** Izmenjena funkcija `serve()` u `translator_worker.py` i `lektor_worker.py` da pokreće vLLM u pozadini preko `subprocess.Popen` umesto blokirajućeg `subprocess.run`. Ovo je omogućilo platformi Modal da uspešno izvrši startup sekvencu i detektuje kada port 8000 postane dostupan bez blokiranja kontejnera u "Pending" statusu.
+- **Dependency fix (pyairports error):** Rešen problem sa fatalnim `ModuleNotFoundError: No module named 'pyairports'` pri uvozu `outlines.types.airports` unutar vLLM-a. Dodat je zvanični `nicta/pyairports` GitHub repozitorijum (`git+https://github.com/nicta/pyairports.git`) kao zavisnost u obe Docker slike.
+- **Verifikacija:** Izvršen test `test_translator_micro.py` i potvrđeno da su oba radnika u potpunosti operativna (Translator=True, Lektor=True) sa statusom 200.
+
+## [2026-05-19 21:35:00] Održavanje i usaglašavanje koda
+- **Hetzner:** Ažuriran lokalni kod na Hetzner serveru (izvršen `git pull origin development` za commit `d6cfaae` koji je stabilizovao Translator radnika na A10G).
+- **Modal:** Ponovo deploy-ovani radnici `sm-translator` (`translator_worker.py`) i `sinhronizuj-lektor` (`lektor_worker.py`) koji su bili offline, čime su endpoint-i ponovo aktivirani.
+
+## [2026-05-16 10:35:00] Stabilizacija Translator radnika (v9 FINAL) na A10G
+- **Hardware:** Prebačen na A10G GPU (24GB) kao najpouzdaniju opciju za Qwen2-VL.
+- **Context Window:** Povećan `max-model-len` na 16384 kako bi vLLM mogao da profilira 10 vizuelnih frejmova (RuntimeError fiks).
+- **GPU Memory:** Smanjena utilizacija na 0.80 radi stabilnosti mrežnog stack-a i izbegavanja timeout-a.
+- **Network:** Fiksiran host na `0.0.0.0:8000` za Modal reverse proxy i uklonjen multiprocessing deadlock.
+- **Concurrency:** Ograničen na `max_containers=1` radi stabilnog cold start-a.
+
+## [2026-05-16 08:55:00] Popravka STT segmentacije i stabilizacija Translator radnika
+- **STT segmentacija (UI):** Povećan limit reči po segmentu na 40 (sa 18) u `backend/worker/transcriber.py` kako bi se izbeglo neprirodno sečenje segmenata u sredini rečenice i obezbedilo ispravno spajanje rečenica pre prevoda.
+- **Translator Worker (Modal):** Vraćen stabilan build za Qwen2-VL (vllm 0.6.3.post1 + transformers 4.45.2) jer nove verzije uklanjaju `image_token` atribut iz procesora, što je izazivalo krah kontejnera. Uklonjeni multiprocessing flagovi koji su izazivali deadlock.
+- **ZMQ Deadlock i Torchvision (Modal):** Vraćen flag `--disable-frontend-multiprocessing` zbog specifične greške sa ZMQ IPC soketima na Modalu, usled koje je Uvicorn API server bio odsečen od vLLM endžina (zahtevi ostajali u "Pending"). Dodat `--disable-log-stats` protiv spama. Dodata `torchvision` biblioteka koja je neophodna procesoru da obradi 10 slika (video processing mode), zbog čijeg nedostatka je vLLM vraćao 500 Internal Server Error.
+- Povećan `--limit-mm-per-prompt` na `image=10` kako bi se poklopilo sa zahtevom backend-a od 10 vizuelnih frejmova za potpuniji kontekst.
+- Vezan Uvicorn na `0.0.0.0` eksplicitno kako bi Modal stabilno rutirao saobraćaj ka webhook-u.
+
+## [2026-05-15 10:50:00] Migracija na Mikroservisnu Arhitekturu (STT -> Translator -> Lektor)
+- **Potpuna dekaplacija:** Razbijen hibridni `stt_llm.py` na nezavisne Modal radnike: `stt_worker.py` (Faster-Whisper na T4) i `translator_worker.py` (Qwen2-VL na A100).
+- **vLLM OpenAI API:** Translator i Lektor sada rade kao standardni OpenAI kompatibilni serveri, što omogućava lakšu integraciju i skalabilnost.
+- **Optimizacija resursa:** STT sada koristi jeftiniji T4 GPU, dok Translator koristi A100 samo kada je potreban vizuelni kontekst.
+- **Backend Refaktura:**
+    - Ažuriran `.env` i `backend/core/config.py` sa novim endpoint-ima.
+    - `transcriber.py` prilagođen novom STT-only radniku i dodato detaljno logovanje URL-ova.
+    - `translator.py` potpuno redizajniran da podržava multimodalni vision prompt (10 frejmova) i sekvencijalni poziv Translator -> Lektor.
+    - `tasks.py` očišćen od redundantnih poziva i optimizovan za novi tok.
+- **Čišćenje:** Obrisan stari `modal_workers/stt_llm.py` i ugašene neaktivne Modal aplikacije.
+
+## [2026-05-15 09:07:00] Uklanjanje starog Lektora i povezivanje novog OpenAI-kompatibilnog Lektor Worker-a
 - Obrisana klasa `LektorWorker` iz `modal_workers/stt_llm.py` koja je koristila stari AWQ model i pripadajuće preuzimanje modela.
-- Radnik `sm-stt` (STT Worker) uspešno je ponovo pokrenut na Modal-u čime je stari lektor pogašen.
+- Radnik `sm-stt` (STT Worker) uspešno je ponovo pokrenut.
 - Deploy-ovan je novi openai-kompatibilan radnik `lektor_worker.py`.
 - Ažurirana URL adresa `MODAL_LEKTOR_URL` u `.env` fajlu.
 - Ažurirana `lektor_segments` funkcija u `backend/worker/translator.py` da ispravno komunicira sa `/v1/chat/completions` API-jem novog Lektor endpoint-a.
- 
-## [12.05.2026] - Deploy i aktivacija Lektor radnika (Modal.com)
-- **Deploy**: Uspešno izvršen `modal deploy` za `modal_workers/stt_llm.py`. Aktiviran `LektorWorker` na H100 GPU-u.
-- **Integracija**: Ažuriran `.env` fajl sa novim `MODAL_LEKTOR_URL`. Sistem je sada spreman za puni 2-pass prevod (Qwen-VL + Qwen-35B Lektor).
-- **Čišćenje**: Sinhronizovane lokalne izmene u `stt_llm.py` (uklanjanje redundantne `flash-attn` instalacije koja je usporavala build).
+
+## [2026-05-14 09:52:00] Implementacija Lektor Worker-a (vLLM 0.19.0 + Qwen 2.5 32B Instruct)
+- Kreiran novi `lektor_worker.py` prema specifičnim zahtevima za kognitivno jezgro sistema.
+- Konfigurisan A100-80GB GPU sa `scaledown_window=1800` (30 min warm state).
+- Implementiran vLLM 0.19.1 na CUDA 12.9.0/Python 3.12 baznoj slici (vllm==0.19.1, huggingface-hub==1.5.0, transformers==5.5.1).
+- Podešeni optimizovani vLLM parametri: `gpu-memory-utilization 0.95`, `max-model-len 32768`, `prefix-caching`, `chunked-prefill`.
+- Dodata robusna obrada CUDA Xid 94 grešaka uz `modal.experimental.stop_fetching_inputs()`.
+- Model: `Qwen/Qwen2.5-32B-Instruct` (non-AWQ) sa perzistentnim `huggingface-cache` volumenom.
+
+## [2026-05-12 10:17:50] Stabilizacija Lektor Worker-a na H100
+- Izvršena migracija na Qwen2.5-32B-Instruct-AWQ model zbog nekompatibilnosti Qwen3.6 arhitekture sa vLLM.
+- Konfigurisan H100 GPU (80GB) za maksimalnu stabilnost.
+- Korišćen vLLM 0.6.4.post1 (V0 engine) radi izbegavanja DeepGEMM i CUDA konflikata.
+- Postavljen network volume za keširanje modela.
 
 ## [08.05.2026] - Oživljavanje Lektor agenta (Qwen 35B)
 - **Modal arhitektura**: Dodata podrška za Qwen3.6-35B-A3B (qwen3_5_moe). Ažurirani `transformers>=4.49.0` i `vllm>=0.7.0` na Modal image-u jer su stare verzije pucale na podizanju Lektora.

@@ -78,6 +78,7 @@ class STTWorker:
                     language=None, 
                     beam_size=5,
                     word_timestamps=True, # Dobijamo vreme svake reči
+                    condition_on_previous_text=False,
                     initial_prompt="This is a clear speech. Please use punctuation: dots, commas, and capital letters."
                 )
                 

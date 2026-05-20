@@ -53,7 +53,7 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("git", "ffmpeg", "portaudio19-dev")
     .run_commands(
-        "git clone --branch v1.4.0 https://github.com/fishaudio/fish-speech.git /opt/fish-speech",
+        "git clone --branch v1.5.1 https://github.com/fishaudio/fish-speech.git /opt/fish-speech",
         "cd /opt/fish-speech && pip install -e .",
     )
     .pip_install("torch", "torchaudio", "huggingface-hub", "orjson", "matplotlib", "librosa", "soundfile", "vector-quantize-pytorch", "torchcodec==0.11.1")
@@ -114,10 +114,15 @@ class WorkerV110:
 
             # Dinamičko pronalaženje skripti unutar /opt/fish-speech
             vqgan_script = next(glob.iglob(f"/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
-            llama_script = next(glob.iglob(f"/opt/fish-speech/**/llama/generate.py", recursive=True), None)
+            llama_script = next(glob.iglob(f"/opt/fish-speech/**/text2semantic/inference.py", recursive=True), None)
             
             if not vqgan_script or not llama_script:
-                return {"error": f"Skripte nisu nađene. VQGAN={vqgan_script}, Llama={llama_script}"}
+                all_py_files = []
+                for root, dirs, files in os.walk("/opt/fish-speech"):
+                    for file in files:
+                        if file.endswith(".py"):
+                            all_py_files.append(os.path.relpath(os.path.join(root, file), "/opt/fish-speech"))
+                return {"error": f"Skripte nisu nađene. VQGAN={vqgan_script}, Llama={llama_script}. Dostupni fajlovi: {all_py_files}"}
 
             print(f"[TTS] Koristim VQGAN skriptu: {vqgan_script}")
             print(f"[TTS] Koristim Llama skriptu: {llama_script}")
@@ -135,14 +140,16 @@ class WorkerV110:
             if result.returncode != 0:
                  return {"error": f"Step 1 (Encode) failed: {result.stderr or result.stdout}"}
             
-            # Proveravamo da li je kreiran .npy (Fish Speech dodaje .npy na -o putanju)
-            ref_indices_path = out_wav + ".npy"
+            ref_indices_path = out_wav.rsplit('.', 1)[0] + ".npy"
             if not os.path.exists(ref_indices_path):
-                # Backwards compatibility ako model ipak kreira samo fake.npy u /tmp
-                if os.path.exists("/tmp/fake.npy"):
+                # Backwards compatibility ako model ipak kreira sa .wav.npy ili fake.npy
+                if os.path.exists(out_wav + ".npy"):
+                    ref_indices_path = out_wav + ".npy"
+                elif os.path.exists("/tmp/fake.npy"):
                     ref_indices_path = "/tmp/fake.npy"
                 else:
-                    return {"error": f"Encode nije generisao npy fajl. Traženo: {ref_indices_path}"}
+                    tmp_files = os.listdir("/tmp")
+                    return {"error": f"Encode nije generisao npy fajl. Traženo: {ref_indices_path}. Fajlovi u /tmp: {tmp_files}"}
 
             print(f"[TTS] Pronađeni indeksi na: {ref_indices_path}")
 
@@ -153,9 +160,8 @@ class WorkerV110:
                 "--text", text,
                 "--prompt-text", ref_text,
                 "--prompt-tokens", ref_indices_path,
-                "--checkpoint-path", llama_ckpt,
-                "--num-samples", "1",
-                "--compile"
+                "--checkpoint-path", os.path.dirname(llama_ckpt),
+                "--num-samples", "1"
             ]
             
             print(f"[TTS] Pokrećem Generate: {' '.join(gen_cmd)}")
@@ -164,12 +170,14 @@ class WorkerV110:
                 return {"error": f"Step 2 (Generate) failed: {p2.stderr}\nSTDOUT: {p2.stdout}"}
                 
             # Step 3: Decode (Semantic Tokens -> Audio)
-            # Proveravamo gde je Llama zapravo izbacila kodove (obično u cwd ili fiksno codes_0.npy)
             codes_path = "/tmp/codes_0.npy"
             if not os.path.exists(codes_path):
-                # Llama nekada izbacuje u /opt/fish-speech ako se ne pazi na cwd
-                if os.path.exists("/opt/fish-speech/codes_0.npy"):
+                if os.path.exists("/tmp/temp/codes_0.npy"):
+                    codes_path = "/tmp/temp/codes_0.npy"
+                elif os.path.exists("/opt/fish-speech/codes_0.npy"):
                     codes_path = "/opt/fish-speech/codes_0.npy"
+                else:
+                    return {"error": f"Generisani codes_0.npy fajl nije pronađen u /tmp, /tmp/temp ili /opt/fish-speech."}
             
             decode_cmd = ["python3", vqgan_script, "-i", codes_path, "-o", TMP_OUT_AUDIO, "--checkpoint-path", vqgan_ckpt]
             print(f"[TTS] Pokrećem Decode: {' '.join(decode_cmd)}")
