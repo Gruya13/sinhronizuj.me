@@ -159,6 +159,51 @@ def get_task_status(task_id: str):
         response["error"] = str(task_result.info)
     return response
 
+@app.post("/api/v1/warmup")
+async def warmup_workers():
+    """
+    Pinguje asinhrono sve Modal workere kako bi započeo proces zagrevanja (cold start)
+    dok se fajl uploada na S3.
+    """
+    import asyncio
+    import httpx
+    
+    urls = [
+        settings.MODAL_STT_URL,
+        settings.MODAL_TRANSLATOR_URL,
+        settings.MODAL_LEKTOR_URL,
+        settings.MODAL_TTS_URL
+    ]
+    
+    # Filtriramo None ili prazne URL-ove
+    urls = [url for url in urls if url]
+    
+    if not urls:
+        return {"status": "success", "message": "Nema konfigurisanih Modal URL-ova za zagrevanje."}
+        
+    print(f"[WARMUP] Započinjem zagrevanje za {len(urls)} Modal radnika: {urls}", flush=True)
+    
+    # Asinhrono šaljemo lagane zahteve svim radnicima bez čekanja na odgovor
+    async def ping(url: str):
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                # Za web_servere i asgi aplikacije GET je sasvim dovoljan da pokrene kontejner.
+                # Llama i TTS mogu vratiti error ili method not allowed, ali cold start će se okinuti.
+                # Šaljemo GET, a ako je method not allowed i dalje se kontejner budi.
+                print(f"[WARMUP] Pingujem: {url}", flush=True)
+                await client.get(url)
+        except httpx.TimeoutException:
+            # Timeout je očekivan jer ne želimo da blokiramo (čim krene cold start može potrajati)
+            print(f"[WARMUP] Ping timeout za {url} (ovo je očekivano i u redu).", flush=True)
+        except Exception as e:
+            print(f"[WARMUP] Ping izuzetak za {url}: {e} (cold start je verovatno okinut).", flush=True)
+
+    # Pokrećemo sve pingove asinhrono kao pozadinski zadatak
+    for url in urls:
+        asyncio.create_task(ping(url))
+        
+    return {"status": "success", "message": "Zahtevi za zagrevanje Modal radnika su poslati u pozadini."}
+
 @app.get("/api/v1/modal-status")
 def get_modal_global_status():
     """

@@ -168,7 +168,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             final_segments.append({
                 "start": orig["start"],
                 "end": orig["end"],
-                "text": t_text or orig["text"]
+                "text": t_text or orig["text"],
+                "original_text": orig["text"]
             })
             
         # POKRETANJE LEKTOR FAZE (KORAK 4.D)
