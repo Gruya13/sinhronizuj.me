@@ -1,7 +1,15 @@
+## [2026-05-20 21:30:00] Čišćenje repozitorijuma i uklanjanje tehničkog duga
+- **Čišćenje fajlova:** Izvršen je kompletan audit projekta i trajno su uklonjeni svi zastareli i neiskorišćeni resursi:
+  - Obrisana je cela `archive/` fascikla koja je sadržala stare konfiguracije za RunPod radnike (`runpod-builder.yml` i `runpod_workers/`).
+  - Obrisana je cela `docs/` fascikla koja je sadržala zastarele planove arhitekture (RunPod, Modal migracioni planovi, prelazne README fajlove, kao i `redis_password.txt`).
+  - Obrisana je zastarela skripta za testiranje RunPod endpointa (`test/test_runpod_endpoints.py`) i privremena skripta za testiranje procesora (`test_processor.py`).
+- **Ažuriranje konfiguracije:** Ažuriran je `.gitignore` da ukloni pravila za ignorisanje fajlova u `docs/` koji više ne postoje. Takođe je ažuriran `README.md` da ukloni sve reference na `docs/` i obrisane arhitektonske planove.
+
 ## [2026-05-20 07:46:00] Rešavanje repetition loop-a u STT (Whisper) fazi
 - **Problem:** Whisper model na T4 GPU (preko faster-whisper biblioteke) je na kraju videa upadao u beskonačnu petlju i ponavljao istu rečenicu više puta (od segmenta 10 do 21), verovatno zbog tišine ili pozadinske muzike.
 - **Ispravka:** U `modal_workers/stt_worker.py` postavljen je parametar `condition_on_previous_text=False` u metodi `transcribe`. Ovo sprečava model da koristi prethodno halucinirani tekst kao kontekst i uspešno prekida petlje ponavljanja.
 - **Deployment:** Aplikacija `sm-stt-only` je ponovo uspešno deploy-ovana na Modal, a kod je sinhronizovan na Hetzner server.
+
 
 ## [2026-05-20 07:35:00] Dodavanje pravila normalizacije teksta za TTS (pisanje brojeva slovima i fonetski brendovi)
 - **Implementacija TTS pravila:** U `backend/worker/translator.py` unutar promptova za prevođenje i lekturu dodata su striktna pravila za pripremu teksta za TTS sintezu glasa:

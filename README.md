@@ -115,7 +115,6 @@ sinhronizuj.me/
 │   ├── translator_worker.py # Multimodalni Translator radnik (Qwen2-VL)
 │   ├── lektor_worker.py     # Jezički lektor radnik (Qwen 2.5 32B Instruct)
 │   └── tts.py               # TTS generator (Fish Speech v1.5.1 na L4)
-├── docs/                    # Planovi i tehnička dokumentacija
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, MinIO)
 ├── Dockerfile               # API/Worker Docker slika za Hetzner VPS
 ├── requirements.txt         # Python biblioteke

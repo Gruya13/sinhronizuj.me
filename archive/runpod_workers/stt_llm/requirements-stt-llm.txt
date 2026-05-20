@@ -1,8 +1,0 @@
---extra-index-url https://download.pytorch.org/whl/cu121
-torch==2.4.0
-torchaudio==2.4.0
-vllm
-faster-whisper
-runpod
-huggingface-hub
-opencv-python-headless
