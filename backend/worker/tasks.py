@@ -167,9 +167,22 @@ def process_video_task(self, video_url: str, debug: bool = False):
     update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
     from backend.worker.tts_engine import synthesize_audio
     
+    # Ucitavanje odabira glasa iz Redisa
+    selected_voice = "clone"
+    try:
+        voice_bytes = r_client.get(f"task:{self.request.id}:voice_settings")
+        if voice_bytes:
+            import json
+            voice_data = json.loads(voice_bytes)
+            selected_voice = voice_data.get("voice", "clone")
+            print(f"[DEBUG] Primena glasa iz Redisa: {selected_voice}", flush=True)
+    except Exception as e:
+        print(f"Greska pri ucitavanju podesavanja glasa: {e}", flush=True)
+        
     tts_result = synthesize_audio(
         sep_result["vocals_path"], 
         translation_result["translated_segments"],
+        voice_type=selected_voice,
         progress_callback=lambda detail: update_progress(detail=detail)
     )
     if tts_result["status"] == "error": return tts_result

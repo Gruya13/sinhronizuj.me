@@ -97,6 +97,9 @@ class MixerSettingsRequest(BaseModel):
     background_volume: float
     dubbed_volume: float
 
+class VoiceSettingsRequest(BaseModel):
+    voice: str
+
 @app.post("/api/v1/continue/{task_id}")
 def continue_task(task_id: str):
     """
@@ -137,6 +140,20 @@ def save_mixer_settings(task_id: str, request: MixerSettingsRequest):
         "dubbed_volume": request.dubbed_volume
     }), ex=3600)
     return {"status": "success", "message": "Podešavanja miksera sačuvana."}
+
+@app.post("/api/v1/voice-settings/{task_id}")
+def save_voice_settings(task_id: str, request: VoiceSettingsRequest):
+    import redis
+    import json
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    
+    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r.set(f"task:{task_id}:voice_settings", json.dumps({
+        "voice": request.voice
+    }), ex=3600)
+    return {"status": "success", "message": "Podešavanja glasa sačuvana."}
 
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):

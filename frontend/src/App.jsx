@@ -30,6 +30,7 @@ function App() {
   const [editedSegments, setEditedSegments] = useState([]);
   const [bgVolume, setBgVolume] = useState(-5);
   const [dubVolume, setDubVolume] = useState(0);
+  const [selectedVoice, setSelectedVoice] = useState("clone");
   
   useEffect(() => {
     localStorage.setItem('sinhronizuj_me_debug_mode', debuggingMode);
@@ -294,6 +295,16 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ background_volume: bgVolume, dubbed_volume: dubVolume })
       });
+
+      // 2.5 Posalji podesavanja glasa ako smo u fazi Prevodjenje
+      if (progressData?.waiting_step === "Prevođenje") {
+        console.log("[STUDIO] Snimam podesavanja glasa...", { voice: selectedVoice });
+        await fetch(`${API_BASE_URL}/api/v1/voice-settings/${taskId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voice: selectedVoice })
+        });
+      }
  
       // 3. Posalji signal za nastavak
       const res = await fetch(`${API_BASE_URL}/api/v1/continue/${taskId}`, { method: 'POST' });
@@ -660,6 +671,49 @@ function App() {
                                   onChange={(e) => setDubVolume(parseInt(e.target.value))} 
                                 />
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {progressData?.waiting_step === "Prevođenje" && (
+                          <div className="voice-selection-box">
+                            <h3 className="voice-selection-title">🎙️ Izaberite AI glas za sintezu na srpskom:</h3>
+                            <div className="voice-options">
+                              <label className={`voice-card ${selectedVoice === 'clone' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="clone" 
+                                  checked={selectedVoice === 'clone'} 
+                                  onChange={() => setSelectedVoice('clone')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">👥</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Kloniraj originalni glas</span>
+                                    <span className="voice-desc">Klonira ton i boju iz originalnog videa (može imati strani naglasak)</span>
+                                  </div>
+                                </div>
+                              </label>
+                              
+                              <label className={`voice-card ${selectedVoice === 'dragana' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="dragana" 
+                                  checked={selectedVoice === 'dragana'} 
+                                  onChange={() => setSelectedVoice('dragana')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">👩‍🦰</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Srpski ženski glas (Dragana)</span>
+                                    <span className="voice-desc">Čist i prirodan srpski govor, bez američkog naglaska</span>
+                                  </div>
+                                </div>
+                              </label>
                             </div>
                           </div>
                         )}

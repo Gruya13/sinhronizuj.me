@@ -980,3 +980,86 @@ input:checked + .slider:before {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Voice Selection Box i Kartice */
+.voice-selection-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.voice-selection-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin-bottom: 16px;
+}
+
+.voice-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .voice-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.voice-card {
+  display: block;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease-in-out;
+}
+
+.voice-card:hover {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.voice-card.active {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.15);
+}
+
+.hidden-radio {
+  display: none;
+}
+
+.voice-card-content {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.voice-icon {
+  font-size: 1.5rem;
+  padding-top: 2px;
+}
+
+.voice-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.voice-desc {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+
