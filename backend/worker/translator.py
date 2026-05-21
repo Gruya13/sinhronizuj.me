@@ -61,8 +61,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         return {
             "status": "success", 
             "translated_segments": [
-                {"start": s["start"], "end": s["end"], "text": s["text"]} 
-                for s in segments
+                {"id": s.get("id", i), "start": s["start"], "end": s["end"], "text": s["text"], "original_text": s["text"]} 
+                for i, s in enumerate(segments)
             ]
         }
 
@@ -166,6 +166,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         for i, orig in enumerate(segments):
             t_text = parsed_lines[i] if i < len(parsed_lines) else ""
             final_segments.append({
+                "id": orig.get("id", i),
                 "start": orig["start"],
                 "end": orig["end"],
                 "text": t_text or orig["text"],
