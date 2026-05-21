@@ -150,26 +150,30 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
         print(f"[DEBUG] RAW TRANSLATION OUTPUT: {raw_output[:500]}...", flush=True)
         
-        # Parsiranje tekstualnog izlaza
-        parsed_lines = []
+        # Parsiranje tekstualnog izlaza pomoću eksplicitnih ID-jeva
+        parsed_dict = {}
         for line in raw_output.split('\n'):
             line = line.strip()
             if not line or '|' not in line:
                 continue
             parts = line.split('|', 1)
             if len(parts) == 2:
-                text = parts[1].strip()
-                if text:
-                    parsed_lines.append(text)
+                try:
+                    idx = int(parts[0].strip())
+                    text = parts[1].strip()
+                    if text:
+                        parsed_dict[idx] = text
+                except ValueError:
+                    continue
                         
         final_segments = []
         for i, orig in enumerate(segments):
-            t_text = parsed_lines[i] if i < len(parsed_lines) else ""
+            t_text = parsed_dict.get(i, orig["text"])
             final_segments.append({
                 "id": orig.get("id", i),
                 "start": orig["start"],
                 "end": orig["end"],
-                "text": t_text or orig["text"],
+                "text": t_text,
                 "original_text": orig["text"]
             })
             
@@ -254,20 +258,25 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
         print(f"[DEBUG] LEKTOR OUTPUT: {lektor_raw[:500]}...", flush=True)
         
-        parsed_lektor = []
+        parsed_lektor_dict = {}
         for line in lektor_raw.split('\n'):
             line = line.strip()
             if not line or '|' not in line:
                 continue
             parts = line.split('|', 1)
             if len(parts) == 2:
-                text = parts[1].strip()
-                if text:
-                    parsed_lektor.append(text)
+                try:
+                    idx = int(parts[0].strip())
+                    text = parts[1].strip()
+                    if text:
+                        parsed_lektor_dict[idx] = text
+                except ValueError:
+                    continue
                     
-        if len(parsed_lektor) > 0:
+        if len(parsed_lektor_dict) > 0:
             for i, seg in enumerate(translated_segments):
-                seg["text"] = parsed_lektor[i] if i < len(parsed_lektor) else seg["text"]
+                if i in parsed_lektor_dict:
+                    seg["text"] = parsed_lektor_dict[i]
                 
     except Exception as lektor_err:
         print(f"[WARNING] Lektor faza nije uspela: {lektor_err}. Nastavljam sa grubim prevodom.")
