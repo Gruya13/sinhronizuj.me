@@ -20,6 +20,9 @@ function App() {
   const [visualContextUrl, setVisualContextUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   
+  const [previewFile, setPreviewFile] = useState(null);
+  const [uploadState, setUploadState] = useState('idle'); // idle, uploading, completed, error
+
   const [terminalOpen, setTerminalOpen] = useState(true);
   const [debuggingMode, setDebuggingMode] = useState(() => localStorage.getItem('sinhronizuj_me_debug_mode') === 'true');
 
@@ -48,6 +51,8 @@ function App() {
     setError(null);
     setUploadProgress(0);
     setVisualContextUrl(null);
+    setPreviewFile(null);
+    setUploadState('idle');
     localStorage.removeItem('sinhronizuj_me_task_id');
     consecutiveErrorsRef.current = 0;
     setEditedSegments([]);
@@ -193,12 +198,57 @@ function App() {
     return () => clearInterval(interval);
   }, [taskId, videoUrl, error]);
 
-  const handleSubmit = async (e, customUrl = null) => {
+  const handleLoadUrl = (e) => {
     if (e) e.preventDefault();
-    const targetUrl = customUrl || url;
+    if (!url) return;
+
+    setError(null);
+
+    // Provera da li je YouTube link
+    const ytMatch = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=)?([^&\s]+)/);
+    if (ytMatch) {
+      const videoId = ytMatch[1];
+      const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      setPreviewFile({
+        name: "YouTube Video",
+        type: "youtube",
+        url: embedUrl,
+        rawUrl: url
+      });
+      setUploadState("completed");
+      return;
+    }
+
+    // Provera da li je direktan video URL
+    if (url.match(/\.(mp4|webm|ogg|mov|mkv)(?:\?|$)/i) || url.startsWith("s3://")) {
+      setPreviewFile({
+        name: "Eksterni Video",
+        type: "direct_url",
+        url: url,
+        rawUrl: url
+      });
+      setUploadState("completed");
+      return;
+    }
+
+    // Ako nije prepoznat specifičan format, i dalje dozvoljavamo preview/sinhronizaciju
+    setPreviewFile({
+      name: "Eksterni Resurs",
+      type: "unknown",
+      url: url,
+      rawUrl: url
+    });
+    setUploadState("completed");
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!previewFile) return;
+
+    const targetUrl = previewFile.type === "local" ? previewFile.s3Url : previewFile.rawUrl;
     if (!targetUrl) return;
 
-    setLoading(true); setError(null); setVideoUrl(null); 
+    setLoading(true); setError(null); setVideoUrl(null); setUploadProgress(0);
     setStartTime(Date.now()); setElapsed(0);
     setStatus('POVEZIVANJE SA KONTROLNOM TABLOM...');
 
@@ -256,19 +306,25 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
-    setLoading(true);
-    setStatus(`PRIPREMA UPLOADA: ${file.name}...`);
-    setError(null);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewFile({
+      name: file.name,
+      size: file.size,
+      type: "local",
+      url: objectUrl,
+      s3Url: null
+    });
+    setUploadState("uploading");
     setUploadProgress(1);
+    setError(null);
 
     try {
       // 1. Dobavi Presigned URL koristeći nativni fetch
       const urlRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`);
+      if (!urlRes.ok) throw new Error("Neuspešno dobavljanje upload URL-a.");
       const { upload_url, s3_url } = await urlRes.json();
 
       // 2. Upload na MinIO koristeći XMLHttpRequest (za progress tracking)
-      setStatus(`UPLOADOVANJE NA S3 STORAGE...`);
-      
       const xhr = new XMLHttpRequest();
       
       xhr.upload.onprogress = (event) => {
@@ -280,19 +336,21 @@ function App() {
 
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          setUploadProgress(0);
-          handleSubmit(null, s3_url);
+          setUploadProgress(100);
+          setUploadState("completed");
+          setPreviewFile(prev => ({
+            ...prev,
+            s3Url: s3_url
+          }));
         } else {
           setError(`Greška pri uploadu: ${xhr.statusText}`);
-          setLoading(false);
-          setUploadProgress(0);
+          setUploadState("error");
         }
       };
 
       xhr.onerror = () => {
         setError("Greška pri mreži tokom uploada.");
-        setLoading(false);
-        setUploadProgress(0);
+        setUploadState("error");
       };
 
       xhr.open('PUT', upload_url);
@@ -301,8 +359,7 @@ function App() {
 
     } catch (err) {
       setError(`Greška: ${err.message}`);
-      setLoading(false);
-      setUploadProgress(0);
+      setUploadState("error");
     }
   };
 
@@ -352,9 +409,9 @@ function App() {
           </div>
         </motion.div>
 
-        {!loading && !videoUrl && (
+        {!loading && !videoUrl && !previewFile && (
           <div className="input-area">
-             <form onSubmit={handleSubmit} className="input-group main-input">
+             <form onSubmit={handleLoadUrl} className="input-group main-input">
                 <div className="input-wrapper">
                 <input 
                     type="url" placeholder="Zalepite YouTube ili S3 link..." 
@@ -370,7 +427,7 @@ function App() {
                     <Paperclip size={20} />
                 </button>
                 <button type="submit" disabled={loading || !url} className="glow-button">
-                    <Play size={20} /> Sinhronizuj
+                    <ArrowRight size={20} /> Učitaj video
                 </button>
                 </div>
             </form>
@@ -395,6 +452,108 @@ function App() {
                 />
                 <span className="slider"></span>
               </label>
+            </div>
+          </div>
+        )}
+
+        {!loading && !videoUrl && previewFile && (
+          <div className="preview-pane-container">
+            {/* Leva strana: Video Player */}
+            <div className="preview-video-wrapper">
+              {previewFile.type === "youtube" ? (
+                <iframe 
+                  src={previewFile.url} 
+                  className="preview-media" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen 
+                  title="YouTube Preview"
+                />
+              ) : previewFile.type === "local" || previewFile.type === "direct_url" ? (
+                <video 
+                  src={previewFile.url} 
+                  controls 
+                  className="preview-media" 
+                />
+              ) : (
+                <div className="preview-placeholder">
+                  <Eye size={48} className="dim-icon text-slate-600" />
+                  <span>Preview nije dostupan za ovaj format</span>
+                </div>
+              )}
+            </div>
+
+            {/* Desna strana: Detalji i Akcije */}
+            <div className="preview-details-panel">
+              <div>
+                <h3 className="preview-title">Priprema videa</h3>
+                <p className="text-sm text-slate-400 mb-6" style={{ marginBottom: '24px' }}>Pregledajte video pre nego što započnete inteligentnu sinhronizaciju.</p>
+                
+                <div className="file-info-list">
+                  <div className="file-info-item">
+                    <span>Naziv:</span>
+                    <span>{previewFile.name}</span>
+                  </div>
+                  {previewFile.size && (
+                    <div className="file-info-item">
+                      <span>Veličina:</span>
+                      <span>{(previewFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                    </div>
+                  )}
+                  <div className="file-info-item">
+                    <span>Tip izvora:</span>
+                    <span className="capitalize" style={{ textTransform: 'capitalize' }}>
+                      {previewFile.type === "local" ? "Lokalni fajl" : previewFile.type === "youtube" ? "YouTube video" : "Eksterni URL"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status uploada */}
+              {previewFile.type === "local" && (
+                <div className="upload-status-box">
+                  <div className="status-text-row">
+                    <span>Status prenosa:</span>
+                    {uploadState === "uploading" ? (
+                      <span className="status-uploading">
+                        <Loader2 size={14} className="spinner-icon pulse-icon" style={{ display: 'inline', marginRight: '6px' }} /> Prenos na storage...
+                      </span>
+                    ) : uploadState === "completed" ? (
+                      <span className="status-completed">
+                        <CheckCircle2 size={14} style={{ display: 'inline', marginRight: '6px' }} /> Spreman na storage-u
+                      </span>
+                    ) : uploadState === "error" ? (
+                      <span className="status-error">
+                        <AlertCircle size={14} style={{ display: 'inline', marginRight: '6px' }} /> Greška pri prenosu
+                      </span>
+                    ) : (
+                      <span>U mirovanju</span>
+                    )}
+                  </div>
+                  
+                  {uploadState === "uploading" && (
+                    <div className="progress-bar-container" style={{ marginTop: '8px' }}>
+                      <div 
+                        className="progress-bar-fill uploading" 
+                        style={{ width: `${uploadProgress}%` }} 
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Akcije */}
+              <div className="preview-actions-row">
+                <button onClick={resetStudio} className="back-btn">
+                  Nazad
+                </button>
+                <button 
+                  onClick={handleSubmit} 
+                  disabled={previewFile.type === "local" && uploadState !== "completed"} 
+                  className="glow-button"
+                >
+                  <Play size={18} /> Sinhronizuj
+                </button>
+              </div>
             </div>
           </div>
         )}
