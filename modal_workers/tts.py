@@ -107,7 +107,8 @@ class WorkerV110:
             "--prompt-text", ref_text,
             "--prompt-tokens", ref_indices_path,
             "--checkpoint-path", os.path.dirname(llama_ckpt),
-            "--num-samples", "1"
+            "--num-samples", "1",
+            "--output-dir", "."
         ]
         
         print(f"[TTS-BATCH] Pokrecem Generate za segment {seg_id}: {text[:30]}...")
