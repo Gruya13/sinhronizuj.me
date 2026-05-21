@@ -14,6 +14,7 @@ class Settings:
     MODAL_TRANSLATOR_URL: str = os.getenv("MODAL_TRANSLATOR_URL", "")
     MODAL_LEKTOR_URL: str = os.getenv("MODAL_LEKTOR_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
+    MODAL_DEMUCS_URL: str = os.getenv("MODAL_DEMUCS_URL", "")
     
     # MinIO Storage
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")

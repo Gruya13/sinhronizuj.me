@@ -93,9 +93,12 @@ def process_video_task(self, video_url: str, debug: bool = False):
     wait_for_user("Preuzimanje")
     
     # --- FAZA 2: Separacija Zvuka ---
-    update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na CPU-u. Ovo može potrajati par minuta...")
+    update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na Modalu...")
     from backend.worker.audio_sep import separate_audio
-    sep_result = separate_audio(result['audio_path'])
+    sep_result = separate_audio(
+        result['audio_path'],
+        progress_callback=lambda detail: update_progress(detail=detail)
+    )
     if sep_result["status"] == "error": return sep_result
     update_progress(completed_step="Vokal izolovan")
     time.sleep(1)
