@@ -4,7 +4,7 @@ import modal
 image_demucs = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "git")
-    .pip_install("demucs", "fastapi", "uvicorn")
+    .pip_install("demucs", "fastapi", "uvicorn", "torchcodec==0.11.1")
 )
 
 app = modal.App("sm-demucs")
