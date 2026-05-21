@@ -26,16 +26,22 @@ def process_video_task(self, video_url: str, debug: bool = False):
         'segments': [],
         'detail': "Priprema radnog prostora...",
         'logs': [],
-        'waiting_for_user': False
+        'waiting_for_user': False,
+        'waiting_step': None
     }
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None, waiting=False):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None, waiting=False, waiting_step=None):
         if step_name: progress_metadata['current_step'] = step_name
         if percentage is not None: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
         progress_metadata['waiting_for_user'] = waiting
+        if waiting_step is not None:
+            progress_metadata['waiting_step'] = waiting_step
+        elif not waiting:
+            progress_metadata['waiting_step'] = None
+
         if detail:
             progress_metadata['detail'] = detail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -49,7 +55,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
         if not debug:
             return
         
-        update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True)
+        update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True, waiting_step=step_name)
         
         # Brišemo stari signal ako postoji
         r_client.delete(f"task:{self.request.id}:continue")
@@ -77,7 +83,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
                     except Exception as e:
                         print(f"Greška pri ažuriranju segmenata: {e}", flush=True)
                 
-                update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False)
+                update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False, waiting_step=None)
                 return
             time.sleep(1)
         

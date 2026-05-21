@@ -115,16 +115,22 @@ function App() {
   }, [loading, videoUrl, startTime]);
 
   useEffect(() => {
-    if (progressData?.waiting_for_user && progressData.segments && editedSegments.length === 0) {
-      console.log("[STUDIO] Ucitavam segmente za izmenu:", progressData.segments.length);
-      setEditedSegments(progressData.segments.map(s => ({
-        id: s.id,
-        original: s.original,
-        translated: s.translated || '',
-        status: s.status
-      })));
+    if (progressData?.waiting_for_user && progressData?.waiting_step === "Prevođenje") {
+      if (progressData.segments && editedSegments.length === 0) {
+        console.log("[STUDIO] Ucitavam segmente za izmenu:", progressData.segments.length);
+        setEditedSegments(progressData.segments.map(s => ({
+          id: s.id,
+          original: s.original,
+          translated: s.translated || '',
+          status: s.status
+        })));
+      }
+    } else {
+      if (editedSegments.length > 0) {
+        setEditedSegments([]);
+      }
     }
-  }, [progressData?.waiting_for_user, progressData?.segments, editedSegments]);
+  }, [progressData?.waiting_for_user, progressData?.waiting_step, progressData?.segments]);
 
   // Isključujemo auto-scroll za segmente da bi korisnik mogao na miru da čita
   // useEffect(() => {
@@ -288,13 +294,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ background_volume: bgVolume, dubbed_volume: dubVolume })
       });
-
+ 
       // 3. Posalji signal za nastavak
       const res = await fetch(`${API_BASE_URL}/api/v1/continue/${taskId}`, { method: 'POST' });
       if (!res.ok) throw new Error();
       
-      // Resetujemo lokalne izmene za sledecu pauzu
-      setEditedSegments([]);
     } catch (err) {
       console.error("Greska pri slanju podataka i nastavku:", err);
     } finally {
@@ -624,39 +628,41 @@ function App() {
                         className="continue-btn-container"
                         style={{ flexDirection: 'column', alignItems: 'center', gap: '16px' }}
                       >
-                        <div className="mixer-panel">
-                          <h4 className="mixer-title">🎛️ Audio Mikser za Finalni Mix</h4>
-                          <div className="mixer-controls">
-                            <div className="mixer-control">
-                              <label>
-                                <span>🎵 Jačina originalne pozadine:</span>
-                                <strong>{bgVolume > 0 ? `+${bgVolume}` : bgVolume} dB</strong>
-                              </label>
-                              <input 
-                                type="range" 
-                                min="-30" 
-                                max="10" 
-                                step="1"
-                                value={bgVolume} 
-                                onChange={(e) => setBgVolume(parseInt(e.target.value))} 
-                              />
-                            </div>
-                            <div className="mixer-control">
-                              <label>
-                                <span>🎙️ Jačina novog srpskog AI glasa:</span>
-                                <strong>{dubVolume > 0 ? `+${dubVolume}` : dubVolume} dB</strong>
-                              </label>
-                              <input 
-                                type="range" 
-                                min="-15" 
-                                max="15" 
-                                step="1"
-                                value={dubVolume} 
-                                onChange={(e) => setDubVolume(parseInt(e.target.value))} 
-                              />
+                        {progressData?.waiting_step === "TTS Sinteza" && (
+                          <div className="mixer-panel">
+                            <h4 className="mixer-title">🎛️ Audio Mikser za Finalni Mix</h4>
+                            <div className="mixer-controls">
+                              <div className="mixer-control">
+                                <label>
+                                  <span>🎵 Jačina originalne pozadine:</span>
+                                  <strong>{bgVolume > 0 ? `+${bgVolume}` : bgVolume} dB</strong>
+                                </label>
+                                <input 
+                                  type="range" 
+                                  min="-30" 
+                                  max="10" 
+                                  step="1"
+                                  value={bgVolume} 
+                                  onChange={(e) => setBgVolume(parseInt(e.target.value))} 
+                                />
+                              </div>
+                              <div className="mixer-control">
+                                <label>
+                                  <span>🎙️ Jačina novog srpskog AI glasa:</span>
+                                  <strong>{dubVolume > 0 ? `+${dubVolume}` : dubVolume} dB</strong>
+                                </label>
+                                <input 
+                                  type="range" 
+                                  min="-15" 
+                                  max="15" 
+                                  step="1"
+                                  value={dubVolume} 
+                                  onChange={(e) => setDubVolume(parseInt(e.target.value))} 
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
 
                         <button 
                           className="continue-btn" 
@@ -664,7 +670,11 @@ function App() {
                           disabled={isContinuing}
                         >
                           {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
-                          Potvrdi prevod i pokreni sintezu
+                          {progressData?.waiting_step === "Prevođenje" 
+                            ? "Potvrdi prevod i pokreni sintezu" 
+                            : progressData?.waiting_step === "TTS Sinteza"
+                              ? "Potvrdi miks i pokreni spajanje videa"
+                              : "Nastavi obradu"}
                         </button>
                       </motion.div>
                     )}
@@ -679,7 +689,7 @@ function App() {
                             <span>AI Prevod (TOON Format)</span>
                           </div>
                           {progressData.segments.map((seg, idx) => {
-                            const isReview = progressData?.waiting_for_user && editedSegments.length > 0;
+                            const isReview = progressData?.waiting_for_user && progressData?.waiting_step === "Prevođenje" && editedSegments.length > 0;
                             return (
                               <motion.div 
                                 key={idx} 
