@@ -212,13 +212,24 @@ class OpenVoiceWorker:
                 if os.path.exists(f): os.remove(f)
             shutil.rmtree(processed_dir, ignore_errors=True)
             
-            # 3. Pokretanje paralelne obrade segmenata
+            # 3. Pokretanje paralelne obrade segmenata u lokalnom ThreadPool-u radi maksimalne brzine i izbegavanja hladnog starta
             if segments:
-                print(f"[OpenVoice] Pokrećem paralelnu konverziju za {len(segments)} segmenata preko Modal.map()")
-                results = list(self.generate_segment.map(
-                    segments,
-                    kwargs={"ref_se_path": ref_se_path, "base_se_path": base_se_path}
-                ))
+                print(f"[OpenVoice] Pokrećem paralelnu konverziju za {len(segments)} segmenata preko lokalnog ThreadPoolExecutor-a...")
+                from concurrent.futures import ThreadPoolExecutor
+                
+                def process_single(seg):
+                    try:
+                        return self.generate_segment(
+                            seg,
+                            ref_se_path=ref_se_path,
+                            base_se_path=base_se_path
+                        )
+                    except Exception as e:
+                        return {"id": seg.get("id"), "error": str(e)}
+
+                # Koristimo 8 niti za paralelnu obradu na istom GPU-u
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    results = list(executor.map(process_single, segments))
                 
                 # Brisanje embedding-a sa NFS-a
                 for f in [ref_se_path, base_se_path]:
