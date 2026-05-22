@@ -150,39 +150,40 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 seg_bytes = base64.b64decode(b64_audio)
                 seg_audio = AudioSegment.from_file(io.BytesIO(seg_bytes), format="wav")
                 
-                # 1. Osnovno ubrzanje govora za 1.15x
-                try:
-                    seg_audio = speedup(seg_audio, playback_speed=1.15)
-                except Exception as ex_speed:
-                    print(f"[TTS WARNING] Neuspešno osnovno ubrzanje segmenta {seg_id}: {ex_speed}")
-                
-                # 2. Dinamičko dodatno ubrzanje ako i dalje prelazi dužinu segmenta
-                original_duration = seg["end"] - seg["start"]
-                generated_duration = seg_audio.duration_seconds
-                if generated_duration > original_duration and original_duration > 0:
-                    additional_speed = generated_duration / original_duration
-                    if additional_speed > 1.25:
-                        additional_speed = 1.25
-                    try:
-                        seg_audio = speedup(seg_audio, playback_speed=additional_speed)
-                        print(f"[TTS SPEEDUP] Segment {seg_id} dodatno ubrzan za {additional_speed:.2f}x (original: {original_duration:.2f}s, novo: {seg_audio.duration_seconds:.2f}s)")
-                    except Exception as ex_speed2:
-                        print(f"[TTS WARNING] Neuspešno dodatno ubrzanje segmenta {seg_id}: {ex_speed2}")
-                
-                # 3. Trimovanje segmenta da se spreči curenje u sledeći segment (eliminiše dupli audio)
+                # 1. Računamo maksimalno dozvoljeno trajanje do početka sledećeg segmenta da bismo sprečili preklapanje (dupli audio)
                 start_ms = int(seg["start"] * 1000)
-                
-                # Računamo do kada ovaj segment sme maksimalno da traje
                 if idx < len(translated_segments) - 1:
                     next_start_ms = int(translated_segments[idx + 1]["start"] * 1000)
-                    max_allowed_duration = next_start_ms - start_ms
+                    max_allowed_duration_ms = next_start_ms - start_ms
                 else:
-                    max_allowed_duration = video_duration_ms - start_ms
+                    max_allowed_duration_ms = video_duration_ms - start_ms
                 
-                # Ako generisani audio traje duže nego što je dozvoljeno do početka sledećeg segmenta, isečemo ga
-                if len(seg_audio) > max_allowed_duration and max_allowed_duration > 0:
-                    print(f"[TTS TRIM] Skraćujem segment {seg_id} sa {len(seg_audio)}ms na {max_allowed_duration}ms da sprečim preklapanje.")
-                    seg_audio = seg_audio[:max_allowed_duration]
+                max_allowed_duration = max_allowed_duration_ms / 1000.0
+
+                # 2. Osnovno lagano ubrzanje govora za 1.05x radi prirodnije dinamike
+                try:
+                    seg_audio = speedup(seg_audio, playback_speed=1.05)
+                except Exception as ex_speed:
+                    print(f"[TTS WARNING] Neuspešno osnovno ubrzanje segmenta {seg_id}: {ex_speed}")
+
+                # 3. Dinamičko dodatno ubrzanje samo ako generisani audio prevazilazi maksimalno dozvoljeni prozor
+                generated_duration = seg_audio.duration_seconds
+                if generated_duration > max_allowed_duration and max_allowed_duration > 0:
+                    additional_speed = generated_duration / max_allowed_duration
+                    # Limitiramo dodatno ubrzanje na maksimalno 1.50x kako glas ne bi zvučao previše izobličeno
+                    if additional_speed > 1.50:
+                        additional_speed = 1.50
+                    
+                    try:
+                        seg_audio = speedup(seg_audio, playback_speed=additional_speed)
+                        print(f"[TTS SPEEDUP] Segment {seg_id} dinamički ubrzan za {additional_speed:.2f}x (max dozvoljeno: {max_allowed_duration:.2f}s, novo trajanje: {seg_audio.duration_seconds:.2f}s)")
+                    except Exception as ex_speed2:
+                        print(f"[TTS WARNING] Neuspešno dodatno ubrzanje segmenta {seg_id}: {ex_speed2}")
+
+                # 4. Trimovanje segmenta samo kao krajnja mera ako i posle maksimalnog ubrzanja prelazi granicu
+                if len(seg_audio) > max_allowed_duration_ms and max_allowed_duration_ms > 0:
+                    print(f"[TTS TRIM] Skraćujem segment {seg_id} sa {len(seg_audio)}ms na {max_allowed_duration_ms}ms da sprečim preklapanje.")
+                    seg_audio = seg_audio[:max_allowed_duration_ms]
                 
                 # Nalepimo segment na tihu traku
                 final_mix = final_mix.overlay(seg_audio, position=start_ms)
