@@ -17,14 +17,14 @@ def download_models():
     import torch
     
     # 1. Preuzimanje srpskog VITS modela
-    print("Preuzimam srpski VITS model (facebook/mms-tts-srp)...")
+    print("Preuzimam srpski VITS model (facebook/mms-tts-srp-script_latin)...")
     srp_model_path = f"{VOLUME_PATH}/mms-tts-srp"
     os.makedirs(srp_model_path, exist_ok=True)
-    VitsModel.from_pretrained("facebook/mms-tts-srp")
-    AutoTokenizer.from_pretrained("facebook/mms-tts-srp")
+    VitsModel.from_pretrained("facebook/mms-tts-srp-script_latin")
+    AutoTokenizer.from_pretrained("facebook/mms-tts-srp-script_latin")
     # Snimamo ih na NFS
-    model = VitsModel.from_pretrained("facebook/mms-tts-srp")
-    tokenizer = AutoTokenizer.from_pretrained("facebook/mms-tts-srp")
+    model = VitsModel.from_pretrained("facebook/mms-tts-srp-script_latin")
+    tokenizer = AutoTokenizer.from_pretrained("facebook/mms-tts-srp-script_latin")
     model.save_pretrained(srp_model_path)
     tokenizer.save_pretrained(srp_model_path)
     print("Srpski VITS model uspešno sačuvan.")
