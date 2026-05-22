@@ -75,6 +75,9 @@ class OpenVoiceWorker:
             config_path=f"{self.piper_model_path}/sr_Marko_medium.onnx.json"
         )
         
+        import inspect
+        print("POTPIS SYNTHESIZE:", inspect.signature(self.piper_voice.synthesize))
+        
         # Inicijalizacija OpenVoice V2 konvertera
         import sys
         sys.path.append("/opt/OpenVoice")
@@ -96,17 +99,33 @@ class OpenVoiceWorker:
         
         seg_id = segment["id"]
         text = segment["text"]
+        max_duration = segment.get("max_duration")
         
         # Ograničenje za Piper model (ako je tekst prazan)
         if not text.strip():
             return {"id": seg_id, "audio_base64": ""}
             
+        # Određivanje optimalne brzine govora (length_scale)
+        length_scale = 0.90  # Malo brže od podrazumevanog za prirodniji Marko glas
+        if max_duration is not None and max_duration > 0:
+            # Procenjeno trajanje za normalan govor (oko 12.5 karaktera u sekundi)
+            estimated_dur = len(text) / 12.5
+            if estimated_dur > max_duration:
+                # Izračunamo potreban odnos
+                ratio = max_duration / estimated_dur
+                # Limitiramo length_scale između 0.70 i 0.90 kako ne bismo previše izobličili izgovor
+                length_scale = max(0.70, min(0.90, ratio))
+                print(f"[OpenVoice Speed] Segment {seg_id} (max_dur={max_duration:.2f}s, est_dur={estimated_dur:.2f}s) -> postavljen length_scale={length_scale:.2f}")
+        
         try:
-            # 1. Generisanje čistog srpskog govora preko Piper modela
+            # 1. Generisanje čistog srpskog govora preko Piper modela sa dinamičkom brzinom
             tmp_base_wav = f"/tmp/base_{uuid.uuid4().hex}_{seg_id}.wav"
             import wave
+            from piper.voice import SynthesisConfig
+            
+            syn_config = SynthesisConfig(length_scale=length_scale)
             with wave.open(tmp_base_wav, 'wb') as wav_file:
-                chunks = list(self.piper_voice.synthesize(text))
+                chunks = list(self.piper_voice.synthesize(text, syn_config=syn_config))
                 if not chunks:
                     return {"id": seg_id, "error": "Piper nije generisao audio čankove."}
                 sample_rate = chunks[0].sample_rate
@@ -134,6 +153,33 @@ class OpenVoiceWorker:
                 output_path=tmp_final_wav,
                 message="@MyShell"
             )
+            
+            # 3. Visokokvalitetno dodatno ubrzavanje sa librosa ukoliko i dalje prelazi max_duration
+            if max_duration is not None and max_duration > 0:
+                import librosa
+                import numpy as np
+                from scipy.io import wavfile
+                
+                sr, y = wavfile.read(tmp_final_wav)
+                # Konverzija u float32 za librosa time stretch
+                if y.dtype == np.int16:
+                    y = y.astype(np.float32) / 32768.0
+                elif y.dtype == np.int32:
+                    y = y.astype(np.float32) / 2147483648.0
+                
+                generated_dur = len(y) / sr
+                if generated_dur > max_duration:
+                    stretch_ratio = generated_dur / max_duration
+                    # Ako je prekoračenje veće od 1.01x (da izbegnemo sitna zaokruživanja)
+                    if stretch_ratio > 1.01:
+                        # Limitiramo time stretch na max 1.35x da glas ostane razumljiv i ljudski
+                        stretch_ratio = min(1.35, stretch_ratio)
+                        print(f"[OpenVoice Librosa Stretch] Segment {seg_id} (generated={generated_dur:.2f}s, max={max_duration:.2f}s) -> ubrzavam za {stretch_ratio:.2f}x")
+                        y_stretched = librosa.effects.time_stretch(y, rate=stretch_ratio)
+                        
+                        # Konverzija float32 [-1, 1] nazad u 16-bitni PCM za scipy
+                        y_int16 = np.int16(y_stretched * 32767)
+                        wavfile.write(tmp_final_wav, sr, y_int16)
             
             # Citanje finalnog fajla i konverzija u base64
             with open(tmp_final_wav, "rb") as f:
@@ -203,8 +249,10 @@ class OpenVoiceWorker:
                 sample_text = "Dobar dan. Ovo je test za dobijanje baznog glasa koji mora biti dovoljno dugačak kako bi glasovni ekstraktor uspešno prepoznao zvučne karakteristike. Zato ponavljamo rečenicu još nekoliko puta kako bismo prešli granicu od pet sekundi govora. Dobar dan. Ovo je test za dobijanje baznog glasa."
                 tmp_sample_wav = f"/tmp/sample_base_{req_uuid}.wav"
                 import wave
+                from piper.voice import SynthesisConfig
+                syn_config = SynthesisConfig(length_scale=1.0)
                 with wave.open(tmp_sample_wav, 'wb') as wav_file:
-                    chunks = list(self.piper_voice.synthesize(sample_text))
+                    chunks = list(self.piper_voice.synthesize(sample_text, syn_config=syn_config))
                     if not chunks:
                         return {"error": "Piper nije uspeo da generiše uzorak za bazni SE."}
                     sample_rate = chunks[0].sample_rate

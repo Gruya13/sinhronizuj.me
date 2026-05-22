@@ -90,12 +90,29 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
     except Exception as e:
         return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}
 
-    # 2. Priprema segmenata za slanje na Modal
+    # 2. Učitavamo originalni vokal da bismo znali ukupnu dužinu i izračunali maksimalna trajanja segmenata
+    try:
+        ref_audio = AudioSegment.from_wav(vocals_path)
+        video_duration_ms = len(ref_audio)
+    except Exception as e:
+        return {"status": "error", "message": f"Greška pri učitavanju originalnog vokala: {e}"}
+
+    # Priprema segmenata za slanje na Modal sa uračunatim max_duration
     modal_segments = []
-    for s in translated_segments:
+    for idx, s in enumerate(translated_segments):
+        start_ms = int(s["start"] * 1000)
+        if idx < len(translated_segments) - 1:
+            next_start_ms = int(translated_segments[idx + 1]["start"] * 1000)
+            max_allowed_duration_ms = next_start_ms - start_ms
+        else:
+            max_allowed_duration_ms = video_duration_ms - start_ms
+            
+        max_duration = max(0.5, max_allowed_duration_ms / 1000.0)
+        
         modal_segments.append({
             "id": str(s["id"]),
-            "text": s["text"]
+            "text": s["text"],
+            "max_duration": max_duration
         })
     
     payload = {
@@ -104,7 +121,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         "reference_text": ref_text
     }
 
-    print(f"[TTS V2] Pozivam Modal Fish Speech (Paralelno .map()) za {len(translated_segments)} segmenata...")
+    print(f"[TTS V2] Pozivam Modal OpenVoice V2 (Paralelno) za {len(translated_segments)} segmenata sa dynamic duration limitiranjem...")
     
     try:
         output = call_modal_endpoint(
@@ -119,10 +136,6 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
             error_msg = output.get("error", "Modal nije vratio rezultate.")
             return {"status": "error", "message": f"Sinteza nije uspela: {error_msg}"}
             
-        # 3. Ucitavamo originalni vokal da bismo znali ukupnu duzinu i kreirali praznu traku
-        ref_audio = AudioSegment.from_wav(vocals_path)
-        video_duration_ms = len(ref_audio)
-        
         # Pravimo tihu audio traku iste duzine
         final_mix = AudioSegment.silent(duration=video_duration_ms)
         
@@ -134,10 +147,9 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 continue
             audio_by_id[str(r.get("id"))] = r.get("audio_base64")
 
-        # 4. Spajamo segmente na njihove tacne startne pozicije
+        # 4. Spajamo segmente na njihove tacne startne pozicije (bez pydub speedup-a radi očuvanja kvaliteta!)
         print("[TTS V2] Miksujem generisane segmente na vremensku osu...")
         stitched_count = 0
-        from pydub.effects import speedup
         
         for idx, seg in enumerate(translated_segments):
             seg_id = str(seg["id"])
@@ -150,7 +162,6 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 seg_bytes = base64.b64decode(b64_audio)
                 seg_audio = AudioSegment.from_file(io.BytesIO(seg_bytes), format="wav")
                 
-                # 1. Računamo maksimalno dozvoljeno trajanje do početka sledećeg segmenta da bismo sprečili preklapanje (dupli audio)
                 start_ms = int(seg["start"] * 1000)
                 if idx < len(translated_segments) - 1:
                     next_start_ms = int(translated_segments[idx + 1]["start"] * 1000)
@@ -158,32 +169,13 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 else:
                     max_allowed_duration_ms = video_duration_ms - start_ms
                 
-                max_allowed_duration = max_allowed_duration_ms / 1000.0
-
-                # 2. Osnovno lagano ubrzanje govora za 1.05x radi prirodnije dinamike
-                try:
-                    seg_audio = speedup(seg_audio, playback_speed=1.05)
-                except Exception as ex_speed:
-                    print(f"[TTS WARNING] Neuspešno osnovno ubrzanje segmenta {seg_id}: {ex_speed}")
-
-                # 3. Dinamičko dodatno ubrzanje samo ako generisani audio prevazilazi maksimalno dozvoljeni prozor
-                generated_duration = seg_audio.duration_seconds
-                if generated_duration > max_allowed_duration and max_allowed_duration > 0:
-                    additional_speed = generated_duration / max_allowed_duration
-                    # Limitiramo dodatno ubrzanje na maksimalno 1.50x kako glas ne bi zvučao previše izobličeno
-                    if additional_speed > 1.50:
-                        additional_speed = 1.50
-                    
-                    try:
-                        seg_audio = speedup(seg_audio, playback_speed=additional_speed)
-                        print(f"[TTS SPEEDUP] Segment {seg_id} dinamički ubrzan za {additional_speed:.2f}x (max dozvoljeno: {max_allowed_duration:.2f}s, novo trajanje: {seg_audio.duration_seconds:.2f}s)")
-                    except Exception as ex_speed2:
-                        print(f"[TTS WARNING] Neuspešno dodatno ubrzanje segmenta {seg_id}: {ex_speed2}")
-
-                # 4. Trimovanje segmenta samo kao krajnja mera ako i posle maksimalnog ubrzanja prelazi granicu
+                # Trimovanje segmenta samo kao krajnja mera opreza
                 if len(seg_audio) > max_allowed_duration_ms and max_allowed_duration_ms > 0:
-                    print(f"[TTS TRIM] Skraćujem segment {seg_id} sa {len(seg_audio)}ms na {max_allowed_duration_ms}ms da sprečim preklapanje.")
-                    seg_audio = seg_audio[:max_allowed_duration_ms]
+                    # Dozvoljavamo blago prelazak od 100ms ako ne smeta sledećem, inače skraćujemo
+                    overage = len(seg_audio) - max_allowed_duration_ms
+                    if overage > 100:
+                        print(f"[TTS TRIM] Skraćujem segment {seg_id} sa {len(seg_audio)}ms na {max_allowed_duration_ms}ms (prekoračenje: {overage}ms)")
+                        seg_audio = seg_audio[:max_allowed_duration_ms]
                 
                 # Nalepimo segment na tihu traku
                 final_mix = final_mix.overlay(seg_audio, position=start_ms)

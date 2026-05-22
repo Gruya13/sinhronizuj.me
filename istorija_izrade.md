@@ -1,3 +1,13 @@
+## [2026-05-22 08:02:00] Stabilizacija OpenVoice V2 i Piper dinamičkog ubrzanja na Modalu
+- **Problem:** Prilikom paralelnog testiranja TTS generacije sa parametrima trajanja, Modal radnik je bacao grešku `# channels not specified` na segmentima. Istragom logova utvrđeno je da:
+  1. `PiperVoice.synthesize` u verziji instaliranoj na Modalu ne prihvata parametar `length_scale` direktno kao keyword argument (TypeError).
+  2. Modul `wave` u Pythonu baca grešku `# channels not specified` kao sporedni efekat jer se context manager zatvara pre upisivanja zaglavlja fajla usled gornjeg TypeError-a.
+  3. `librosa.load` podrazumevano koristi `soundfile` backend koji ima poteškoća sa čitanjem nestandardnih audio zaglavlja.
+- **Rešenje:**
+  1. **Uvođenje `SynthesisConfig`:** Za kontrolu brzine govora unutar Piper-a kreira se objekat `SynthesisConfig(length_scale=length_scale)` i prosleđuje se kao parametar `syn_config` u `piper_voice.synthesize()`.
+  2. **Bypass `soundfile` biblioteke:** Zamenjena je `librosa.load` biblioteka sa `scipy.io.wavfile.read` i `scipy.io.wavfile.write` za učitavanje i čuvanje audio signala tokom `librosa.effects.time_stretch` ubrzavanja. Ovo je u potpunosti eliminisalo zavisnost od `soundfile` backenda i rešilo grešku sa kanalima.
+  3. **Uspešan deployment i test:** Ažurirani radnik je uspešno deploy-ovan na Modal. Testiranjem sa segmentima koji imaju vremenska ograničenja potvrđen je Status 200 sa čistim ubrzanim audio fajlovima i kloniranom bojom glasa bez ikakvih grešaka.
+
 ## [2026-05-22 07:03:00] Ispravka Hugging Face putanje za srpski VITS model u Modal radniku
 - **Problem:** Modal radnik `sm-tts-openvoice` je prilikom podizanja izbacivao grešku `Repository Not Found (401 Unauthorized)` jer je pokušavao da preuzme srpski VITS model sa nepostojeće Hugging Face adrese `facebook/mms-tts-srp`.
 - **Rešenje:**
