@@ -12,22 +12,16 @@ models_nfs = modal.NetworkFileSystem.from_name("sinhronizuj-models-nfs", create_
 VOLUME_PATH = "/models_nfs"
 
 def download_models():
-    from huggingface_hub import snapshot_download, HfApi
-    from transformers import VitsModel, AutoTokenizer
-    import torch
+    from huggingface_hub import hf_hub_download, snapshot_download
     
-    # 1. Preuzimanje srpskog VITS modela
-    print("Preuzimam srpski VITS model (facebook/mms-tts-srp-script_latin)...")
-    srp_model_path = f"{VOLUME_PATH}/mms-tts-srp"
-    os.makedirs(srp_model_path, exist_ok=True)
-    VitsModel.from_pretrained("facebook/mms-tts-srp-script_latin")
-    AutoTokenizer.from_pretrained("facebook/mms-tts-srp-script_latin")
-    # Snimamo ih na NFS
-    model = VitsModel.from_pretrained("facebook/mms-tts-srp-script_latin")
-    tokenizer = AutoTokenizer.from_pretrained("facebook/mms-tts-srp-script_latin")
-    model.save_pretrained(srp_model_path)
-    tokenizer.save_pretrained(srp_model_path)
-    print("Srpski VITS model uspešno sačuvan.")
+    # 1. Preuzimanje srpskog Piper modela
+    print("Preuzimam srpski Piper model (phantom9623/piper-serbian-tts)...")
+    piper_model_path = f"{VOLUME_PATH}/piper"
+    os.makedirs(piper_model_path, exist_ok=True)
+    
+    hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx", local_dir=piper_model_path)
+    hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx.json", local_dir=piper_model_path)
+    print("Srpski Piper model uspešno sačuvan.")
     
     # 2. Preuzimanje OpenVoice V2 konvertera
     print("Preuzimam OpenVoice V2 checkpoint...")
@@ -38,13 +32,14 @@ def download_models():
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "ffmpeg", "portaudio19-dev", "build-essential")
+    .apt_install("git", "ffmpeg", "portaudio19-dev", "build-essential", "espeak-ng")
     .run_commands(
         "git clone https://github.com/myshell-ai/OpenVoice.git /opt/OpenVoice"
     )
     .pip_install(
         "torch", "torchaudio", "transformers", "soundfile", "scipy", "librosa", 
-        "huggingface-hub", "speechbrain", "silero-vad", "eng-to-ipa", "pypinyin", "cn2an", "jieba", "fastapi"
+        "huggingface-hub", "speechbrain", "silero-vad", "eng-to-ipa", "pypinyin", "cn2an", "jieba", "fastapi", "piper-tts",
+        "inflect", "unidecode", "wavmark", "pydub", "whisper-timestamped"
     )
 )
 
@@ -52,6 +47,7 @@ image = (
 class OpenVoiceWorker:
     @modal.enter()
     def setup(self):
+        import torch
         # Podesavamo keš direktorijume na NFS da se modeli ne bi skidali svaki put iznova
         os.environ["HF_HOME"] = f"{VOLUME_PATH}/hf_cache"
         os.environ["TORCH_HOME"] = f"{VOLUME_PATH}/torch_cache"
@@ -61,25 +57,25 @@ class OpenVoiceWorker:
         os.makedirs(f"{VOLUME_PATH}/torch_cache", exist_ok=True)
         os.makedirs(f"{VOLUME_PATH}/speechbrain_cache", exist_ok=True)
         
-        self.srp_model_path = f"{VOLUME_PATH}/mms-tts-srp"
+        self.piper_model_path = f"{VOLUME_PATH}/piper"
         self.ov_path = f"{VOLUME_PATH}/openvoice_v2"
         
         # Ako modeli ne postoje, preuzimamo ih
-        if not os.path.exists(f"{self.srp_model_path}/config.json") or not os.path.exists(f"{self.ov_path}/converter/checkpoint.pth"):
+        if not os.path.exists(f"{self.piper_model_path}/sr_Marko_medium.onnx") or not os.path.exists(f"{self.ov_path}/converter/checkpoint.pth"):
             print("Modeli nisu nađeni na NFS. Pokrećem preuzimanje...")
             download_models()
             
-        # Inicijalizacija VITS srpskog generatora na GPU
-        import torch
-        from transformers import VitsModel, AutoTokenizer
+        # Inicijalizacija Piper srpskog generatora
+        from piper.voice import PiperVoice
         
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Učitavam srpski VITS model na uređaj: {self.device}...")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.srp_model_path)
-        self.vits_model = VitsModel.from_pretrained(self.srp_model_path).to(self.device)
+        print(f"Učitavam srpski Piper model...")
+        self.piper_voice = PiperVoice.load(
+            f"{self.piper_model_path}/sr_Marko_medium.onnx",
+            config_path=f"{self.piper_model_path}/sr_Marko_medium.onnx.json"
+        )
         
         # Inicijalizacija OpenVoice V2 konvertera
-        # OpenVoice kod zahteva da budemo u /opt/OpenVoice direktorijumu ili da ga dodamo u sys.path
         import sys
         sys.path.append("/opt/OpenVoice")
         from openvoice.api import ToneColorConverter
@@ -90,34 +86,38 @@ class OpenVoiceWorker:
         self.tone_color_converter.load_ckpt(f"{converter_dir}/checkpoint.pth")
         print("Inicijalizacija uspešna.")
 
-    @modal.method()
-    def generate_segment(self, segment: dict, ref_se_path: str, base_se_path: str) -> dict:
+    def _generate_segment(self, segment: dict, ref_se_path: str, base_se_path: str) -> dict:
         import sys
         sys.path.append("/opt/OpenVoice")
         import torch
-        import soundfile as sf
-        import numpy as np
+        import base64
+        import uuid
+        import os
         
         seg_id = segment["id"]
         text = segment["text"]
         
-        # Ograničenje za VITS model (ako je tekst prazan)
+        # Ograničenje za Piper model (ako je tekst prazan)
         if not text.strip():
             return {"id": seg_id, "audio_base64": ""}
             
         try:
-            # 1. Generisanje čistog srpskog govora preko Meta VITS modela
-            inputs = self.tokenizer(text=text, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                output = self.vits_model(**inputs)
-            
-            # Dobijamo sirovi audio signal
-            vits_audio = output.audio[0].cpu().numpy()
-            sampling_rate = self.vits_model.config.sampling_rate
-            
-            # Snimamo u privremeni fajl u kontejneru
+            # 1. Generisanje čistog srpskog govora preko Piper modela
             tmp_base_wav = f"/tmp/base_{uuid.uuid4().hex}_{seg_id}.wav"
-            sf.write(tmp_base_wav, vits_audio, sampling_rate)
+            import wave
+            with wave.open(tmp_base_wav, 'wb') as wav_file:
+                chunks = list(self.piper_voice.synthesize(text))
+                if not chunks:
+                    return {"id": seg_id, "error": "Piper nije generisao audio čankove."}
+                sample_rate = chunks[0].sample_rate
+                sample_channels = chunks[0].sample_channels
+                sample_width = chunks[0].sample_width
+                audio_bytes = b''.join(chunk.audio_int16_bytes for chunk in chunks)
+                
+                wav_file.setnchannels(sample_channels)
+                wav_file.setsampwidth(sample_width)
+                wav_file.setframerate(sample_rate)
+                wav_file.writeframes(audio_bytes)
             
             # Učitavamo speaker embedding-e sa NFS-a
             target_se = torch.load(ref_se_path, map_location=self.device)
@@ -153,8 +153,14 @@ class OpenVoiceWorker:
     @modal.fastapi_endpoint(method="POST")
     def task(self, data: dict):
         import sys
+        from unittest.mock import MagicMock
+        sys.modules['faster_whisper'] = MagicMock()
+        
         sys.path.append("/opt/OpenVoice")
         import torch
+        import torch.hub
+        torch.hub._check_repo_is_trusted = lambda *args, **kwargs: True
+        
         from openvoice import se_extractor
         import traceback
         import shutil
@@ -183,19 +189,44 @@ class OpenVoiceWorker:
             target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=True)
             
             # 2. Generisanje i ekstrakcija Speaker Embedding-a za bazni srpski glas
-            # Pošto je bazni glas uvek isti (naš Meta VITS srpski model), možemo generisati kratak uzorak teksta 
-            # da bismo izvukli base_se. Još bolje: možemo izvući base_se jednom i keširati ga, ali izvlačenje je brzo.
-            print(f"[OpenVoice] Generišem uzorak za bazni SE...")
-            sample_text = "Dobar dan, ovo je test za dobijanje baznog glasa."
-            inputs = self.tokenizer(text=sample_text, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                output = self.vits_model(**inputs)
-            vits_audio = output.audio[0].cpu().numpy()
-            tmp_sample_wav = f"/tmp/sample_base_{req_uuid}.wav"
-            import soundfile as sf
-            sf.write(tmp_sample_wav, vits_audio, self.vits_model.config.sampling_rate)
+            base_se_cache_path = f"{VOLUME_PATH}/openvoice_v2/base_se.pt"
+            base_se = None
+            if os.path.exists(base_se_cache_path):
+                print(f"[OpenVoice] Učitavam keširani bazni SE sa {base_se_cache_path}...")
+                try:
+                    base_se = torch.load(base_se_cache_path)
+                except Exception as e:
+                    print(f"[OpenVoice] Greška pri učitavanju keša: {e}, generišem ponovo...")
             
-            base_se, _ = se_extractor.get_se(tmp_sample_wav, self.tone_color_converter, target_dir=processed_dir, vad=True)
+            if base_se is None:
+                print(f"[OpenVoice] Generišem uzorak za bazni SE preko Piper-a...")
+                sample_text = "Dobar dan. Ovo je test za dobijanje baznog glasa koji mora biti dovoljno dugačak kako bi glasovni ekstraktor uspešno prepoznao zvučne karakteristike. Zato ponavljamo rečenicu još nekoliko puta kako bismo prešli granicu od pet sekundi govora. Dobar dan. Ovo je test za dobijanje baznog glasa."
+                tmp_sample_wav = f"/tmp/sample_base_{req_uuid}.wav"
+                import wave
+                with wave.open(tmp_sample_wav, 'wb') as wav_file:
+                    chunks = list(self.piper_voice.synthesize(sample_text))
+                    if not chunks:
+                        return {"error": "Piper nije uspeo da generiše uzorak za bazni SE."}
+                    sample_rate = chunks[0].sample_rate
+                    sample_channels = chunks[0].sample_channels
+                    sample_width = chunks[0].sample_width
+                    audio_bytes = b''.join(chunk.audio_int16_bytes for chunk in chunks)
+                    
+                    wav_file.setnchannels(sample_channels)
+                    wav_file.setsampwidth(sample_width)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(audio_bytes)
+                
+                base_se, _ = se_extractor.get_se(tmp_sample_wav, self.tone_color_converter, target_dir=processed_dir, vad=True)
+                
+                try:
+                    torch.save(base_se, base_se_cache_path)
+                    print(f"[OpenVoice] Bazni SE uspešno keširan na {base_se_cache_path}.")
+                except Exception as e:
+                    print(f"[OpenVoice] Upozorenje: Neuspešno keširanje baznog SE: {e}")
+                
+                if os.path.exists(tmp_sample_wav):
+                    os.remove(tmp_sample_wav)
             
             # Snimamo embedding-e na NFS da bi im paralelni radnici mogli pristupiti
             nfs_temp_dir = f"{VOLUME_PATH}/temp"
@@ -208,8 +239,8 @@ class OpenVoiceWorker:
             torch.save(base_se, base_se_path)
             
             # Brisanje lokalnih privremenih fajlova za ekstrakciju
-            for f in [tmp_ref_path, tmp_sample_wav]:
-                if os.path.exists(f): os.remove(f)
+            if os.path.exists(tmp_ref_path):
+                os.remove(tmp_ref_path)
             shutil.rmtree(processed_dir, ignore_errors=True)
             
             # 3. Pokretanje paralelne obrade segmenata u lokalnom ThreadPool-u radi maksimalne brzine i izbegavanja hladnog starta
@@ -219,7 +250,7 @@ class OpenVoiceWorker:
                 
                 def process_single(seg):
                     try:
-                        return self.generate_segment(
+                        return self._generate_segment(
                             seg,
                             ref_se_path=ref_se_path,
                             base_se_path=base_se_path

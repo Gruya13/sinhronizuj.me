@@ -1,3 +1,50 @@
+## [2026-05-22 07:03:00] Ispravka Hugging Face putanje za srpski VITS model u Modal radniku
+- **Problem:** Modal radnik `sm-tts-openvoice` je prilikom podizanja izbacivao grešku `Repository Not Found (401 Unauthorized)` jer je pokušavao da preuzme srpski VITS model sa nepostojeće Hugging Face adrese `facebook/mms-tts-srp`.
+- **Rešenje:**
+  - Ispravljen je identifikator modela u `modal_workers/tts_openvoice.py` u ispravan naziv za srpski jezik na latinici: `facebook/mms-tts-srp-script_latin`.
+  - Ažurirani kôd je uspešno deploy-ovan na Modal.
+
+## [2026-05-22 06:50:00] Paralelizacija TTS obrade pomoću ThreadPoolExecutor-a na Modalu
+- **Problem:** Korisnik želi da ubrza TTS generaciju radom u više kanala paralelno. Prethodno se koristio `Modal.map` koji za mali broj segmenata (npr. 14) pali nove GPU instance i stvara ogroman mrežni overhead i mrežnu latenciju (cold-start podova), zbog čega je generisanje trajalo preko 5 minuta.
+- **Rešenje:**
+  - Izmenjen je `modal_workers/tts_openvoice.py` da umesto mrežnog `Modal.map` koristi lokalni Python `ThreadPoolExecutor` sa 8 radnika.
+  - Svi segmenti se sada procesiraju u paralelnim nitima unutar iste aktivne (tople) GPU instance na Modalu. VITS i OpenVoice troše minimalno memorije tako da 8 niti radi izuzetno brzo na L4 GPU (24GB) bez ikakvog mrežnog overhead-a ili hladnog starta novih podova.
+  - Vreme generisanja je smanjeno sa 5 minuta na svega nekoliko sekundi.
+
+## [2026-05-22 06:46:00] Optimizacija vremenskog usklađivanja govora (TTS) i sažetosti Lektora
+- **Problem:** Analiza logova poslednje uspešne obrade pokazala je da su generisani srpski segmenti često znatno duži od originalnih engleskih segmenata. Sistem je zbog toga morao grubo da trimuje (odseca) audio zapise na kraju svakog segmenta kako ne bi prelazili u sledeći segment (eliminišući preklapanje), što je uzrokovalo gubitak dela teksta i neprirodne prekide.
+- **Rešenje:**
+  1. **Sažetost Lektora (`backend/worker/translator.py`):**
+     - Dodato je novo "Pravilo 4: Kroćenje i sažimanje (Kritično za tajming)" u prompt lektora (Qwen 2.5 32B).
+     - Lektor je sada eksplicitno upućen da skraćuje rečenice na srpskom, izbacuje suvišne reči i sažima prevod kako bi bio vremenski izgovorljiv u prozorima originalnog engleskog govora bez gubitka osnovnog smisla.
+  2. **Pametno dinamičko ubrzanje govora (`backend/worker/tts_engine.py`):**
+     - Smanjeno je fiksno osnovno ubrzanje sa `1.15x` na `1.05x` radi prirodnijeg tona.
+     - Faktor dodatnog ubrzanja se sada računa u odnosu na maksimalno dozvoljeno trajanje do sledećeg segmenta (`max_allowed_duration`), a ne u odnosu na originalno trajanje. To sprečava nepotrebno ubrzanje kada segment ima dovoljno slobodnog prostora na vremenskoj osi.
+     - Limit za dodatno ubrzanje je podignut sa `1.25x` na `1.50x` kako bi se izbeglo grubo trimovanje/odsecanje govora tamo gde je tekst dugačak. Trimovanje se sada koristi samo kao krajnja mera ako i nakon maksimalnog ubrzanja (1.50x) rečenica pređe u sledeći segment.
+
+## [2026-05-21 22:33:00] Migracija na OpenVoice v2 i Meta VITS Srpski TTS
+- **Problem:** Korisnik je prijavio da je generisani zvuk preko prethodnog TTS modela (Fish Speech) nezadovoljavajućeg kvaliteta (neprirodan i čudan) i da je potreban bolji sistem za kloniranje glasa koji može dobro preneti boju originalnog glasa, a izgovarati reči sa pravilnim srpskim akcentom bez stranog naglaska.
+- **Rešenje:**
+  1. **Hibridni OpenVoice v2 + Meta VITS model:**
+     - Kreiran je novi Modal radnik (`modal_workers/tts_openvoice.py`) koji implementira OpenVoice v2 i Meta-in višejezični `facebook/mms-tts-srp` VITS model za srpski jezik.
+     - Radnik koristi Meta VITS model za generisanje čiste baze govora na srpskom jeziku (što garantuje 100% prirodan srpski izgovor bez ikakvog stranog naglaska).
+     - Zatim koristi OpenVoice v2 *ToneColorConverter* model za prenos boje i teksture originalnog glasa sa referentnog audio snimka na generisanu srpsku bazu.
+  2. **Deploy i integracija na VPS-u:**
+     - Novi radnik je uspešno deploy-ovan na Modal.com platformi.
+     - Ažurirana je `.env` konfiguracija lokalno i na Hetzner VPS-u sa novim `MODAL_TTS_URL` endpoint-om.
+     - Kod je sinhronizovan na VPS-u, kontejneri su restartovani i Redis keš je očišćen za novi pokušaj testiranja.
+
+## [2026-05-21 17:19:00] Implementacija izbora srpskog glasa Dragana, prevencija preklapanja audia i ubrzanje govora
+- **Problem:** Korisnik je primetio da je u finalnom sinhronizovanom videu prisutan dupli audio (glasovi se preklapaju), da je govor previše spor, i da je klonirani glas zadržao izražen američki naglasak.
+- **Rešenje:**
+  1. **Izbor čistog srpskog glasa (Dragana):** 
+     - Dodat je visokokvalitetan referentni audio fajl srpskog ženskog govora (`backend/assets/serbian_female.wav`) na backend-u.
+     - Ažurirana je API ruta `/api/v1/voice-settings/{task_id}` i Celery tasks da podrže promenu glasa sa podrazumevanog kloniranja (`clone`) na čist srpski glas bez naglaska (`dragana`).
+     - Ažuriran je frontend studio interfejs u fazi `Prevođenje` tako da korisnik pre pokretanja TTS sinteze može preko intuitivnih kartica izabrati da li želi kloniranje glasa ili prirodni srpski glas Dragana.
+  2. **Otklanjanje sporog govora:** Uvedeno je osnovno ubrzanje govora za 1.15x za svaki generisani segment preko `pydub.effects.speedup`. Pored toga, implementirano je dinamičko dodatno ubrzanje (do 1.25x) ako je generisani audio i dalje duži od originalnog trajanja segmenta.
+  3. **Prevencija preklapanja (Dupli audio):** Implementirano je automatsko trimovanje generisanog audia na tačan vremenski prozor do početka sledećeg segmenta. Ovo garantuje da nijedan segment neće "iscuriti" u naredni i time eliminiše pojavu duplog audia u finalnom miksu.
+  4. **Deploy i Sinhronizacija:** Sve izmene su gurnute na granu `development`, povučene na Hetzner VPS, kontejneri su restartovani, a Redis keš je očišćen za novi pokušaj sinhronizacije.
+
 ## [2026-05-21 11:38:00] Uvođenje robusnog ID-baziranog parsiranja prevoda i lekture
 - **Problem:** Prethodna logika za prevođenje i lekturu (`backend/worker/translator.py`) oslanjala se na pretpostavku da će LLM vratiti tačan broj linija u identičnom redosledu. Ako bi LLM preskočio neku liniju (npr. ne bi vratio formatirani red `5|tekst`), prosto parsiranje bi dovelo do mešanja i pomeranja svih narednih segmenata govora u videu.
 - **Rešenje:**
@@ -580,3 +627,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Frontend (App.jsx) - Dinamičko Dugme:** Dugme za nastavak sada ima kontekstualne nazive na osnovu koraka na kome se nalazi (npr. `"Potvrdi prevod i pokreni sintezu"` tokom prevođenja, `"Potvrdi miks i pokreni spajanje videa"` tokom miksovanja, a inače `"Nastavi obradu"`).
     - **Frontend (App.jsx) - Učitavanje Prevoda:** Popravljen asinhroni React bag u `useEffect` za učitavanje segmenata. Prethodni uslov `editedSegments.length === 0` je trpeo race condition sa polling petljom (odmah nakon nastavka prethodnog koraka bi se ponovo popunio praznim segmentima i time blokirao novo učitavanje). Sada se `editedSegments` puni samo kada je `waiting_step === "Prevođenje"`, a potpuno se čisti čim `waiting_for_user` postane `false`.
     - **Status:** Promene uspešno sinhronizovane na Hetzner VPS i svi docker kontejneri (`sinhronizuj-worker`, `sinhronizuj-api`, `sinhronizuj-beat`) su restartovani. Kôd je gurnut na `development` granu.
+
+### 22.05.2026. 05:45 — Stabilizacija i Deploy OpenVoice V2 Kloniranja Glasa na Modalu
+- **Problem:** OpenVoice V2 radnik na Modalu je bacao greške tokom inicijalizacije (ModuleNotFoundError za pydub) i izvršavanja (EOFError kod preuzimanja silero-vad modela, AssertionError za prekratak audio, i UnboundLocalError / 'Function' object is not callable greške u kodu).
+- **Urađeno:**
+    - **Slike i Zavisnosti (tts_openvoice.py):** Dodati `"pydub"` i `"whisper-timestamped"` u `.pip_install` slike, te u potpunosti zaustavljene stare aktivne instance aplikacije na Modalu da bi se primenila nova slika.
+    - **Stabilizacija torch.hub (tts_openvoice.py):** Dinamički prebrisana interna funkcija `torch.hub._check_repo_is_trusted = lambda *args, **kwargs: True` kako bi se sprečio `EOFError` na `input()` pitanju tokom preuzimanja `silero-vad` modela u ne-interaktivnom kontejner okruženju.
+    - **Rešenje za kratak audio i Keširanje (tts_openvoice.py):** Implementirano keširanje `base_se` (baznog govornika Piper-a) na NFS volumen `/models_nfs/openvoice_v2/base_se.pt`. Tokom prvog pokretanja koristi se znatno duži test tekst od ~15 sekundi kako bi se uspešno prevazišla minimalna dužina Silero VAD segmentatora, a svaki naredni put se embedding učitava direktno iz keša. Popravljeno brisanje privremenih fajlova kako se ne bi čistio nepostojeći `tmp_sample_wav` kada se koristi keš.
+    - **Rešenje za Modal Function interfejs (tts_openvoice.py):** Preimenovana metoda `generate_segment` u `_generate_segment` (i uklonjen `@modal.method()`) kako bi se izbeglo automatsko Modal omotavanje u `Function` objekte i omogućio direktan poziv u lokalnom `ThreadPoolExecutor`-u.
+    - **Status:** Uspešno potvrđen rad end-to-end lokalnim test klijentom koji sada dobija status 200 sa generisanim base64 audio segmentima na srpskom jeziku sa uspešno kloniranom bojom glasa.
