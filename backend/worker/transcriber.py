@@ -183,7 +183,16 @@ def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callb
     # Definišemo paralelne ASR pozive
     def run_whisper():
         print("[ASR] Pokrećem Whisper transkripciju...", flush=True)
-        payload = {"task": "transcribe", "audio_base64": audio_base64}
+        payload = {
+            "task": "transcribe", 
+            "audio_base64": audio_base64,
+            "vad_filter": False,
+            "condition_on_previous_text": True,
+            "word_timestamps": False,
+            "no_speech_threshold": None,
+            "log_prob_threshold": None,
+            "compression_ratio_threshold": None
+        }
         if initial_prompt:
             payload["initial_prompt"] = initial_prompt
             

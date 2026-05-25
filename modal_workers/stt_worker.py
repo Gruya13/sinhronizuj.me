@@ -63,6 +63,15 @@ class STTWorker:
             data = await request.json()
             audio_b64 = data.get("audio_base64")
             initial_prompt = data.get("initial_prompt", "This is a clear speech. Please use punctuation: dots, commas, and capital letters.")
+            vad_filter = data.get("vad_filter", True)
+            condition_on_previous_text = data.get("condition_on_previous_text", False)
+            word_timestamps = data.get("word_timestamps", True)
+            
+            # Dodatni pragovi za borbu protiv preskakanja
+            no_speech_threshold = data.get("no_speech_threshold", 0.6)
+            log_prob_threshold = data.get("log_prob_threshold", -1.0)
+            compression_ratio_threshold = data.get("compression_ratio_threshold", 2.4)
+            
             if not audio_b64:
                 return {"error": "audio_base64 is required"}
                 
@@ -73,19 +82,22 @@ class STTWorker:
             
             try:
                 # Forsiramo interpunkciju kroz initial_prompt
-                print(f"Transkribujem fajl: {tmp_audio_path} sa promptom: {initial_prompt}")
+                print(f"Transkribujem: {tmp_audio_path}, vad_filter: {vad_filter}, word_timestamps: {word_timestamps}, condition_on_prev: {condition_on_previous_text}")
                 segments, info = self.whisper_model.transcribe(
                     tmp_audio_path, 
                     language=None, 
                     beam_size=5,
-                    word_timestamps=True, # Dobijamo vreme svake reči
-                    condition_on_previous_text=False,
-                    vad_filter=True,
+                    word_timestamps=word_timestamps, # Dobijamo vreme svake reči
+                    condition_on_previous_text=condition_on_previous_text,
+                    vad_filter=vad_filter,
                     vad_parameters=dict(
                         min_speech_duration_ms=250,
                         speech_pad_ms=400  # Izbegavanje sečenja reči
-                    ),
-                    initial_prompt=initial_prompt
+                    ) if vad_filter else None,
+                    initial_prompt=initial_prompt,
+                    no_speech_threshold=no_speech_threshold,
+                    log_prob_threshold=log_prob_threshold,
+                    compression_ratio_threshold=compression_ratio_threshold
                 )
                 
                 result = []

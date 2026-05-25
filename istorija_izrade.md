@@ -677,3 +677,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Hibridni Ensemble ASR (transcriber.py):** Ažurirana funkcija `transcribe_audio` da paralelno (kroz `ThreadPoolExecutor`) poziva i Whisper i SenseVoice-Small na Modalu.
     - **LLM Arbitraža (transcriber.py):** Implementirana funkcija `arbitrate_transcripts` koja šalje originalne Whisper segmente i kompletan SenseVoice transkript Lektoru (Qwen 32B) da na osnovu konteksta ispravi sve uočene ASR greške, zadržavajući originalne vremenske oznake (timestamps) segmenata.
     - **Status:** Svi radnici na Modalu su uspešno deploy-ovani, backend i Celery kod je ažuriran. Spreman za testiranje.
+
+
+### 25.05.2026. 09:38 — Rešavanje Problema sa Preskakanjem Segmenata Engleskog jezika u Whisper STT-u
+- **Problem:** Primećeno je da su pojedini segmenti engleskog jezika na UI-ju bili "pojedeni" (nedostajali su). Detaljnim debugovanjem kroz `debug_arbitration.py` ustanovili smo da je Whisper Large-V3 potpuno preskakao cele blokove govora (konkretno prozor od 14.5 sekundi između 53.6s i 68.1s). Zatim bi Lektor tokom arbitraže sav SenseVoice tekst koji Whisper nije čuo ugurao u preostale prekratke segmente, što bi tokom TTS-a i time-stretch-a dovelo do nerazumljivog govora velike brzine (chipmunk efekat) i dugih rupa tišine na tajmlajnu.
+- **Urađeno:**
+    - **Ažuriranje STT Radnika (stt_worker.py):** Dodati konfigurabilni parametri `vad_filter`, `condition_on_previous_text`, `word_timestamps`, `no_speech_threshold`, `log_prob_threshold` i `compression_ratio_threshold` koji se primaju kroz API zahtev i prosleđuju u `WhisperModel.transcribe`. Implementirana i test funkcija na Modalu za brzu dijagnostiku.
+    - **Stabilizacija Transkripcije (transcriber.py):** Ažuriran `run_whisper` poziv u backendu da koristi optimizovane parametre za transkripciju izolovanog vokala:
+        * `vad_filter: False` (Demucs je već izolovao glas, pa VAD filter više ne može slučajno odseći tihe delove govora).
+        * `condition_on_previous_text: True` (obezbeđuje kontinuitet konteksta).
+        * `word_timestamps: False` (onemogućeno jer je ctranslate2/faster-whisper algoritam za poravnanje reči često bacao greške i bacao cele rečenice. Sistem sada koristi stabilni fallback u `segment_by_sentences`).
+        * `no_speech_threshold: None`, `log_prob_threshold: None` i `compression_ratio_threshold: None` (onemogućeni svi pragovi osetljivosti kako bi Whisper bio primoran da dekodira ceo audio i da ne preskače ništa).
+- **Status:** Uspešno testirano kroz integracioni test `test_hybrid_transcribe.py`. Whisper je vratio svih 14 segmenata bez ijedne rupe na tajmlajnu, a Lektor je obavio savršenu arbitražu. Izmene su uspešno deploy-ovane na Modal.
