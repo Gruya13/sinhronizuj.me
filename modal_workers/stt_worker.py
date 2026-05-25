@@ -62,6 +62,7 @@ class STTWorker:
             
             data = await request.json()
             audio_b64 = data.get("audio_base64")
+            initial_prompt = data.get("initial_prompt", "This is a clear speech. Please use punctuation: dots, commas, and capital letters.")
             if not audio_b64:
                 return {"error": "audio_base64 is required"}
                 
@@ -72,7 +73,7 @@ class STTWorker:
             
             try:
                 # Forsiramo interpunkciju kroz initial_prompt
-                print(f"Transkribujem fajl: {tmp_audio_path}")
+                print(f"Transkribujem fajl: {tmp_audio_path} sa promptom: {initial_prompt}")
                 segments, info = self.whisper_model.transcribe(
                     tmp_audio_path, 
                     language=None, 
@@ -80,8 +81,11 @@ class STTWorker:
                     word_timestamps=True, # Dobijamo vreme svake reči
                     condition_on_previous_text=False,
                     vad_filter=True,
-                    vad_parameters=dict(min_speech_duration_ms=250),
-                    initial_prompt="This is a clear speech. Please use punctuation: dots, commas, and capital letters."
+                    vad_parameters=dict(
+                        min_speech_duration_ms=250,
+                        speech_pad_ms=400  # Izbegavanje sečenja reči
+                    ),
+                    initial_prompt=initial_prompt
                 )
                 
                 result = []

@@ -85,7 +85,9 @@ def _download_from_youtube(url: str) -> dict:
                 "status": "success",
                 "video_path": video_path,
                 "audio_path": audio_path,
-                "title": info.get('title', 'YouTube Video')
+                "title": info.get('title', 'YouTube Video'),
+                "description": info.get('description', ''),
+                "tags": info.get('tags', [])
             }
     except Exception as e:
         return {"status": "error", "message": f"YouTube Download Error: {str(e)}"}

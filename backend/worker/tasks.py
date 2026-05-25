@@ -112,9 +112,29 @@ def process_video_task(self, video_url: str, debug: bool = False):
     
     # --- FAZA 3: Transkripcija ---
     update_progress("Prepoznavanje govora (Whisper Modal)...", 40, detail="Inicijalizacija Whisper zahteva...")
+    
+    # Korak 1: Kreiranje dinamičkog initial prompt-a na osnovu metapodataka videa
+    video_title = result.get("title", "")
+    video_desc = result.get("description", "")
+    video_tags = result.get("tags", [])
+    
+    prompt_keywords = []
+    if video_title:
+        prompt_keywords.append(video_title)
+    if video_tags:
+        prompt_keywords.extend(video_tags[:5])
+        
+    keywords_str = ", ".join([str(kw) for kw in prompt_keywords[:8]])
+    initial_prompt = "This is a clear speech. Please use punctuation: dots, commas, and capital letters."
+    if keywords_str:
+        initial_prompt = f"This is a video about {keywords_str}. Please use correct punctuation: dots, commas, and capital letters. Spell names and technical terms correctly."
+        
+    print(f"[ASR] Generisan dinamički prompt: {initial_prompt}", flush=True)
+
     from backend.worker.transcriber import transcribe_audio
     transcription_result = transcribe_audio(
         sep_result["vocals_path"],
+        initial_prompt=initial_prompt,
         progress_callback=lambda detail: update_progress(detail=detail)
     )
     if transcription_result["status"] == "error": return transcription_result

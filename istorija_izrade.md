@@ -1,3 +1,14 @@
+## [2026-05-25 08:59:00] Stabilizacija SenseVoice radnika na Modalu i hibridne transkripcije
+- **Problem:**
+  1. **NFS konflikt i trka**: SenseVoice radnik je imao konflikt sa konkurentnim kreiranjem privremenih foldera i datoteka (greška sa `._____temp`) na deljenom NFS disku (`sinhronizuj-models`), što je uzrokovalo beskonačnu petlju padova i ponovnih preuzimanja modela na Modalu (`RuntimeError: model 'iic/SenseVoiceSmall' is not registered`).
+  2. **Greška normalizacije audia**: U `backend/worker/utils.py` korišćeno je pogrešno svojstvo `sound.dbfs` (malim slovima) umesto ispravnog `sound.dBFS` iz biblioteke `pydub`, što je dovodilo do kraha.
+  3. **Lokalni Python 3.14 problem**: Na lokalnom sistemu sa Python 3.14 verzijom uvoz `pydub` je krašovao zbog nedostatka modula `audioop` koji je uklonjen iz standardne biblioteke.
+- **Rešenje:**
+  1. **HuggingFace & Image Ugradnja**: Potpuno je uklonjen NFS mrežni disk iz konfiguracije za `sensevoice_worker.py`. Konfigurisano je preuzimanje sa HuggingFace-a (`FunAudioLLM/SenseVoiceSmall`, `hub="hf"`), koje na Modalu preuzima model od 1.2 GB za svega 5 sekundi. Preuzimanje je stavljeno u build time slike, čime je model trajno zapakovan u Docker sliku radnika.
+  2. **Ispravka `dBFS`**: Svojstvo u `backend/worker/utils.py` ispravljeno je u `sound.dBFS`.
+  3. **Dodavanje `audioop-lts`**: U `requirements.txt` dodata je zavisnost `audioop-lts; python_version >= '3.13'` za lokalnu kompatibilnost.
+  4. **Uspešan test**: Pokrenut je test `test_hybrid_transcribe.py` koji je bez greške izvršio normalizaciju, paralelnu transkripciju i Lektor LLM arbitražu sa izlaznim statusom 0.
+
 ## [2026-05-22 08:02:00] Stabilizacija OpenVoice V2 i Piper dinamičkog ubrzanja na Modalu
 - **Problem:** Prilikom paralelnog testiranja TTS generacije sa parametrima trajanja, Modal radnik je bacao grešku `# channels not specified` na segmentima. Istragom logova utvrđeno je da:
   1. `PiperVoice.synthesize` u verziji instaliranoj na Modalu ne prihvata parametar `length_scale` direktno kao keyword argument (TypeError).
@@ -646,3 +657,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Rešenje za kratak audio i Keširanje (tts_openvoice.py):** Implementirano keširanje `base_se` (baznog govornika Piper-a) na NFS volumen `/models_nfs/openvoice_v2/base_se.pt`. Tokom prvog pokretanja koristi se znatno duži test tekst od ~15 sekundi kako bi se uspešno prevazišla minimalna dužina Silero VAD segmentatora, a svaki naredni put se embedding učitava direktno iz keša. Popravljeno brisanje privremenih fajlova kako se ne bi čistio nepostojeći `tmp_sample_wav` kada se koristi keš.
     - **Rešenje za Modal Function interfejs (tts_openvoice.py):** Preimenovana metoda `generate_segment` u `_generate_segment` (i uklonjen `@modal.method()`) kako bi se izbeglo automatsko Modal omotavanje u `Function` objekte i omogućio direktan poziv u lokalnom `ThreadPoolExecutor`-u.
     - **Status:** Uspešno potvrđen rad end-to-end lokalnim test klijentom koji sada dobija status 200 sa generisanim base64 audio segmentima na srpskom jeziku sa uspešno kloniranom bojom glasa.
+
+### 24.05.2026. 07:05 — Brainstorming i Evaluacija Mega-ASR integracije
+- **Problem/Zahtev:** Korisnik je predložio integraciju Mega-ASR modela (Qwen3-ASR) kao dodatnog (sekundarnog) transkribera pored Whisper-a, sa ciljem poređenja rezultata i smanjenja grešaka kako bi se postigla preciznost bliže 100%.
+- **Urađeno:**
+    - Razjašnjeno je da se transkripcija u našem pipeline-u zapravo vrši na originalnom engleskom jeziku, nakon čega sledi prevođenje i lektura na srpskom.
+    - Sproveli smo analizu korišćenja Mega-ASR modela (Qwen3-ASR-1.7B) za engleski jezik. Model je robustan na akcente i brz govor, ali pošto Demucs već čisti šum, njegova glavna snaga akustičke robusnosti je manje izražena.
+    - Predložena je strategija LLM Arbitraže (generativna fuzija) gde se dva engleska transkripta šalju Lektoru (Qwen 35B) koji rešava neslaganja i kreira finalni "Master engleski transkript" pre prevođenja.
+    - Predložene su alternative za sekundarni engleski ASR model: izuzetno brzi `SenseVoice-Small` ili tradicionalni CTC-bazirani modeli (poput Wav2Vec2/Conformer) koji ne haluciniraju i ne preskaču reči.
+    - Kreiran je korigovani evaluacioni dokument u `brainstorming/mega_asr_evaluacija.md` i zabeležen u sistemu.
+- **Status:** Brainstorming je uspešno završen i dokumentovan sa ispravnim engleskim kontekstom. Čeka se povratna informacija korisnika za dalje korake.
+
+### 25.05.2026. 08:17 — Unapređenje Tačnosti Whisper STT-a (VAD, Dynamic Prompting, Normalizacija i Ensemble ASR)
+- **Zahtev:** Implementacija poboljšanja pod koracima 1 (VAD padding + dinamički prompt), 2 (normalizacija audia) i 4 (Ensemble ASR sa SenseVoice-Small i LLM arbitražom).
+- **Urađeno:**
+    - **VAD i Dynamic Prompting (stt_worker.py & tasks.py):** Ažuriran Whisper STT radnik na Modalu da prihvata dinamički `initial_prompt` i dodat `speech_pad_ms=400` u Silero VAD parametre kako bi se sprečilo prerano odsecanje reči. U `tasks.py` se automatski izdvajaju naslov i tagovi videa kako bi se kreirao kontekstualni prompt za bolje spelovanje stručnih i tehničkih termina.
+    - **Audio Preprocessing (utils.py & transcriber.py):** Dodata funkcija `normalize_audio` koja pre slanja audia na transkripciju normalizuje jačinu zvuka vokalne trake na stabilnih -20 dBFS pomoću `pydub`.
+    - **SenseVoice-Small Worker (sensevoice_worker.py):** Kreiran i uspešno postavljen novi serverless Modal radnik koji na T4 GPU-u pokreće Alibaba-in `SenseVoice-Small` model (izuzetno brz ASR optimizovan za engleski pravopis bez halucinacija).
+    - **Hibridni Ensemble ASR (transcriber.py):** Ažurirana funkcija `transcribe_audio` da paralelno (kroz `ThreadPoolExecutor`) poziva i Whisper i SenseVoice-Small na Modalu.
+    - **LLM Arbitraža (transcriber.py):** Implementirana funkcija `arbitrate_transcripts` koja šalje originalne Whisper segmente i kompletan SenseVoice transkript Lektoru (Qwen 32B) da na osnovu konteksta ispravi sve uočene ASR greške, zadržavajući originalne vremenske oznake (timestamps) segmenata.
+    - **Status:** Svi radnici na Modalu su uspešno deploy-ovani, backend i Celery kod je ažuriran. Spreman za testiranje.

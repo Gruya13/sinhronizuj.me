@@ -11,6 +11,7 @@ class Settings:
     
     # Modal Serverless Endpoints
     MODAL_STT_URL: str = os.getenv("MODAL_STT_URL", "")
+    MODAL_SENSEVOICE_URL: str = os.getenv("MODAL_SENSEVOICE_URL", "")
     MODAL_TRANSLATOR_URL: str = os.getenv("MODAL_TRANSLATOR_URL", "")
     MODAL_LEKTOR_URL: str = os.getenv("MODAL_LEKTOR_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
