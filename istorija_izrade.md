@@ -881,6 +881,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Frontend (`frontend/src/App.jsx`):** Uklonjen je kompleksan meni sa izborom glasova koji je nudio nepouzdane/alternativne glasove. Umesto toga, dodat je jednostavan i jasan informativni panel koji obaveštava korisnika da se koristi standardni i provereni srpski model Marko sa kloniranjem boje glasa.
 - **Status:** Uspešno implementirano, radnik deploy-ovan na Modal i spreman za stabilan rad.
 
+### 26.05.2026. 17:25 — Ispravka greške sa ToneColorConverter na Modalu (Hotfix)
+- **Opis / Problem:**
+    Nakon čišćenja koda radnika na Modalu, aplikacija je ušla u crash loop sa greškama:
+    1. `AttributeError: 'ToneColorConverter' object has no attribute 'load_checkpoint'` (biblioteka koristi naziv metode `load_ckpt`).
+    2. `TypeError: ToneColorConverter.convert() got an unexpected keyword argument 'model'` (OpenVoice V2 prima `audio_src_path` i ne prima parametar `model` za razliku od V1 verzije).
+- **Urađeno:**
+    - Ispravljen je poziv učitavanja checkpoint-a na `load_ckpt`.
+    - Ispravljen je poziv `.convert` metode prema parametrima OpenVoice V2.
+    - Ugašeni su stari kontejneri na Modalu (`modal app stop`) i odrađen je ponovni, svež deploy.
+    - Pokrenuto je testiranje preko `scratch/test_cloning.py` i sinteza je uspešno izvršena, generišući željeni audio izlaz bez grešaka.
+- **Status:** Problem je uspešno otklonjen, radnik na Modalu je u potpunosti stabilan i funkcionalan.
+
+
 
 
 

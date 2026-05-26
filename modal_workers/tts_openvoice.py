@@ -91,7 +91,7 @@ class OpenVoiceWorker:
             f"{self.ov_path}/converter/config.json",
             device=self.device
         )
-        self.tone_color_converter.load_checkpoint(
+        self.tone_color_converter.load_ckpt(
             f"{self.ov_path}/converter/checkpoint.pth"
         )
         print("Svi modeli su uspešno inicijalizovani.")
@@ -139,8 +139,7 @@ class OpenVoiceWorker:
             base_se = torch.load(base_se_path)
             
             self.tone_color_converter.convert(
-                model=self.tone_color_converter.model,
-                src_path=tmp_base_wav,
+                audio_src_path=tmp_base_wav,
                 src_se=base_se,
                 tgt_se=target_se,
                 output_path=tmp_final_wav,
