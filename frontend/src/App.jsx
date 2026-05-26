@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, CloudUpload } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, CloudUpload, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
@@ -116,7 +116,9 @@ function App() {
   }, [loading, videoUrl, startTime]);
 
   useEffect(() => {
-    if (progressData?.waiting_for_user && progressData?.waiting_step === "Prevođenje") {
+    const isStepAwaiting = progressData?.waiting_for_user && 
+      (progressData?.waiting_step === "Prevođenje" || progressData?.waiting_step === "TTS Sinteza");
+    if (isStepAwaiting) {
       if (progressData.segments && editedSegments.length === 0) {
         console.log("[STUDIO] Ucitavam segmente za izmenu:", progressData.segments.length);
         setEditedSegments(progressData.segments.map(s => ({
@@ -296,8 +298,8 @@ function App() {
         body: JSON.stringify({ background_volume: bgVolume, dubbed_volume: dubVolume })
       });
 
-      // 2.5 Posalji podesavanja glasa ako smo u fazi Prevodjenje
-      if (progressData?.waiting_step === "Prevođenje") {
+      // 2.5 Posalji podesavanja glasa ako smo u fazi Prevodjenje ili TTS Sinteza
+      if (progressData?.waiting_step === "Prevođenje" || progressData?.waiting_step === "TTS Sinteza") {
         console.log("[STUDIO] Snimam podesavanja glasa...", { voice: selectedVoice });
         await fetch(`${API_BASE_URL}/api/v1/voice-settings/${taskId}`, {
           method: 'POST',
@@ -312,6 +314,43 @@ function App() {
       
     } catch (err) {
       console.error("Greska pri slanju podataka i nastavku:", err);
+    } finally {
+      setTimeout(() => setIsContinuing(false), 2000);
+    }
+  };
+
+  const handleRegenerateTTS = async () => {
+    if (!taskId) return;
+    setIsContinuing(true);
+    try {
+      // 1. Ako je korisnik vrsio izmene na segmentima, posalji ih backendu
+      if (editedSegments.length > 0) {
+        console.log("[STUDIO] Snimam izmenjene segmente za regeneraciju...", editedSegments);
+        await fetch(`${API_BASE_URL}/api/v1/edit-segments/${taskId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments: editedSegments })
+        });
+      }
+      
+      // 2. Posalji podesavanja glasa
+      console.log("[STUDIO] Snimam podesavanja glasa za regeneraciju...", { voice: selectedVoice });
+      await fetch(`${API_BASE_URL}/api/v1/voice-settings/${taskId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice: selectedVoice })
+      });
+
+      // 3. Posalji signal za regeneraciju
+      console.log("[STUDIO] Slanje zahteva za regeneraciju TTS...");
+      const res = await fetch(`${API_BASE_URL}/api/v1/regenerate-tts/${taskId}`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      
+      // Ocisti lokalne segmente za izmenu kako bi se ponovo ucitali sa servera kada se zavrsi sinteza
+      setEditedSegments([]);
+      
+    } catch (err) {
+      console.error("Greska pri regeneraciji TTS-a:", err);
     } finally {
       setTimeout(() => setIsContinuing(false), 2000);
     }
@@ -672,10 +711,23 @@ function App() {
                                 />
                               </div>
                             </div>
+
+                            {progressData?.dubbed_audio_url && (
+                              <div className="audio-preview-section" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '15px', marginTop: '10px' }}>
+                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span>🎧</span> Preslušajte generisani srpski glas (pre spajanja sa videom):
+                                </p>
+                                <audio 
+                                  src={`${API_BASE_URL}${progressData.dubbed_audio_url}`} 
+                                  controls 
+                                  style={{ width: '100%', height: '40px', borderRadius: '8px' }}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {progressData?.waiting_step === "Prevođenje" && (
+                        {(progressData?.waiting_step === "Prevođenje" || progressData?.waiting_step === "TTS Sinteza") && (
                           <div className="voice-selection-box">
                             <h3 className="voice-selection-title">🎙️ Izaberite AI glas za sintezu na srpskom:</h3>
                             <div className="voice-options">
@@ -769,6 +821,42 @@ function App() {
                                 </div>
                               </label>
 
+                              <label className={`voice-card ${selectedVoice === 'clone_institut' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="clone_institut" 
+                                  checked={selectedVoice === 'clone_institut'} 
+                                  onChange={() => setSelectedVoice('clone_institut')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">🏫</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Kloniraj - Institut (Piper)</span>
+                                    <span className="voice-desc">Klonira originalni glas koristeći model Serbskog instituta</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              <label className={`voice-card ${selectedVoice === 'institut' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="institut" 
+                                  checked={selectedVoice === 'institut'} 
+                                  onChange={() => setSelectedVoice('institut')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">🏫</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Čist Institut (Piper)</span>
+                                    <span className="voice-desc">Bez kloniranja. Čist, prirodan spikerski glas Serbskog instituta</span>
+                                  </div>
+                                </div>
+                              </label>
+
                               <label className={`voice-card ${selectedVoice === 'dragana' ? 'active' : ''}`}>
                                 <input 
                                   type="radio" 
@@ -790,18 +878,33 @@ function App() {
                           </div>
                         )}
 
-                        <button 
-                          className="continue-btn" 
-                          onClick={handleContinue}
-                          disabled={isContinuing}
-                        >
-                          {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
-                          {progressData?.waiting_step === "Prevođenje" 
-                            ? "Potvrdi prevod i pokreni sintezu" 
-                            : progressData?.waiting_step === "TTS Sinteza"
-                              ? "Potvrdi miks i pokreni spajanje videa"
-                              : "Nastavi obradu"}
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '10px', alignItems: 'center' }}>
+                          <button 
+                            className="continue-btn" 
+                            onClick={handleContinue}
+                            disabled={isContinuing}
+                            style={{ width: '100%', maxWidth: '350px', justifyContent: 'center' }}
+                          >
+                            {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <Play size={20} />}
+                            {progressData?.waiting_step === "Prevođenje" 
+                              ? "Potvrdi prevod i pokreni sintezu" 
+                              : progressData?.waiting_step === "TTS Sinteza"
+                                ? "Potvrdi miks i pokreni spajanje videa"
+                                : "Nastavi obradu"}
+                          </button>
+
+                          {progressData?.waiting_step === "TTS Sinteza" && (
+                            <button 
+                              className="regenerate-btn" 
+                              onClick={handleRegenerateTTS}
+                              disabled={isContinuing}
+                              style={{ width: '100%', maxWidth: '350px', justifyContent: 'center' }}
+                            >
+                              {isContinuing ? <Loader2 size={20} className="spinner-icon" /> : <RefreshCw size={16} />}
+                              <span>Ponovo generiši glas sa novim podešavanjima/tekstom</span>
+                            </button>
+                          )}
+                        </div>
                       </motion.div>
                     )}
                   </div>
@@ -815,7 +918,7 @@ function App() {
                             <span>AI Prevod (TOON Format)</span>
                           </div>
                           {progressData.segments.map((seg, idx) => {
-                            const isReview = progressData?.waiting_for_user && progressData?.waiting_step === "Prevođenje" && editedSegments.length > 0;
+                            const isReview = progressData?.waiting_for_user && (progressData?.waiting_step === "Prevođenje" || progressData?.waiting_step === "TTS Sinteza") && editedSegments.length > 0;
                             return (
                               <motion.div 
                                 key={idx} 

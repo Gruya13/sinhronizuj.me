@@ -14,21 +14,32 @@ VOLUME_PATH = "/models_nfs"
 def download_models():
     from huggingface_hub import hf_hub_download, snapshot_download
     
-    # 1. Preuzimanje srpskog Piper modela
-    print("Preuzimam srpski Piper model (phantom9623/piper-serbian-tts)...")
     piper_model_path = f"{VOLUME_PATH}/piper"
     os.makedirs(piper_model_path, exist_ok=True)
     
-    hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx", local_dir=piper_model_path)
-    hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx.json", local_dir=piper_model_path)
-    print("Srpski Piper model uspešno sačuvan.")
+    # 1. Preuzimanje srpskog Piper modela (Marko)
+    if not os.path.exists(f"{piper_model_path}/sr_Marko_medium.onnx") or \
+       not os.path.exists(f"{piper_model_path}/sr_Marko_medium.onnx.json"):
+        print("Preuzimam srpski Piper model (phantom9623/piper-serbian-tts)...")
+        hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx", local_dir=piper_model_path)
+        hf_hub_download(repo_id="phantom9623/piper-serbian-tts", filename="sr_Marko_medium.onnx.json", local_dir=piper_model_path)
+        print("Srpski Piper model uspešno sačuvan.")
+    
+    # 1b. Preuzimanje srpskog Piper modela (serbski_institut)
+    if not os.path.exists(f"{piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx") or \
+       not os.path.exists(f"{piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx.json"):
+        print("Preuzimam srpski Piper model (serbski_institut)...")
+        hf_hub_download(repo_id="rhasspy/piper-voices", filename="sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx", local_dir=piper_model_path)
+        hf_hub_download(repo_id="rhasspy/piper-voices", filename="sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx.json", local_dir=piper_model_path)
+        print("Serbski institut model uspešno sačuvan.")
     
     # 2. Preuzimanje OpenVoice V2 konvertera
-    print("Preuzimam OpenVoice V2 checkpoint...")
     ov_path = f"{VOLUME_PATH}/openvoice_v2"
-    os.makedirs(ov_path, exist_ok=True)
-    snapshot_download(repo_id="myshell-ai/OpenVoiceV2", local_dir=ov_path)
-    print("OpenVoice V2 checkpoint uspešno sačuvan.")
+    if not os.path.exists(f"{ov_path}/converter/checkpoint.pth"):
+        print("Preuzimam OpenVoice V2 checkpoint...")
+        os.makedirs(ov_path, exist_ok=True)
+        snapshot_download(repo_id="myshell-ai/OpenVoiceV2", local_dir=ov_path)
+        print("OpenVoice V2 checkpoint uspešno sačuvan.")
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
@@ -61,7 +72,11 @@ class OpenVoiceWorker:
         self.ov_path = f"{VOLUME_PATH}/openvoice_v2"
         
         # Ako modeli ne postoje, preuzimamo ih
-        if not os.path.exists(f"{self.piper_model_path}/sr_Marko_medium.onnx") or not os.path.exists(f"{self.ov_path}/converter/checkpoint.pth"):
+        if not os.path.exists(f"{self.piper_model_path}/sr_Marko_medium.onnx") or \
+           not os.path.exists(f"{self.piper_model_path}/sr_Marko_medium.onnx.json") or \
+           not os.path.exists(f"{self.piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx") or \
+           not os.path.exists(f"{self.piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx.json") or \
+           not os.path.exists(f"{self.ov_path}/converter/checkpoint.pth"):
             print("Modeli nisu nađeni na NFS. Pokrećem preuzimanje...")
             download_models()
             
@@ -73,6 +88,11 @@ class OpenVoiceWorker:
         self.piper_voice = PiperVoice.load(
             f"{self.piper_model_path}/sr_Marko_medium.onnx",
             config_path=f"{self.piper_model_path}/sr_Marko_medium.onnx.json"
+        )
+        print(f"Učitavam serbski_institut Piper model...")
+        self.piper_voice_institut = PiperVoice.load(
+            f"{self.piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx",
+            config_path=f"{self.piper_model_path}/sr/sr_RS/serbski_institut/medium/sr_RS-serbski_institut-medium.onnx.json"
         )
         
         import inspect
@@ -148,10 +168,14 @@ class OpenVoiceWorker:
                 from piper.voice import SynthesisConfig
                 
                 syn_config = SynthesisConfig(length_scale=length_scale)
+                voice_model = self.piper_voice
+                if base_voice == "serbski_institut":
+                    voice_model = self.piper_voice_institut
+                
                 with wave.open(tmp_base_wav, 'wb') as wav_file:
-                    chunks = list(self.piper_voice.synthesize(text, syn_config=syn_config))
+                    chunks = list(voice_model.synthesize(text, syn_config=syn_config))
                     if not chunks:
-                        return {"id": seg_id, "error": "Piper nije generisao audio čankove."}
+                        return {"id": seg_id, "error": f"Piper ({base_voice}) nije generisao audio čankove."}
                     sample_rate = chunks[0].sample_rate
                     sample_channels = chunks[0].sample_channels
                     sample_width = chunks[0].sample_width
@@ -252,8 +276,10 @@ class OpenVoiceWorker:
             # - clone / clone_male: muški base (Nicholas) + kloniranje
             # - clone_female: ženski base (Sophie) + kloniranje
             # - clone_marko: Marko (Piper) + kloniranje
+            # - clone_institut: Institut (Piper) + kloniranje
             # - nicholas: čist Nicholas (Edge) bez kloniranja
             # - sophie: čista Sophie (Edge) bez kloniranja
+            # - institut: čist Institut (Piper) bez kloniranja
             # - dragana: Dragana (referentni glas) + kloniranje
             
             if voice_type in ["clone", "clone_male"]:
@@ -265,11 +291,17 @@ class OpenVoiceWorker:
             elif voice_type == "clone_marko":
                 base_voice = "sr_Marko_medium"
                 should_clone = True
+            elif voice_type == "clone_institut":
+                base_voice = "serbski_institut"
+                should_clone = True
             elif voice_type == "nicholas":
                 base_voice = "sr-RS-NicholasNeural"
                 should_clone = False
             elif voice_type == "sophie":
                 base_voice = "sr-RS-SophieNeural"
+                should_clone = False
+            elif voice_type == "institut":
+                base_voice = "serbski_institut"
                 should_clone = False
             elif voice_type == "dragana":
                 base_voice = "sr-RS-SophieNeural" # Koristimo ženski bazni glas za Dragana referentni
@@ -329,8 +361,12 @@ class OpenVoiceWorker:
                         import wave
                         from piper.voice import SynthesisConfig
                         syn_config = SynthesisConfig(length_scale=1.0)
+                        voice_model = self.piper_voice
+                        if base_voice == "serbski_institut":
+                            voice_model = self.piper_voice_institut
+                            
                         with wave.open(tmp_sample_wav, 'wb') as wav_file:
-                            chunks = list(self.piper_voice.synthesize(sample_text, syn_config=syn_config))
+                            chunks = list(voice_model.synthesize(sample_text, syn_config=syn_config))
                             if not chunks:
                                 return {"error": f"Piper nije uspeo da generiše uzorak za bazni SE ({base_voice})."}
                             sample_rate = chunks[0].sample_rate

@@ -54,7 +54,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
 
     def wait_for_user(step_name, segments_to_update=None):
         if not debug:
-            return
+            return "continue"
         
         update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True, waiting_step=step_name)
         
@@ -64,7 +64,8 @@ def process_video_task(self, video_url: str, debug: bool = False):
         # Čekamo signal (max 30 minuta)
         start_wait = time.time()
         while time.time() - start_wait < 1800:
-            if r_client.get(f"task:{task_id}:continue"):
+            val = r_client.get(f"task:{task_id}:continue")
+            if val:
                 r_client.delete(f"task:{task_id}:continue")
                 
                 # Provera da li postoje editovani segmenti u Redis-u
@@ -85,7 +86,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
                         print(f"Greška pri ažuriranju segmenata: {e}", flush=True)
                 
                 update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False, waiting_step=None)
-                return
+                return val.decode("utf-8") if isinstance(val, bytes) else str(val)
             time.sleep(1)
         
         raise TimeoutError("Korisnik nije potvrdio nastavak u predviđenom roku.")
@@ -185,30 +186,67 @@ def process_video_task(self, video_url: str, debug: bool = False):
 
     
     # --- FAZA 5: Sinteza Govora ---
-    update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija Fish Speech modela...")
     from backend.worker.tts_engine import synthesize_audio
     
-    # Ucitavanje odabira glasa iz Redisa
-    selected_voice = "clone"
-    try:
-        voice_bytes = r_client.get(f"task:{task_id}:voice_settings")
-        if voice_bytes:
-            import json
-            voice_data = json.loads(voice_bytes)
-            selected_voice = voice_data.get("voice", "clone")
-            print(f"[DEBUG] Primena glasa iz Redisa: {selected_voice}", flush=True)
-    except Exception as e:
-        print(f"Greska pri ucitavanju podesavanja glasa: {e}", flush=True)
+    while True:
+        update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija i generisanje srpskih vokala...")
         
-    tts_result = synthesize_audio(
-        sep_result["vocals_path"], 
-        translation_result["translated_segments"],
-        voice_type=selected_voice,
-        progress_callback=lambda detail: update_progress(detail=detail)
-    )
-    if tts_result["status"] == "error": return tts_result
-    update_progress(completed_step="Glas generisan", percentage=85)
-    wait_for_user("TTS Sinteza")
+        # Učitavanje odabira glasa iz Redisa
+        selected_voice = "clone"
+        try:
+            voice_bytes = r_client.get(f"task:{task_id}:voice_settings")
+            if voice_bytes:
+                import json
+                voice_data = json.loads(voice_bytes)
+                selected_voice = voice_data.get("voice", "clone")
+                print(f"[DEBUG] Primena glasa iz Redisa: {selected_voice}", flush=True)
+        except Exception as e:
+            print(f"Greska pri ucitavanju podesavanja glasa: {e}", flush=True)
+            
+        # Primenjujemo najnoviji prevod/tekst iz Redisa ako postoji
+        edited_bytes = r_client.get(f"task:{task_id}:edited_segments")
+        if edited_bytes:
+            import json
+            try:
+                edited_data = json.loads(edited_bytes)
+                print(f"[DEBUG] Primena editovanih segmenata pre TTS-a: {len(edited_data)} stavki.", flush=True)
+                for ed_seg in edited_data:
+                    idx = ed_seg.get("id")
+                    new_text = ed_seg.get("translated")
+                    if idx is not None and new_text is not None:
+                        if idx < len(translation_result["translated_segments"]):
+                            translation_result["translated_segments"][idx]["text"] = new_text
+            except Exception as e:
+                print(f"Greska pri ucitavanju editovanih segmenata za TTS: {e}", flush=True)
+
+        tts_result = synthesize_audio(
+            sep_result["vocals_path"], 
+            translation_result["translated_segments"],
+            voice_type=selected_voice,
+            progress_callback=lambda detail: update_progress(detail=detail)
+        )
+        if tts_result["status"] == "error": return tts_result
+        
+        # Eksponiramo generisani audio URL za preslušavanje na frontendu
+        import os
+        dubbed_filename = os.path.basename(tts_result["dubbed_audio_path"])
+        progress_metadata['dubbed_audio_url'] = f"/videos/{dubbed_filename}"
+        
+        segments_ui = [{
+            "id": s.get("id", idx),
+            "original": s.get("original_text", ""),
+            "translated": s.get("text", ""),
+            "status": "translated"
+        } for idx, s in enumerate(translation_result["translated_segments"])]
+        update_progress(completed_step="Glas generisan", percentage=85, segments=segments_ui)
+        
+        # Čekamo odluku korisnika
+        action = wait_for_user("TTS Sinteza", translation_result["translated_segments"])
+        if action == "regenerate":
+            print("[DEBUG] Korisnik je zatražio ponovno generisanje glasa. Ponavljam sintezu...", flush=True)
+            continue
+        else:
+            break
     
     # --- FAZA 6: Spajanje ---
     update_progress("Finalni Mix...", 90)

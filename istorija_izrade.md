@@ -832,3 +832,35 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
             6. Lokalna Dragana (RHVoice) - Lokalni sintetički ženski glas sa jasnim srpskim izgovorom.
 - **Status:** Uspešno deploy-ovano na Modal. Sve skripte za testiranje (`test_nicholas.py` i `test_cloning.py`) prolaze sa statusom 200 i uspešno čuvaju srpski audio.
 
+### 26.05.2026. 09:50 — Implementacija Preslušavanja Audia, Izmene Teksta i Regeneracije u TTS Fazi
+- **Zahtevi:**
+    1. Omogućiti preslušavanje generisanog srpskog glasa (pre spajanja sa videom) u fazi `TTS Sinteza`.
+    2. Omogućiti izmenu prevoda po segmentima i tokom `TTS Sinteza` faze.
+    3. Dodati dugme "Ponovo generiši glas sa novim podešavanjima/tekstom" kako bi se TTS ponovio sa novim parametrima bez resetovanja celog pipeline-a.
+- **Urađeno:**
+    - **Backend & Celery (tasks.py):**
+        * U Fazu 5 (Sinteza govora) dodato dinamičko učitavanje najnovijih izmenjenih segmenata (`edited_segments`) i podešavanja glasa (`voice_settings`) iz Redisa na početku svake iteracije.
+        * Dodat signal `"regenerate"` koji Celery radnik prihvata u petlji i vraća se na početak sinteze sa novim parametrima.
+        * Popravljen bag sa nestajanjem teksta u tabeli tokom TTS faze: segmenti se pre slanja na frontend preko `update_progress` sada ispravno mapiraju iz API modela (`original_text` i `text`) u UI model (`original` i `translated`).
+    - **Frontend (App.jsx & index.css):**
+        * Dodan HTML5 `<audio>` plejer unutar `.mixer-panel` koji se prikazuje čim `dubbed_audio_url` postane dostupan.
+        * Ažuriran `useEffect` za učitavanje `editedSegments` i uslov `isReview` u tabeli tako da se editovanje prevoda dozvoljava i u fazi `TTS Sinteza` pored faze `Prevođenje`.
+        * Meni za odabir glasa (`voice-selection-box`) je omogućen i vidljiv i tokom `TTS Sinteza` faze kako bi se govornik mogao promeniti pre regeneracije.
+        * Implementirana funkcija `handleRegenerateTTS` koja šalje izmenjene segmente i izabrani glas na backend, a zatim poziva novi endpoint `/api/v1/regenerate-tts/{taskId}`.
+        * Dodato dugme `.regenerate-btn` na interfejs sa odgovarajućim modernim staklenim (glassmorphism) dizajnom.
+- **Status:** Sve izmene su lokalno implementirane i testirane. Server i radnik su pokrenuti i spremni za rad.
+
+### 26.05.2026. 10:25 — Implementacija i verifikacija novog Piper modela (serbski_institut)
+- **Opis:**
+    1. **Preuzimanje novih Piper modela na Modal NFS:**
+       U `modal_workers/tts_openvoice.py` dodata je podrška za preuzimanje i učitavanje modela `serbski_institut` iz repozitorijuma `rhasspy/piper-voices` (fajlovi `sr_RS-serbski_institut-medium.onnx` i `sr_RS-serbski_institut-medium.onnx.json`).
+       Optimizovano je preuzimanje na NFS disk tako da se snapshot i hash provere preskaču ukoliko fajlovi već postoje, čime se cold-start vreme svelo na minimum.
+    2. **Logika izbora modela u TTS radniku:**
+       Metoda `task` je ažurirana tako da podržava režime `institut` i `clone_institut` (čista sinteza sa modelom Serbskog instituta i kloniranje glasa sa tim modelom kao bazom).
+    3. **Ažuriranje testne skripte:**
+       Fajl `scratch/test_institut.py` je ažuriran da koristi stvaran zvučni snimak (`scratch/test_clone_female.wav`) kao referencu i ispravno rukuje povratnim ključem `results` koji Modal radnik šalje.
+    4. **Rezultati:**
+       Testovi su uspešno prošli, a generisani audio fajlovi su sačuvani u `scratch/output_institut.wav` i `scratch/output_clone_institut.wav` sa ispravnom srpskom sintezom i prenosom boje glasa.
+- **Status:** Uspešno implementirano, verifikovano i spremno za rad.
+
+

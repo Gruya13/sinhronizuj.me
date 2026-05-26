@@ -114,6 +114,21 @@ def continue_task(task_id: str):
     r.set(f"task:{task_id}:continue", "true", ex=3600)
     return {"status": "success", "message": "Signal za nastavak poslat."}
 
+@app.post("/api/v1/regenerate-tts/{task_id}")
+def regenerate_tts(task_id: str):
+    """
+    Signalizira Celery zadatku da ponovo generiše TTS sa novim glasom/prevodom.
+    """
+    import redis
+    import re
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    
+    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r.set(f"task:{task_id}:continue", "regenerate", ex=3600)
+    return {"status": "success", "message": "Zahtev za ponovno generisanje TTS-a poslat."}
+
+
 @app.post("/api/v1/edit-segments/{task_id}")
 def edit_segments(task_id: str, request: EditedSegmentsRequest):
     import redis
