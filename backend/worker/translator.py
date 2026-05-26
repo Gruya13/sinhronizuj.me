@@ -202,6 +202,45 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
+def clean_translation_text(text: str) -> str:
+    if not text:
+        return text
+    
+    # 1. Padeži za Ej Aj
+    text = re.sub(r'\bsa Ej Aj\b', 'sa Ej Ajem', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo Ej Aj\b', 'o Ej Aju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bod Ej Aj\b', 'od Ej Aja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bu Ej Aj\b', 'u Ej Aju', text, flags=re.IGNORECASE)
+    
+    # 2. Greške sa "buduće" umesto "budućnost"
+    text = re.sub(r'\bžele ovo buduće\b', 'žele takvu budućnost', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bžele to buduće\b', 'žele takvu budućnost', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bovo buduće\b', 'ovu budućnost', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bto buduće\b', 'tu budućnost', text, flags=re.IGNORECASE)
+    
+    # 3. Tipične greške u izgovoru/kucanju za "poći po zlu"
+    text = re.sub(r'\bpođi po zlu\b', 'poći po zlu', text, flags=re.IGNORECASE)
+    
+    # 4. Množina robotike i slično
+    text = re.sub(r'\brobotikama\b', 'robotici', text, flags=re.IGNORECASE)
+    text = re.sub(r'\brobotike\b', 'roboticu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo Ej Aju i robotike\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo Ej Aj i robotike\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo Ej Aj i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo Ej Aju i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
+    
+    # 5. Odluke o pripremi -> zapošljavanju
+    text = re.sub(r'\bodlukama o pripremi\b', 'odlukama o zapošljavanju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bodluke o pripremi\b', 'odluke o zapošljavanju', text, flags=re.IGNORECASE)
+    
+    # 6. Slaganje rodova za knjige (poput X i Y, koji su popularni -> koje su popularne)
+    text = re.sub(r'\bpoput ([^,]+) i ([^,]+), koji su popularni\b', r'poput \1 i \2, koje su popularne', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bpoput ([^,]+), koji su popularni\b', r'poput \1, koje su popularne', text, flags=re.IGNORECASE)
+
+    # 7. Dupli razmaci i čišćenje
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
 def lektor_segments(original_segments, translated_segments, progress_callback=None):
     """
     Druga faza: Qwen 2.5 32B (Lektor) lekturiše grubi prevod.
@@ -336,4 +375,9 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     except Exception as lektor_err:
         print(f"[WARNING] Lektor faza nije uspela: {lektor_err}. Nastavljam sa grubim prevodom.")
         
+    # Na kraju, uvek primenjujemo post-processing čišćenje/korekciju teksta na sve segmente
+    for seg in translated_segments:
+        if "text" in seg:
+            seg["text"] = clean_translation_text(seg["text"])
+            
     return {"status": "success", "translated_segments": translated_segments}
