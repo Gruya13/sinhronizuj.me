@@ -973,6 +973,22 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Deploy i restart:** Izmene su poslate na GitHub granu `development`, povučene na Hetzner VPS i kontejneri `sinhronizuj-worker` i `sinhronizuj-api` su restartovani.
 - **Status:** Završeno i deploy-ovano na server.
 
+### 26.05.2026. 19:36 — Implementacija automatskog Python Regex korektora (post-processora)
+- **Zahtev / Problem:**
+    Korisnik je prihvatio predlog 1 (automatska programska ispravka teksta) kako bi se osigurala 100% ispravnost prevoda pre slanja u TTS sintezu glasa, i eliminisale sitne greške lektora (poput pogrešnog prevoda *hiring* -> *priprema*, gramatičkih grešaka sa rodom kod knjiga, nepostojećeg izraza *ovo buduće* i nepravilnog oblika glagola *poći*).
+- **Urađeno:**
+    - **Funkcija `clean_translation_text` (`backend/worker/translator.py`):**
+        Implementirao sam novu funkciju koja pomoću regularnih izraza (Regex) čisti tekst od specifičnih LLM grešaka:
+        *   Zamenjuje nepravilne padeže za Ej Aj (npr. `sa Ej Aj` -> `sa Ej Ajem`, `o Ej Aj` -> `o Ej Aju`, `od Ej Aj` -> `od Ej Aja`, `u Ej Aj` -> `u Ej Aju`).
+        *   Ispravlja nepravilnu imenicu `buduće` u `budućnost` (npr. `ovo buduće` -> `ovu budućnost`).
+        *   Koriguju greške lektora kod glagola `poći` (npr. `pođi po zlu` -> `poći po zlu`).
+        *   Usklađuje slaganje rodova kod množine imenice *knjiga* (npr. `koji su popularni` -> `koje su popularne`).
+        *   Ispravlja prevod *odluke o pripremi* u `odluke o zapošljavanju`.
+    - **Poziv funkcije:** Funkcija se izvršava na samom kraju `lektor_segments` faze, i to nad svim segmentima u listi `translated_segments` (čime pokriva i uspešnu lekturu i fallback slučaj).
+    - **Testiranje:** Svi test primeri su uspešno prošli kroz automatski Python test skript.
+- **Status:** Uspešno implementirano, testirano, gurnuto na granu `development` i deploy-ovano na server.
+
+
 
 
 
