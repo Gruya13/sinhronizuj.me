@@ -988,6 +988,27 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Testiranje:** Svi test primeri su uspešno prošli kroz automatski Python test skript.
 - **Status:** Uspešno implementirano, testirano, gurnuto na granu `development` i deploy-ovano na server.
 
+### 26.05.2026. 19:45 — Proširivanje Regex post-processora novim jezičkim pravilima
+- **Zahtev / Problem:**
+    Korisnik je zatražio analizu poslednjeg sklapanja videa i ispravku preostalih uočenih problema u prevodu.
+- **Urađeno:**
+    - **Analiza logova:** Utvrđeno je da je lektor u novoj iteraciji ispravio nekoliko grešaka, ali su i dalje postojale nesavršenosti:
+        1.  Uvedeno je gramatički neispravno povratno "se" kod glagola postati: *koje su se ironično postale popularne*.
+        2.  Izraz *articles of incorporation* je lektor pogrešno preveo kao *članke o firmi* umesto *osnivačke dokumente/akte*.
+        3.  Zid u prodavnici je opisan kao *zadnja zidina* umesto prirodnog *zadnji zid*.
+        4.  Redosled negacije nužnosti je glasio *ne nužno rade/čine* umesto tečnog *ne rade/čine nužno*.
+        5.  Izraz *odluke o prijemu* je mapiran u *odluke o zapošljavanju*.
+    - **Dodavanje novih pravila u `clean_translation_text`:**
+        Proširio sam Python regex funkciju da automatski i garantovano rešava ove specifične situacije:
+        *   `su se ... postale` -> `su ... postale`
+        *   `na zadnjoj zidini` -> `na zadnjem zidu`
+        *   `članke o firmi kako bi je registrovala` -> `dokumente za registraciju kako bi registrovala firmu`
+        *   `ne nužno rade/čine` -> `ne rade/čine nužno`
+        *   `odluke o prijemu` -> `odluke o zapošljavanju`
+    - **Deploy:** Izmene su gurnute na granu `development` i kontejneri na Hetzner serveru su restartovani nakon preuzimanja najnovijeg koda.
+- **Status:** Završeno i deploy-ovano.
+
+
 
 
 
