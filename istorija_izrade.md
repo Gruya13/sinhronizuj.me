@@ -893,6 +893,18 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - Pokrenuto je testiranje preko `scratch/test_cloning.py` i sinteza je uspešno izvršena, generišući željeni audio izlaz bez grešaka.
 - **Status:** Problem je uspešno otklonjen, radnik na Modalu je u potpunosti stabilan i funkcionalan.
 
+### 26.05.2026. 17:52 — Unapređenje Lektor prompta za deklinaciju "Ej Aj"
+- **Opis / Zahtev:**
+    Primećeno je da lektor (Qwen 32B) uvek ostavlja skraćenicu "Ej Aj" (prevod za AI) u nominativu bez obzira na rečenični kontekst (npr. piše "sa Ej Aj", "o Ej Aj" što je gramatički neispravno).
+- **Urađeno:**
+    - **Prompt Lektora (`backend/worker/translator.py`):**
+        1. Izmenjeno Pravilo 3 (Provera izgovora akronima i skraćenica) kako bi se eksplicitno naglasila obaveza menjanja po padežima izraza "Ej Aj" (npr. "od Ej Aja", "ka Ej Aju", "sa Ej Ajem", "o Ej Aju").
+        2. Dodat je few-shot primer u `PRIMER LEKTURE` gde se engleska rečenica sa "AI" prevodi i prilagođava u lokativu ("o Ej Aju").
+    - **Testiranje (`scratch/test_lektor_cases.py`):**
+        Kreirana je testna skripta i poslat zahtev lektoru na Modalu. Rezultati potvrđuju da Qwen model sada savršeno deklinira frazu (npr. korigovano u "sa Ej Ajem" i "o Ej Aju").
+- **Status:** Uspešno implementirano, testirano i gurnuto na repozitorijum.
+
+
 
 
 
