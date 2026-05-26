@@ -229,15 +229,29 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bo Ej Aj i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
     text = re.sub(r'\bo Ej Aju i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
     
-    # 5. Odluke o pripremi -> zapošljavanju
+    # 5. Odluke o pripremi/prijemu -> zapošljavanju
     text = re.sub(r'\bodlukama o pripremi\b', 'odlukama o zapošljavanju', text, flags=re.IGNORECASE)
     text = re.sub(r'\bodluke o pripremi\b', 'odluke o zapošljavanju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bodlukama o prijemu\b', 'odlukama o zapošljavanju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bodluke o prijemu\b', 'odluke o zapošljavanju', text, flags=re.IGNORECASE)
     
     # 6. Slaganje rodova za knjige (poput X i Y, koji su popularni -> koje su popularne)
     text = re.sub(r'\bpoput ([^,]+) i ([^,]+), koji su popularni\b', r'poput \1 i \2, koje su popularne', text, flags=re.IGNORECASE)
     text = re.sub(r'\bpoput ([^,]+), koji su popularni\b', r'poput \1, koje su popularne', text, flags=re.IGNORECASE)
+    
+    # 7. Ispravka povratnog "se" kod glagola postati (npr. "koje su se ironično postale popularne" -> "koje su ironično postale popularne")
+    text = re.sub(r'\b(su|je) se\s+([^,.]+?\s+)?(postale|postali|postala|postao|postalo)\b', r'\1 \2\3', text, flags=re.IGNORECASE)
+    
+    # 8. Ispravka neobičnih opisa zidova (na zadnjoj zidini -> na zadnjem zidu)
+    text = re.sub(r'\bna zadnjoj zidini\b', 'na zadnjem zidu', text, flags=re.IGNORECASE)
+    
+    # 9. Osnivačka dokumenta (članke o firmi kako bi je registrovala -> dokumente za registraciju kako bi registrovala firmu)
+    text = re.sub(r'\bčlanke o firmi kako bi je registrovala\b', 'dokumente za registraciju kako bi registrovala firmu', text, flags=re.IGNORECASE)
+    
+    # 10. Prirodniji raspored reči za negaciju nužnosti
+    text = re.sub(r'\bne nužno (trade|čine)\b', r'ne \1 nužno', text, flags=re.IGNORECASE)
 
-    # 7. Dupli razmaci i čišćenje
+    # 11. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
