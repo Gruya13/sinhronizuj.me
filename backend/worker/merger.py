@@ -108,7 +108,7 @@ def merge_audio_and_video_dynamic(
     tts_segments: list,
     background_vol: float = -5.0,
     dubbed_vol: float = 0.0,
-    max_video_stretch: float = 1.15
+    max_video_stretch: float = 1.05
 ) -> dict:
     """
     Dinamički video time stretching:
