@@ -17,9 +17,10 @@ def process_video_task(self, video_url: str, debug: bool = False):
     match = re.search(r'@([^:/]+)', settings.REDIS_URL)
     redis_host = match.group(1) if match else "redis"
     r_client = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    task_id = self.request.id
 
     progress_metadata = {
-        'id': self.request.id,
+        'id': task_id,
         'current_step': "Inicijalizacija...",
         'percent': 0,
         'completed_steps': [],
@@ -49,7 +50,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
-        self.update_state(state='PROGRESS', meta=progress_metadata)
+        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
 
     def wait_for_user(step_name, segments_to_update=None):
         if not debug:
@@ -58,16 +59,16 @@ def process_video_task(self, video_url: str, debug: bool = False):
         update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True, waiting_step=step_name)
         
         # Brišemo stari signal ako postoji
-        r_client.delete(f"task:{self.request.id}:continue")
+        r_client.delete(f"task:{task_id}:continue")
         
         # Čekamo signal (max 30 minuta)
         start_wait = time.time()
         while time.time() - start_wait < 1800:
-            if r_client.get(f"task:{self.request.id}:continue"):
-                r_client.delete(f"task:{self.request.id}:continue")
+            if r_client.get(f"task:{task_id}:continue"):
+                r_client.delete(f"task:{task_id}:continue")
                 
                 # Provera da li postoje editovani segmenti u Redis-u
-                edited_bytes = r_client.get(f"task:{self.request.id}:edited_segments")
+                edited_bytes = r_client.get(f"task:{task_id}:edited_segments")
                 if edited_bytes and segments_to_update is not None:
                     import json
                     try:
@@ -190,7 +191,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     # Ucitavanje odabira glasa iz Redisa
     selected_voice = "clone"
     try:
-        voice_bytes = r_client.get(f"task:{self.request.id}:voice_settings")
+        voice_bytes = r_client.get(f"task:{task_id}:voice_settings")
         if voice_bytes:
             import json
             voice_data = json.loads(voice_bytes)
@@ -216,7 +217,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
     background_vol = -5.0
     dubbed_vol = 0.0
     try:
-        mixer_bytes = r_client.get(f"task:{self.request.id}:mixer_settings")
+        mixer_bytes = r_client.get(f"task:{task_id}:mixer_settings")
         if mixer_bytes:
             import json
             mixer_data = json.loads(mixer_bytes)
@@ -226,14 +227,23 @@ def process_video_task(self, video_url: str, debug: bool = False):
     except Exception as e:
         print(f"Greska pri ucitavanju podesavanja miksera: {e}", flush=True)
 
-    from backend.worker.merger import merge_audio_and_video
-    merge_result = merge_audio_and_video(
-        result["video_path"], 
-        sep_result["no_vocals_path"], 
-        tts_result["dubbed_audio_path"],
-        background_vol=background_vol,
-        dubbed_vol=dubbed_vol
-    )
+    from backend.worker.merger import merge_audio_and_video, merge_audio_and_video_dynamic
+    if tts_result.get("tts_segments"):
+        merge_result = merge_audio_and_video_dynamic(
+            result["video_path"], 
+            sep_result["no_vocals_path"], 
+            tts_result["tts_segments"],
+            background_vol=background_vol,
+            dubbed_vol=dubbed_vol
+        )
+    else:
+        merge_result = merge_audio_and_video(
+            result["video_path"], 
+            sep_result["no_vocals_path"], 
+            tts_result["dubbed_audio_path"],
+            background_vol=background_vol,
+            dubbed_vol=dubbed_vol
+        )
     if merge_result["status"] == "error": return merge_result
     update_progress(completed_step="Video spojen")
     
@@ -243,7 +253,8 @@ def process_video_task(self, video_url: str, debug: bool = False):
     needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
     
     if needs_lipsync:
-        lip_result = apply_lip_sync(merge_result["final_video_path"], tts_result["dubbed_audio_path"])
+        lip_vocals_path = merge_result.get("dubbed_audio_path") or tts_result["dubbed_audio_path"]
+        lip_result = apply_lip_sync(merge_result["final_video_path"], lip_vocals_path)
         final_output = lip_result["lipsync_video_path"] if lip_result["status"] != "error" else merge_result["final_video_path"]
     else:
         final_output = merge_result["final_video_path"]

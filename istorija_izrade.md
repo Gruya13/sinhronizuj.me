@@ -1,3 +1,125 @@
+## [2026-05-26 09:02:00] Ažuriranje README.md sa implementiranim stavkama iz brainstorminga
+- **Opis:**
+  Analizirani su fajlovi iz direktorijuma `brainstorming/` i verifikovano je šta je od planiranih stavki uspešno završeno u dosadašnjem toku projekta:
+  1. **Separacija vokala (Demucs) na Modal GPU:** Prebačen je Demucs sa VPS CPU-a na Modal serverless GPU (htdemucs).
+  2. **Ensemble ASR i LLM Arbitraža:** Implementirana paralelna transkripcija (Whisper + SenseVoice) sa automatskom arbitražom pomoću Lektora (Qwen 32B).
+  3. **Normalizacija Audia:** Dodata automatska RMS normalizacija vokalnog signala na -20.0 dBFS pre transkripcije.
+  4. **VAD Optimizacije:** Dodat `speech_pad_ms=400` parametar u `stt_worker.py`.
+  5. **Dynamic Time Stretching:** Implementirano rastezanje/usporavanje videa i muzike do 1.15x u `merger.py`.
+  Ažuriran je `README.md` (ključne karakteristike, tehnološki stek, struktura foldera i mapa puta za dalji razvoj na osnovu preostalih ciljeva poput prepoznavanja govornika i HD LipSync-a).
+
+## [2026-05-25 18:07:00] Rešavanje problema sa detekcijom kontrolera (gamepad-a) u igrama
+- **Problem:**
+  Povezani kontroler (Sony PS4 DualShock 4) se nije registrovao u igrama pod Protonom.
+- **Rešenje:**
+  1. Ažurirane su obe pokretačke skripte (`launch-soul-reaver.sh` i `launch-hordes-of-hel.sh`):
+     - Postavljen `GAMEID=0` (kao u ostalim ispravnim igrama na sistemu, npr. Hades II) kako Proton ne bi primenjivao specifične Steam Input konfiguracije koje ometaju prenos kontrolera van Steam-a.
+     - Dodato `export PROTON_NO_STEAMINPUT=1` kako bi se u potpunosti isključio virtuelni Steam Input sloj u Protonu.
+     - Dodato `export WINEDLLOVERRIDES="steam_api,steam_api64=n,b"` kako bi se primoralo korišćenje Goldberg krek DLL-ova iz foldera igre umesto Protonovih ugrađenih, čime se obezbeđuje učitavanje našeg modifikovanog `steam_emu.ini` fajla.
+     - Dodato `export PROTON_USE_SDL=1` za forsiranje SDL2 mapiranja.
+     - Dodato `export SDL_GAMECONTROLLER_IGNORE_DEVICES=0x2222/0x3333,0x1234/0x5678` za eliminaciju lažnih input uređaja.
+  2. Komentarisane su linije `SteamController=SteamController008` i `SteamInput=SteamInput006` u `steam_emu.ini` fajlovima obe igre (Soul Reaver i Hordes of Hel) kako bi se onemogućio lažni Steam Input interfejs iz Goldberg emulatora, čime se igra primorava da padne na standardni DirectInput/XInput koji Proton uspešno mapira na fizički kontroler.
+
+
+
+
+## [2026-05-25 17:55:00] Instalacija i konfiguracija igre Legacy of Kain - Soul Reaver 1 & 2 Remastered
+- **Opis:**
+  Instalirana je igra *Legacy of Kain - SR 1 & 2 Remastered* u namenskom vinskom prefiksu (`/home/gruya/Games/SoulReaver-Prefix`). Pronađen je glavni izvršni fajl (`SRX.exe`) u direktorijumu `/home/gruya/Games/SoulReaver/Legacy of Kain - SR 1&2 Remastered`. Kreirana je izvršna pokretačka skripta `/home/gruya/Games/launch-soul-reaver.sh` sa svim NVIDIA GPU varijablama i tačnim Steam AppID-jem (`2521380`) radi optimalne kompatibilnosti pod `umu-run` i Proton okruženjem.
+
+
+## [2026-05-25 17:42:00] Otklanjanje rušenja (crash) igre Hordes of Hel pri pokretanju run-a
+- **Problem:**
+  Igra *Jotunnslayer: Hordes of Hel* se uspešno pokretala, ali se rušila prilikom učitavanja nivoa (pokretanja run-a) sa greškom drajvera `Out of memory [NV_ERR_NO_MEMORY]`. 4GB VRAM-a na mobilnoj kartici RTX 3050 je bilo nedovoljno za učitavanje visokokvalitetnih tekstura pod Proton translation slojem.
+- **Rešenje:**
+  1. Postavljen je ispravan Steam AppID (`GAMEID=2820820`) u pokretačkoj skripti igre kako bi Proton primenio specifične optimizacije.
+  2. Smanjen je kvalitet grafike na minimum (`Low`) direktnim upisivanjem vrednosti `0` za ključ `UnityGraphicsQuality_h1669003810` u Wine registriju prefiksa igre, čime je sprečeno preopterećenje VRAM-a i omogućeno stabilno pokretanje nivoa.
+
+## [2026-05-25 16:53:00] Instalacija i konfiguracija pokretanja igre Hordes of Hel
+- **Opis:**
+  Instalirana je igra *Jotunnslayer - Hordes of Hel* u namenskom vinskom prefiksu (`/home/gruya/Games/HordesOfHel-Prefix`) pomoću alata `umu-run`. Kreirana je izvršna skripta za pokretanje `/home/gruya/Games/launch-hordes-of-hel.sh` sa svim potrebnim NVIDIA GPU postavkama kako bi se osigurao optimalan rad i stabilnost na hardveru korisnika, prateći šablon ostalih igara na sistemu.
+
+
+## [2026-05-25 15:58:00] Dokumentovanje mape celokupnog pipeline-a i inženjerskih izazova
+- **Opis:**
+  Kreiran je detaljan arhitektonski i tehnički vodič za pipeline u fajlu `pipeline_map.md` u korenu projekta. Dokument sadrži vizuelne Mermaid dijagrame, opis uloga hibridne infrastrukture (Hetzner VPS + Modal.com GPU), detaljan prolaz kroz svaki korak pipeline-a (Demucs, Whisper, Translator, Lektor, TTS, Dynamic Stretching, Wav2Lip, Merger), kao i analizu glavnih inženjerskih problema (brzina govora, akcenti, skraćenice, rodovi i vremena) i načina na koji su ti problemi rešeni.
+
+## [2026-05-25 15:02:00] Dinamičko sažimanje teksta prema trajanju segmenta i ispravka akcentovanja (bez-crtica skraćenice)
+- **Problem:**
+  Iako je dinamičko rastezanje videa drastično poboljšalo situaciju, pojedini segmenti su i dalje zvučali ubrzano ako je prevod bio višestruko duži od vremenskog slota (npr. previše srpskih reči na kratku englesku rečenicu). Takođe, primećen je čudan izgovor skraćenica (npr. "Ej-Aj") i stranih reči koje su ostale u originalu (npr. "Andon Labs").
+- **Rešenje:**
+  1. **Sažimanje u odnosu na dužinu segmenta:** Lektoru se sada, pored originalnog i grubog teksta, šalje i tačno trajanje svakog segmenta u sekundama (npr. `[seg-0] (trajanje: 2.5s)`).
+  2. **Stroga pravila za dužinu prevoda:** Uvedeno je striktno pravilo za Lektora da prevod ne sme prelaziti limit od `trajanje * 3` reči (prosečna brzina prirodnog govora je 2.5-3 reči po sekundi). Lektor sada bez milosti sažima i skraćuje rečenice koje prelaze ovaj limit.
+  3. **Ispravka akcentovanja i izgovora (uklanjanje crtica, povratak na 'Ej Aj'):** Zamenili smo format pisanja akronima "Ej-Aj" sa "Ej Aj" (bez crtice). TTS model (Piper) je crtice interpretirao kao minus ili pauzu. Takođe, na zahtev korisnika, odustali smo od izraza "veštačka inteligencija" i vratili skraćenicu "Ej Aj" svuda kako bi prevod ostao moderan i prirodan za ciljnu publiku.
+  4. **Fonetska transkripcija bez prevoda značenja (i kvarte):** Strani nazivi i naslovi (brendovi, knjige, platforme, gradski kvartovi) se pišu isključivo fonetski bez prevođenja značenja na srpski (npr. 'Brave New World' -> 'Brejv Nju Vorld', 'Superintelligence' -> 'Superintelidžens', 'Andon Labs' -> 'Endon Labs', 'Cow Hollow' -> 'Kau Holou').
+  5. **Očuvanje glagolskih vremena i rodova:** Definisana su stroga pravila za očuvanje glagolskih vremena originala (npr. sprečavanje prevoda prezenta u prošlo vreme: *'I have no face'* -> *'Nemam lice'* umesto *'Nisam imala lice'*) i precizno usaglašavanje gramatičkog roda govornika na osnovu slika i konteksta.
+  6. **Deploy:** Kod je ažuriran na Hetzner serveru, Celery radnik je restartovan, a Redis keš obrisan.
+
+## [2026-05-25 14:48:00] Implementacija Dinamičkog Video Time Stretching-a (Dynamic Video Stretching)
+- **Problem:**
+  Prilikom sinhronizacije, kada je prevedeni srpski tekst duži od originalnog engleskog teksta, TTS model je morao agresivno da se ubrzava (čak do 1.35x), što je dovodilo do neprirodnog, crtanog i nerazumljivog srpskog glasa.
+- **Rešenje:**
+  1. **Onemogućavanje ubrzanja na Modalu:** Isključili smo agresivno ubrzanje glasa unutar `backend/worker/tts_engine.py` tako što šaljemo `max_duration=0` na Modal, čime generišemo prirodan, kvalitetan srpski TTS govor normalnog tempa.
+  2. **Čuvanje pojedinačnih segmenata:** Ažurirali smo `tts_engine.py` da čuva zvučne zapise svakog pojedinačnog segmenta u privremenom radnom prostoru i vraća njihove tačne dužine.
+  3. **Dinamički Video Time Stretching u Mergeru:** U `backend/worker/merger.py` smo implementirali novu funkciju `merge_audio_and_video_dynamic` koja:
+     - Deli video na govorne i negovorne blokove (gaps).
+     - Ako je srpski govor duži od originalnog slota, rasteže (usporava) video segment pomoću FFmpeg `setpts` filtera (do maksimalno 1.15x za očuvanje vizuelne prirodnosti).
+     - Ukoliko je prekoračenje još uvek veće od 1.15x, preostali odnos koriguje blagim i neprimetnim ubrzanjem audia (pomoću `atempo` filtera u FFmpeg-u).
+     - Paralelno rasteže pozadinsku muziku/zvukove i kreira novu rastegnutu vokalnu traku.
+  4. **Lip-Sync Integracija:** Prilagodili smo `tasks.py` da prosleđuje novu rastegnutu vokalnu traku u LipSync modul, obezbeđujući savršenu sinhronizaciju usana sa usporenim videom i zvukom.
+  5. **Deploy:** Fajlovi `tts_engine.py`, `merger.py` i `tasks.py` su prebačeni na Hetzner VPS, `sinhronizuj-worker` je restartovan i Redis baza je očišćena.
+
+## [2026-05-25 10:33:00] Korekcija rogobatnih izraza (komisioniranje, brinućima, AI) i uvođenje uredničke slobode za Lektora
+- **Problem:**
+  Uočen je mali broj preostalih stilskih i leksičkih nepravilnosti u prevodu:
+  1. Bukvalno prevođenje fraza: npr. "commissioned a muralist" -> "komisionirala muralistu" (biznis termin, nepravilno za slikanje murala), "preoccupied with AI risk" -> "ljudima brinućima" (nepravilna reč, i ostavljen akronim AI umesto fonetskog Ej-Aj).
+  2. Nedostatak glagola "želeti" (want) u rečenici za budućnost ("ne nužno radi zbog ove budućnosti").
+- **Rešenje:**
+  1. **Zabrana rogobatnih termina:** Dodali smo izričite zabrane i primere za uočene nepravilne oblike ("komisionirala" -> "angažovala je", "ljudima brinućima" -> "ljudima koji brinu/zabrinuti su", "trgovinsko iskustvo" -> "iskustvo u maloprodaji").
+  2. **Fonetska pravila i prevođenje celina:** Podsećanje modela da prevodi sve celine bez ostavljanja delova na engleskom i da striktno poštuje fonetsko pisanje brendova ("Ej-Aj" umesto "AI").
+  3. **Veća urednička sloboda Lektora:** Redefinisali smo ulogu Lektora (Qwen2.5 32B) u "glavnog urednika i prevodioca" i dali mu punu slobodu da preformuliše i prepiše cele rečenice iz grubog prevoda ako su rogobatne ili bukvalne, upoređujući ih sa originalnim engleskim tekstom.
+  4. **Deploy:** Kod je postavljen na Hetzner server, radnik je restartovan, a Redis keš očišćen.
+
+## [2026-05-25 10:20:00] Poboljšanje gramatike, deklinacije stranih imena i logičkog prevoda u Translator i Lektor fazama
+- **Problem:**
+  Primećene su gramatičke i semantičke greške u prevodu:
+  1. Strana imena i brendovi nisu deklinirani (npr. "stvorio Luna" umesto "stvorio Lunu").
+  2. Imenica "future" je prevođena kao "to buduće" umesto ispravne imenice "budućnost".
+  3. Frazu "not doing this necessarily because they want this future" modeli su prevodili kao "ne rade to jer ne žele", izvrćući originalni logički smisao.
+- **Rešenje:**
+  1. **Specifična pravila za prevod i lekturu:** U promptove za Translator (Qwen2-VL) i Lektor (Qwen2.5 32B) u `backend/worker/translator.py` dodata su stroga pravila sa primerima za:
+     - Deklinaciju stranih imena i brendova kroz padeže u srpskom jeziku (npr. "Lunu", "sa Klodom", "preko Zuma", "na Linkedinu").
+     - Obavezan prevod imenice "future" kao "budućnost" (npr. "tu budućnost", "takvu budućnost").
+     - Tačan prenos logičkog smisla za negacije i uslove (npr. "not necessarily because" -> "ne ... nužno zato što...").
+  2. **Puni logovi za dijagnostiku:** Izmenjen je ispis u logove u `translator.py` kako se sirovi Translator i Lektor izlazi ne bi skraćivali na 500 karaktera, što omogućava potpun uvid u sve prevedene segmente.
+  3. **Deploy i čišćenje:** Fajlovi su sinhronizovani na Hetzner VPS, `sinhronizuj-worker` je ponovo pokrenut, a Redis baza je očišćena.
+
+## [2026-05-25 10:15:00] Rešavanje desinkronizacije i pomeranja segmenata prevoda (Uvođenje [seg-ID] tag formata)
+- **Problem:**
+  Prilikom prevođenja i lektorisanja transkripata, LLM modeli (Qwen2-VL i Qwen2.5) su imali tendenciju da spoje susedne rečenice ili preskoče segmente, a potom generišu čisto sekvencijalne ID-jeve (npr. `0|`, `1|`, `2|`...), ignorišući granice segmenata. To je dovodilo do kaskadnog pomeranja (desinhronizacije) svih prevoda u odnosu na originalne vremenske oznake na UI-ju.
+- **Rešenje:**
+  1. **Uvođenje [seg-ID] formata:** Promenili smo formatiranje segmentisanog ulaza iz prostog ID-ja (`i|`) u robusniji i jedinstveniji tag oblik `[seg-i]`. Ovi tagovi služe kao jaka sidra (anchors) koja LLM dosledno prepisuje iz prompta.
+  2. **Stroža LLM pravila:** U promptove za Translator i Lektor ugrađeno je striktno pravilo o zabrani spajanja i preskakanja segmenata, sa jasnim instrukcijama da se granice segmenata moraju očuvati po svaku cenu.
+  3. **Ažuriranje parsera:** Zamenili smo stare split-by-pipe parsere u `backend/worker/transcriber.py` i `backend/worker/translator.py` regularnim izrazom `r'\[seg-(\d+)\]\s*(.*)'`.
+  4. **Fallback na prazan string:** U slučaju da prevod za neki segment ipak nedostaje iz LLM odgovora, postavljen je fallback na prazan string (`""`) umesto na originalni engleski tekst. Time se garantuje da sinhronizacija na tim mestima neće izgovarati engleske rečenice.
+  5. **Deploy, Sinhronizacija i Redis:**
+     - Fajlovi `transcriber.py`, `translator.py` i `tasks.py` su prebačeni na Hetzner VPS (`/opt/sinhronizuj-me/backend/worker/`).
+     - Kontejner `sinhronizuj-worker` je restartovan i uspešno se podigao.
+     - Redis baza je očišćena komandom `flushall` kako bi se uklonili svi keširani stari zadaci.
+  6. **Status:** Sistem je u potpunosti pripremljen za testiranje i pokretanje novog E2E pipeline-a.
+
+## [2026-05-25 10:01:00] Rešavanje ValueError greške u Celery radniku kod ažuriranja progresa (Thread-Local Fix)
+- **Problem:**
+  Prilikom pokretanja transkripcije, Celery zadatak je pucao odmah po pozivanju Whisper endpointa sa greškom `ValueError: task_id must not be empty. Got None instead.`. Uzrok je bio uvođenje `ThreadPoolExecutor`-a u `transcriber.py` radi paralelne transkripcije. Pozadinske niti su pozivale `progress_callback` koji okida `self.update_state`. Budući da je `self.request` u Celery-ju **thread-local** objekat, pozadinske niti nisu imale pristup ID-ju zadatka (bio je `None`), što je rušilo Redis backend prilikom pokušaja čuvanja stanja.
+- **Rešenje:**
+  1. **Thread-Safe task_id:** U `backend/worker/tasks.py` smo na samom početku `process_video_task` metode uveli lokalnu promenljivu `task_id = self.request.id` koja se čuva u closure-u.
+  2. **Celery update_state izmena:** U pomoćnoj funkciji `update_progress` zamenili smo poziv `self.update_state(...)` sa eksplicitnim prosleđivanjem sačuvanog ID-ja: `self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)`. Takođe smo zamenili sve druge dinamičke reference na `self.request.id` unutar zadatka sa sigurnom `task_id` promenljivom.
+  3. **Deploy i Sinhronizacija:**
+     - Kod je ažuriran na Hetzner VPS-u (`backend/worker/tasks.py`) i Celery worker (`sinhronizuj-worker`) je uspešno restartovan.
+     - Deploy-ovana je najnovija verzija `stt_worker.py` na Modal.com (što je ažuriralo i `faster-whisper` na verziju 1.2.1 i rešilo raniji problem sa parametrom `log_prob_threshold`).
+     - Izvršeno je kompletno čišćenje Redis baze (`flushall`) na VPS-u.
+  4. **Status:** Sistem je sada stabilan, očišćen i spreman za slanje novog čistog E2E zahteva iz Studija.
+
 ## [2026-05-25 08:59:00] Stabilizacija SenseVoice radnika na Modalu i hibridne transkripcije
 - **Problem:**
   1. **NFS konflikt i trka**: SenseVoice radnik je imao konflikt sa konkurentnim kreiranjem privremenih foldera i datoteka (greška sa `._____temp`) na deljenom NFS disku (`sinhronizuj-models`), što je uzrokovalo beskonačnu petlju padova i ponovnih preuzimanja modela na Modalu (`RuntimeError: model 'iic/SenseVoiceSmall' is not registered`).
@@ -689,3 +811,24 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * `word_timestamps: False` (onemogućeno jer je ctranslate2/faster-whisper algoritam za poravnanje reči često bacao greške i bacao cele rečenice. Sistem sada koristi stabilni fallback u `segment_by_sentences`).
         * `no_speech_threshold: None`, `log_prob_threshold: None` i `compression_ratio_threshold: None` (onemogućeni svi pragovi osetljivosti kako bi Whisper bio primoran da dekodira ceo audio i da ne preskače ništa).
 - **Status:** Uspešno testirano kroz integracioni test `test_hybrid_transcribe.py`. Whisper je vratio svih 14 segmenata bez ijedne rupe na tajmlajnu, a Lektor je obavio savršenu arbitražu. Izmene su uspešno deploy-ovane na Modal.
+
+### 26.05.2026. 09:15 — Integracija Microsoft Neural Glasova i Naprednog Kloniranja Glasa
+- **Zahtev / Problem:** Korisnik želi dodatne prirodne glasove za srpski jezik kako bi se izbegao "strani naglasak" i ubrzavanje govora. Piper model je ograničen, pa je potrebno integrisati Microsoft Neural TTS (`edge-tts`) glasove i omogućiti ih kako za čistu sintezu tako i za osnovu (base voice) pri kloniranju glasa.
+- **Urađeno:**
+    - **Modal Radnik (tts_openvoice.py):**
+        * Dodat `edge-tts` paket u Modal sliku (`modal.Image.debian_slim`).
+        * Ažuriran `setup()` i `task()` za podršku novim modelima bez kloniranja (`should_clone=False`) i sa kloniranjem (`should_clone=True`).
+        * Integrisano dinamičko keširanje `base_se` (Speaker Embeddings) za Microsoft Nicholas i Sophie na NFS volumen kako bi se obezbedila maksimalna brzina i paralelizam.
+        * Omogućeno dinamičko računanje i primena brzine govora (`rate`) za `edge-tts` u skladu sa izračunatim optimalnim `length_scale`.
+    - **Backend (tts_engine.py):**
+        * Dodato prosleđivanje izabranog glasa (`voice_type`) kroz payload ka Modalu.
+    - **Frontend (App.jsx):**
+        * Proširen meni za izbor glasa u Studiju na 6 opcija:
+            1. Kloniraj - Muški bazni glas (Nicholas) - Klonira originalni glas sa prirodnim srpskim izgovorom i akcentom.
+            2. Kloniraj - Ženski bazni glas (Sophie) - Klonira originalni glas koristeći prirodan ženski model.
+            3. Čist Nicholas (Microsoft Neural) - Bez kloniranja. Savršen, čist muški spikerski glas sa idealnom dikcijom.
+            4. Čista Sophie (Microsoft Neural) - Bez kloniranja. Savršen, prirodan ženski spikerski glas.
+            5. Kloniraj - Marko (Piper Offline) - Stari sistem kloniranja zasnovan na Piper-Marko lokalnom generatoru.
+            6. Lokalna Dragana (RHVoice) - Lokalni sintetički ženski glas sa jasnim srpskim izgovorom.
+- **Status:** Uspešno deploy-ovano na Modal. Sve skripte za testiranje (`test_nicholas.py` i `test_cloning.py`) prolaze sa statusom 200 i uspešno čuvaju srpski audio.
+

@@ -7,13 +7,16 @@
 
 ## 🚀 Ključne Karakteristike
 
-- **Hibridna Arhitektura:** Kontrolna logika, baza podataka, asinhroni Celery radnik i MinIO (S3) lokalno skladište nalaze se na Hetzner VPS-u, dok se teške AI operacije (Whisper STT, Qwen-VL prevod, Lektor i Fish Speech TTS) izvršavaju serverless na **Modal.com** (T4, A10G, H100/L4 GPU-ovi).
+- **Hibridna Arhitektura:** Kontrolna logika, baza podataka, asinhroni Celery radnik i MinIO (S3) lokalno skladište nalaze se na Hetzner VPS-u, dok se teške AI operacije (Demucs, Whisper, SenseVoice, Qwen-VL prevod, Lektor, Piper TTS i Wav2Lip) izvršavaju serverless na **Modal.com** (T4, A10G, H100/L4 GPU-ovi).
 - **Direktan Upload:** Korisnik može uploadovati lokalne video fajlove direktno u MinIO Object Storage pomoću Presigned URL-ova.
+- **Ensemble ASR & LLM Arbitraža:** Paralelno prepoznavanje govora pomoću modela **Whisper** (sa reč-po-reč tajminzima) i **SenseVoice-Small** na Modalu. Lektor (Qwen 32B) automatski arbitruje između njih i ispravlja greške u sluhu/pravopisu pre prevođenja, bez narušavanja vremenskih oznaka.
+- **Normalizacija Audia i VAD Optimizacije:** Integrisana RMS normalizacija vokalnog signala na `-20.0 dBFS` pre transkripcije, uz upotrebu `speech_pad_ms=400` kako bi se sprečilo sečenje krajeva reči u tišini.
 - **Jednostavan 2-Pass Prevod i Lektura:** 
   1. **Pass 1 (Translator - Qwen2-VL):** Multimodalni model koji na osnovu 10 frejmova iz videa prepoznaje rod govornika, kontekst i prevodi tekst na srpski.
   2. **Pass 2 (Lektor - Qwen 2.5 32B Instruct):** Jezički model na H100 koji pegla gramatiku, srpske padeže, stilske oblike i formatira tekst spreman za TTS sintezu.
-- **TTS Normalizacija:** Ugrađena pravila za automatsko ispisivanje brojeva slovima i fonetski prevod engleskih brendova (npr. *„Indeed”* -> *„Indid”*, *„AI”* -> *„Ej-Aj”*).
-- **Voice Cloning (Fish Speech v1.5.1):** Sinhronizacija na srpskom jeziku zadržavajući ton i boju glasa originalnog govornika.
+- **TTS Normalizacija:** Ugrađena pravila za automatsko ispisivanje brojeva slovima i fonetski prevod engleskih brendova (npr. *„Indeed”* -> *„Indid”*, *„AI”* -> *„Ej Aj”*).
+- **Dinamički Time Stretching (Video & Audio):** Dinamičko ubrzavanje ili usporavanje videa i pozadinske muzike (do 1.15x) kada je srpski izgovor duži od originalnog engleskog govora, kombinovano sa preciznim lektorskim ograničenjem broja reči (`trajanje * 3`) i laganim ubrzavanjem audia.
+- **Sinhronizacija Usana (Wav2Lip):** Pokretanje serverless Wav2Lip modela za fotorealistično prilagođavanje pokreta usana govornika srpskom audio zapisu.
 - **Studio Interface:** Moderni React frontend sa real-time progresom faza, uporednim prikazom originalnih i prevedenih segmenata i vizuelnim kontekstom frejmova.
 
 ---
@@ -24,16 +27,17 @@
 |---|---|
 | **Frontend** | React (Vite), Framer Motion, Tailwind CSS, Lucide Icons |
 | **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker / Cache), PostgreSQL (Baza), MinIO (S3 Object Storage) |
-| **Compute Plane (Modal)** | Whisper (STT - T4 GPU), Qwen2-VL-7B (Prevodilac - A10G GPU), Qwen2.5-32B-Instruct (Lektor - H100 GPU), Fish Speech v1.5.1 (TTS - L4 GPU) |
+| **Compute Plane (Modal)** | Demucs (Separacija vokala - T4 GPU), Whisper (STT - T4 GPU), SenseVoice-Small (Sekundarni ASR - T4 GPU), Qwen2-VL-7B (Prevodilac - A10G GPU), Qwen2.5-32B-Instruct (Lektor - H100 GPU), Fish Speech v1.5.1 (TTS - L4 GPU), Wav2Lip (LipSync - A10G GPU) |
 
 ### AI Pipeline (Faze Obrade)
 
 1. **Preuzimanje:** Preuzimanje YouTube videa ili dobijanje direktno sa MinIO S3 skladišta.
-2. **Separacija (Demucs):** Izolacija vokalne trake od pozadinske muzike i zvučnih efekata na VPS-u.
-3. **Transkripcija (STT):** Whisper transkripcija izolovanog vokala na Modalu (isključen `condition_on_previous_text` radi izbegavanja repetition loop-a).
-4. **Prevod & Lektura:** Multimodalni prevod (Qwen2-VL) sa 10 frejmova, nakon čega sledi stilsko peglanje teksta (Qwen 2.5 Lektor).
-5. **Sinteza (TTS - Fish Speech):** Generisanje srpskog govora sa kloniranim glasom originalnog zvučnika na osnovu referentnog audia.
-6. **Spajanje (FFmpeg):** Miksovanje generisanog srpskog glasa sa originalnom pozadinskom muzikom i spajanje sa slikom bez rekompresije.
+2. **Separacija (Demucs):** Izolacija vokalne trake od pozadinske muzike i zvučnih efekata na Modalu (prebačeno sa VPS-a na GPU za bolje performanse i oslobađanje resursa).
+3. **Transkripcija (Ensemble ASR):** Paralelno prepoznavanje pomoću Whisper-a (sa reč-po-reč tajminzima) i SenseVoice-Small na Modalu, praćeno LLM arbitražom za automatsku ispravku grešaka i normalizacijom zvuka na -20.0 dBFS.
+4. **Prevod & Lektura:** Multimodalni prevod (Qwen2-VL) sa 10 frejmova, nakon čega sledi stilsko peglanje teksta i vremensko sažimanje (Qwen 2.5 Lektor).
+5. **Sinteza (TTS - Piper):** Generisanje srpskog govora (muški glas 'sr_Marko') uz zadržavanje prirodnog tempa izgovora (bez nasilnog ubrzavanja na nivou TTS-a).
+6. **Dinamičko Rastezanje & Spajanje:** Primena dynamic time stretching-a na video i muziku (do 1.15x) i FFmpeg aresample spajanje.
+7. **Sinhronizacija Usana (Wav2Lip):** Prilagođavanje usana govornika generisanom srpskom audiju pomoću Wav2Lip modela.
 
 ---
 
@@ -100,21 +104,24 @@ sinhronizuj.me/
 │       ├── celery_app.py    # Celery konfiguracija
 │       ├── tasks.py         # Celery taskovi (glavni pipeline)
 │       ├── downloader.py    # Preuzimanje videa (yt-dlp/S3)
-│       ├── audio_sep.py     # Separacija vokala pomoću Demucs-a
+│       ├── audio_sep.py     # Separacija vokala pomoću Demucs-a na Modalu
 │       ├── preprocessor.py  # Ekstrakcija vizuelnog konteksta (frejmovi)
-│       ├── transcriber.py   # Pozivanje Modal Whisper STT endpoint-a
+│       ├── transcriber.py   # Pozivanje Modal Whisper & SenseVoice STT sa LLM arbitražom
 │       ├── translator.py    # Pozivanje Modal Translator i Lektor API-ja
-│       ├── tts_engine.py    # Pozivanje Modal Fish Speech TTS endpoint-a
-│       └── merger.py        # Spajanje audio/video zapisa (FFmpeg)
+│       ├── tts_engine.py    # Pozivanje Piper TTS modela na Modalu
+│       └── merger.py        # Dynamic Time Stretching i spajanje audio/video zapisa (FFmpeg)
 ├── frontend/
 │   └── src/
 │       ├── App.jsx          # React Studio korisnički interfejs
 │       └── index.css        # Premium Glassmorphism stilovi
 ├── modal_workers/           # Serverless radnici na Modal.com
+│   ├── demucs_worker.py     # Demucs radnik na Modalu (separacija vokala)
 │   ├── stt_worker.py        # Whisper STT radnik (Faster-Whisper na T4)
+│   ├── sensevoice_worker.py # SenseVoice ASR radnik za sekundarnu transkripciju
 │   ├── translator_worker.py # Multimodalni Translator radnik (Qwen2-VL)
 │   ├── lektor_worker.py     # Jezički lektor radnik (Qwen 2.5 32B Instruct)
-│   └── tts.py               # TTS generator (Fish Speech v1.5.1 na L4)
+│   ├── tts.py               # Generički TTS generator (Fish Speech v1.5.1 na L4)
+│   └── tts_openvoice.py     # Piper + OpenVoice TTS generator (Marko sr_Marko_medium na L4)
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, MinIO)
 ├── Dockerfile               # API/Worker Docker slika za Hetzner VPS
 ├── requirements.txt         # Python biblioteke
@@ -125,10 +132,11 @@ sinhronizuj.me/
 
 ## 🗺️ Plan Daljeg Razvoja
 
-U narednim fazama razvoja planirane su sledeće stavke:
-1. **Fine-tuning Lektora:** Dodatno obučavanje ili fino podešavanje (fine-tuning) Qwen 2.5 lektorskog modela na specifičnom korpusu srpskog jezika kako bi se eliminisali preostali anglicizmi i poboljšao stilski tok rečenica.
-2. **Testiranje i podešavanje TTS-a:** Eksperimentisanje sa različitim govornicima, prilagođavanje brzine govora i fino podešavanje emocija/akcentovanja u Fish Speech-u radi što prirodnijeg srpskog izgovora.
-3. **Poboljšanje početka Pipeline-a (Asinhroni Upload):** Izmena toka na frontendu i backendu tako da procesuiranje i upload fajla na S3 ne pokreću automatski dubbing pipeline. Korisnik će prvo odabrati fajl, sačekati da se upload na S3 uspešno završi, a tek onda klikom na dugme "Sinhronizuj" svesno pokrenuti prevođenje i obradu.
+U narednim fazama razvoja planirane su sledeće strateške stavke iz brainstorm planova:
+1. **Prepoznavanje Govornika (Diarization) & Multi-Voice Cloning:** Integracija `PyAnnote.audio` modela na Modalu za automatsko označavanje i isecanje referentnih audio isečaka za svakog govornika u videu, te slanje na individualnu sintezu glasa (idealno za intervjue i podcaste).
+2. **HD Face Restoration za LipSync:** Propuštanje Wav2Lip izlaza kroz modele za restauraciju i izoštravanje lica (GFPGAN ili CodeFormer) kako bi se postigla HD rezolucija i izbeglo zamućenje predela oko usana na 1080p/4K videima.
+3. **Interaktivni Studio Editor (v2):** Izgradnja naprednog table-editora na frontendu koji pauzira pipeline nakon prevođenja, omogućavajući korisniku da ručno promeni prevod, spoji segmente ili vizuelno poravna audio blokove na zvučnom talasu (`wavesurfer.js`) pre sinteze i spajanja.
+4. **Pametan Prevodilac - Korisnički Rečnik (Glossary):** Mogućnost unosa prilagođenih rečnika direktno na frontendu koji se šalju sistemskom promptu Qwen Lektora kako bi se osigurao konzistentan prevod specifičnih tehničkih termina.
 
 ---
 

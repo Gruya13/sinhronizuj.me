@@ -689,14 +689,86 @@ function App() {
                                   className="hidden-radio"
                                 />
                                 <div className="voice-card-content">
-                                  <span className="voice-icon">👥</span>
+                                  <span className="voice-icon">👨</span>
                                   <div className="voice-info">
-                                    <span className="voice-title">Kloniraj originalni glas</span>
-                                    <span className="voice-desc">Klonira ton i boju iz originalnog videa (može imati strani naglasak)</span>
+                                    <span className="voice-title">Kloniraj - Muški bazni glas (Nicholas)</span>
+                                    <span className="voice-desc">Klonira originalni glas sa prirodnim srpskim izgovorom i akcentom</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              <label className={`voice-card ${selectedVoice === 'clone_female' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="clone_female" 
+                                  checked={selectedVoice === 'clone_female'} 
+                                  onChange={() => setSelectedVoice('clone_female')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">👩</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Kloniraj - Ženski bazni glas (Sophie)</span>
+                                    <span className="voice-desc">Klonira originalni glas koristeći prirodan ženski model</span>
                                   </div>
                                 </div>
                               </label>
                               
+                              <label className={`voice-card ${selectedVoice === 'nicholas' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="nicholas" 
+                                  checked={selectedVoice === 'nicholas'} 
+                                  onChange={() => setSelectedVoice('nicholas')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">🗣️</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Čist Nicholas (Microsoft Neural)</span>
+                                    <span className="voice-desc">Bez kloniranja. Savršen, čist muški spikerski glas sa idealnom dikcijom</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              <label className={`voice-card ${selectedVoice === 'sophie' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="sophie" 
+                                  checked={selectedVoice === 'sophie'} 
+                                  onChange={() => setSelectedVoice('sophie')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">👸</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Čista Sophie (Microsoft Neural)</span>
+                                    <span className="voice-desc">Bez kloniranja. Savršen, prirodan ženski spikerski glas</span>
+                                  </div>
+                                </div>
+                              </label>
+
+                              <label className={`voice-card ${selectedVoice === 'clone_marko' ? 'active' : ''}`}>
+                                <input 
+                                  type="radio" 
+                                  name="voice_type" 
+                                  value="clone_marko" 
+                                  checked={selectedVoice === 'clone_marko'} 
+                                  onChange={() => setSelectedVoice('clone_marko')} 
+                                  className="hidden-radio"
+                                />
+                                <div className="voice-card-content">
+                                  <span className="voice-icon">🤖</span>
+                                  <div className="voice-info">
+                                    <span className="voice-title">Kloniraj - Marko (Piper Offline)</span>
+                                    <span className="voice-desc">Stari sistem kloniranja zasnovan na Piper-Marko lokalnom generatoru</span>
+                                  </div>
+                                </div>
+                              </label>
+
                               <label className={`voice-card ${selectedVoice === 'dragana' ? 'active' : ''}`}>
                                 <input 
                                   type="radio" 
@@ -709,8 +781,8 @@ function App() {
                                 <div className="voice-card-content">
                                   <span className="voice-icon">👩‍🦰</span>
                                   <div className="voice-info">
-                                    <span className="voice-title">Srpski ženski glas (Dragana)</span>
-                                    <span className="voice-desc">Čist i prirodan srpski govor, bez američkog naglaska</span>
+                                    <span className="voice-title">Lokalna Dragana (RHVoice)</span>
+                                    <span className="voice-desc">Lokalni sintetički ženski glas sa jasnim srpskim izgovorom</span>
                                   </div>
                                 </div>
                               </label>
