@@ -1008,6 +1008,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Deploy:** Izmene su gurnute na granu `development` i kontejneri na Hetzner serveru su restartovani nakon preuzimanja najnovijeg koda.
 - **Status:** Završeno i deploy-ovano.
 
+### 26.05.2026. 20:11 — Implementacija rukovanja greškama u video plejeru i rešavanje autoplay blokade
+- **Zahtev / Problem:**
+    Korisnik je prijavio problem gde plejer stoji na `0:00` i prikazuje crn ekran nakon uspešne obrade.
+- **Urađeno:**
+    - **Analiza:** 
+        1. Proverio sam validnost fajla na serveru (H264 video + AAC audio, ispravan i potpuno čitljiv/dostupan preko `200` i `206 Partial Content`).
+        2. Glavni sumnjivac za zamrznut plejer na `0:00` u modernim pretraživačima je bezbednosna politika automatske reprodukcije (`autoPlay`) bez stišanog zvuka (`muted`), što tera pretraživač da blokira učitavanje i reprodukciju.
+    - **Rešenje:**
+        1. Dodao sam `muted` atribut na `<video>` tag u `App.jsx` kako bi se zaobišle restrikcije pretraživača.
+        2. Implementirao sam reaktivno stanje `videoError` i `onError` hendler na nivou video plejera koji prevodi i ispisuje precizan uzrok greške direktno na ekranu (npr. mrežna greška, neispravan kodek ili nepodržan format).
+- **Status:** Završeno, ažurirano lokalno i gurnuto na granu `development`.
+
+
 
 
 

@@ -13,6 +13,7 @@ function App() {
   const [progressData, setProgressData] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [videoError, setVideoError] = useState(null);
   const [startTime, setStartTime] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [hwStats, setHwStats] = useState(null);
@@ -53,6 +54,7 @@ function App() {
     setProgressData(null);
     setVideoUrl(null);
     setError(null);
+    setVideoError(null);
     setUploadProgress(0);
     setVisualContextUrl(null);
     setPreviewFile(null);
@@ -260,7 +262,7 @@ function App() {
     const targetUrl = previewFile.type === "local" ? previewFile.s3Url : previewFile.rawUrl;
     if (!targetUrl) return;
 
-    setLoading(true); setError(null); setVideoUrl(null); setUploadProgress(0);
+    setLoading(true); setError(null); setVideoUrl(null); setVideoError(null); setUploadProgress(0);
     setStartTime(Date.now()); setElapsed(0);
     setStatus('POVEZIVANJE SA KONTROLNOM TABLOM...');
 
@@ -916,8 +918,35 @@ function App() {
                 <span>OBRADA USPEŠNO ZAVRŠENA!</span>
               </div>
               <div className="video-player-wrapper">
-                <video src={videoUrl} controls autoPlay />
+                <video 
+                  src={videoUrl} 
+                  controls 
+                  autoPlay 
+                  muted 
+                  onError={(e) => {
+                    const mediaError = e.target.error;
+                    console.error("Video error details:", mediaError);
+                    let errMsg = "Nepoznata greška pri učitavanju videa.";
+                    if (mediaError) {
+                      switch (mediaError.code) {
+                        case 1: errMsg = "Učitavanje videa je prekinuto (aborted)."; break;
+                        case 2: errMsg = "Mrežna greška pri preuzimanju videa."; break;
+                        case 3: errMsg = "Dekodiranje videa nije uspelo (moguće neispravan kodek)."; break;
+                        case 4: errMsg = "Format videa ili kodek nisu podržani u vašem pretraživaču."; break;
+                      }
+                      if (mediaError.message) {
+                        errMsg += ` Detalji: ${mediaError.message}`;
+                      }
+                    }
+                    setVideoError(errMsg);
+                  }}
+                />
               </div>
+              {videoError && (
+                <div style={{ color: "#ff4d4f", marginTop: "12px", textAlign: "center", fontSize: "14px", fontWeight: "600", background: "rgba(255,77,79,0.1)", padding: "10px", borderRadius: "8px", border: "1px solid rgba(255,77,79,0.2)" }}>
+                  ⚠️ Greška plejera: {videoError}
+                </div>
+              )}
               <div className="result-actions">
                 <button onClick={() => window.location.reload()} className="new-task-btn">Sinhronizuj novi video</button>
                 <a href={videoUrl} download className="download-btn">Preuzmi Video</a>
