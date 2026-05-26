@@ -71,7 +71,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
             print(f"[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
             
     except Exception as e:
-        return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}ia: {e}"}
+        return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}
 
     # 2. Učitavamo originalni vokal da bismo znali ukupnu dužinu i izračunali maksimalna trajanja segmenata
     try:
