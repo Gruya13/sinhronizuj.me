@@ -965,6 +965,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         U funkciji `merge_audio_and_video_dynamic` smanjen je parametar `max_video_stretch` sa `1.15` (15% maksimalno usporavanje videa) na `1.05` (5% maksimalno usporavanje). Time je postignuto da se video reprodukuje u gotovo prirodnoj brzini (razlika do 5% je vizuelno neprimetna za ljudsko oko), a glas se preko Rubberband filtera preciznije i brže prilagođava zadatom tajmingu.
 - **Status:** Izmene su testirane, gurnute na granu `development` i uspešno deploy-ovane/restartovane na Hetzner VPS-u.
 
+### 26.05.2026. 19:22 — Ispravka sintaksne greške u `tts_engine.py`
+- **Zahtev / Problem:**
+    Korisnik je dobio grešku "unterminated string literal" na liniji 74 u datoteci `tts_engine.py`.
+- **Urađeno:**
+    - **Uklanjanje viška karaktera:** Na liniji 74 u `backend/worker/tts_engine.py` nalazio se višak karaktera na kraju linije (`ia: {e}"}`) nastao usled prethodnog automatskog spajanja. Kod je ispravljen i proveren preko `py_compile`.
+    - **Deploy i restart:** Izmene su poslate na GitHub granu `development`, povučene na Hetzner VPS i kontejneri `sinhronizuj-worker` i `sinhronizuj-api` su restartovani.
+- **Status:** Završeno i deploy-ovano na server.
+
+
 
 
 
