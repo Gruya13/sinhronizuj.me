@@ -948,6 +948,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         Segment 4: *"Ako želiš da ostaneš u toku sa najnovijim o Ej Aj i robotikama, pratite za više."* je uspešno i u potpunosti korigovan u: **"Ako želiš da ostaneš u toku sa najnovijim o Ej Aju i robotici, prati za više."**. Svi ostali padežni oblici ("sa Ej Ajem", "o Ej Aju") takođe rade savršeno bez mešanja.
 - **Status:** Uspešno implementirano, testirano i gurnuto na repozitorijum.
 
+### 26.05.2026. 18:44 — Čišćenje Redis baze podataka
+- **Zahtev:** Korisnik je tražio čišćenje Redis baze kako bi mogao da pošalje novi čist zahtev za sinhronizaciju.
+- **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` koja je uspešno izvršila `flushdb()` na povezanoj Redis instanci.
+- **Status:** Završeno.
+
 
 
 
