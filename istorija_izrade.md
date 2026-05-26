@@ -872,5 +872,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Vidljivost prekidača na panelu za pregled:** Dodat prekidač za "Korak-po-korak pregled (Studio mod)" direktno na desnu stranu panela za pregled (`preview-details-panel`) iznad glavnog dugmeta "Sinhronizuj". Time se obezbeđuje maksimalna uočljivost i kontrola pre pokretanja procesa.
 - **Status:** Implementirano i spremno za testiranje.
 
+### 26.05.2026. 11:00 — Uklanjanje novih glasova i povratak na provereni Piper Marko model
+- **Opis / Zahtev:**
+    Definitivno vraćanje na jedini stabilan i proveren model za sintezu na srpskom jeziku (Piper-Marko sa kloniranjem boje glasa).
+- **Urađeno:**
+    - **Modal Radnik (`modal_workers/tts_openvoice.py`):** Uklonjena je podrška za edge-tts (Nicholas i Sophie) i Piper serbski_institut model. Radnik je vraćen na stabilnu konfiguraciju koja koristi isključivo lokalni `sr_Marko_medium` model kao bazu za sintezu srpskog teksta, nakon čega vrši kloniranje boje glasa preko OpenVoice V2. Izvršen je deploy radnika na Modal.
+    - **Backend (`backend/worker/tts_engine.py`):** Pojednostavljena je priprema referentnog audia tako da se uvek vrši kloniranje originalnih vokala iz videa (uklonjena preostala logika za alternativne i predefinisane glasove).
+    - **Frontend (`frontend/src/App.jsx`):** Uklonjen je kompleksan meni sa izborom glasova koji je nudio nepouzdane/alternativne glasove. Umesto toga, dodat je jednostavan i jasan informativni panel koji obaveštava korisnika da se koristi standardni i provereni srpski model Marko sa kloniranjem boje glasa.
+- **Status:** Uspešno implementirano, radnik deploy-ovan na Modal i spreman za stabilan rad.
+
+
 
 

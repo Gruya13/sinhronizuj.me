@@ -23,72 +23,55 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
 
     # 1. Priprema i isecanje referentnog audia za kloniranje glasa
     if progress_callback:
-        progress_callback(detail=f"Priprema referentnog audia (tip glasa: {voice_type})...")
+        progress_callback(detail="Priprema referentnog audia...")
     
     try:
-        if voice_type == "dragana":
-            # Koristimo predefinisani srpski zenski glas Dragana
-            # Putanja na Celery radniku (u Dockeru se nalazi u /app/backend/assets/serbian_female.wav)
-            ref_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "serbian_female.wav")
-            if not os.path.exists(ref_path):
-                # Fallback ako fajl ne postoji iz nekog razloga na VPS-u
-                print(f"[WARNING] Predefinisani glas Dragana nije nadjen na putanji {ref_path}. Radim fallback na kloniranje.")
-                voice_type = "clone"
-            else:
-                ref_audio_all = AudioSegment.from_wav(ref_path)
-                buffer = io.BytesIO()
-                ref_audio_all.export(buffer, format="wav")
-                ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                ref_text = "Ovaj glas nije instaliran, vi slušate prethodno snimljen primer."
-                print(f"[TTS V2] Uspešno učitan predefinisani srpski glas Dragana iz assets.")
-
-        if voice_type != "dragana": # "clone" ili fallback
-            # Pronađi prvi segment sa validnim original_text i vremenima
-            ref_segment = None
+        # Pronađi prvi segment sa validnim original_text i vremenima
+        ref_segment = None
+        for seg in translated_segments:
+            if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
+                duration = seg["end"] - seg["start"]
+                if 3.0 <= duration <= 15.0: # Idealno 3 do 15 sekundi
+                    ref_segment = seg
+                    break
+                    
+        # Ako nismo našli idealan, uzmi bilo koji koji ima original_text i traje bar 1 sekundu
+        if not ref_segment:
             for seg in translated_segments:
                 if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
-                    duration = seg["end"] - seg["start"]
-                    if 3.0 <= duration <= 15.0: # Idealno 3 do 15 sekundi
+                    if seg["end"] - seg["start"] > 1.0:
                         ref_segment = seg
                         break
                         
-            # Ako nismo našli idealan, uzmi bilo koji koji ima original_text i traje bar 1 sekundu
-            if not ref_segment:
-                for seg in translated_segments:
-                    if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
-                        if seg["end"] - seg["start"] > 1.0:
-                            ref_segment = seg
-                            break
-                            
-            ref_audio_all = AudioSegment.from_wav(vocals_path)
+        ref_audio_all = AudioSegment.from_wav(vocals_path)
+        
+        if ref_segment and "original_text" in ref_segment and ref_segment.get("start") is not None:
+            start_ms = int(ref_segment["start"] * 1000)
+            end_ms = int(ref_segment["end"] * 1000)
             
-            if ref_segment and "original_text" in ref_segment and ref_segment.get("start") is not None:
-                start_ms = int(ref_segment["start"] * 1000)
-                end_ms = int(ref_segment["end"] * 1000)
-                
-                # Iseci audio za taj segment
-                ref_sub_audio = ref_audio_all[start_ms:end_ms]
-                
-                # Izvoz u buffer
-                buffer = io.BytesIO()
-                ref_sub_audio.export(buffer, format="wav")
-                ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                ref_text = ref_segment["original_text"]
-                print(f"[TTS V2] Uspešno isečen referentni segment ({ref_segment['start']}s - {ref_segment['end']}s) za glas: '{ref_text}'")
-            else:
-                # Fallback na prvih 15 sekundi celog vokala
-                duration_ms = len(ref_audio_all)
-                limit_ms = min(duration_ms, 15000) # Max 15 sekundi
-                ref_sub_audio = ref_audio_all[:limit_ms]
-                
-                buffer = io.BytesIO()
-                ref_sub_audio.export(buffer, format="wav")
-                ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                ref_text = "Ovo je originalni glas iz videa."
-                print(f"[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
-                
+            # Iseci audio za taj segment
+            ref_sub_audio = ref_audio_all[start_ms:end_ms]
+            
+            # Izvoz u buffer
+            buffer = io.BytesIO()
+            ref_sub_audio.export(buffer, format="wav")
+            ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            ref_text = ref_segment["original_text"]
+            print(f"[TTS V2] Uspešno isečen referentni segment ({ref_segment['start']}s - {ref_segment['end']}s) za glas: '{ref_text}'")
+        else:
+            # Fallback na prvih 15 sekundi celog vokala
+            duration_ms = len(ref_audio_all)
+            limit_ms = min(duration_ms, 15000) # Max 15 sekundi
+            ref_sub_audio = ref_audio_all[:limit_ms]
+            
+            buffer = io.BytesIO()
+            ref_sub_audio.export(buffer, format="wav")
+            ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            ref_text = "Ovo je originalni glas iz videa."
+            print(f"[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
+            
     except Exception as e:
-        return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}
+        return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}ia: {e}"}
 
     # 2. Učitavamo originalni vokal da bismo znali ukupnu dužinu i izračunali maksimalna trajanja segmenata
     try:
