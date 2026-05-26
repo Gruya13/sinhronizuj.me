@@ -229,11 +229,8 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bo Ej Aj i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
     text = re.sub(r'\bo Ej Aju i robotikama\b', 'o Ej Aju i robotici', text, flags=re.IGNORECASE)
     
-    # 5. Odluke o pripremi/prijemu -> zapošljavanju
-    text = re.sub(r'\bodlukama o pripremi\b', 'odlukama o zapošljavanju', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bodluke o pripremi\b', 'odluke o zapošljavanju', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bodlukama o prijemu\b', 'odlukama o zapošljavanju', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bodluke o prijemu\b', 'odluke o zapošljavanju', text, flags=re.IGNORECASE)
+    # 5. Odluke o pripremi/prijemu -> zapošljavanju (u svim padežima)
+    text = re.sub(r'\bodluk([a-z]*) o (pripremi|prijemu)\b', r'odluk\1 o zapošljavanju', text, flags=re.IGNORECASE)
     
     # 6. Slaganje rodova za knjige (poput X i Y, koji su popularni -> koje su popularne)
     text = re.sub(r'\bpoput ([^,]+) i ([^,]+), koji su popularni\b', r'poput \1 i \2, koje su popularne', text, flags=re.IGNORECASE)
@@ -249,9 +246,12 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bčlanke o firmi kako bi je registrovala\b', 'dokumente za registraciju kako bi registrovala firmu', text, flags=re.IGNORECASE)
     
     # 10. Prirodniji raspored reči za negaciju nužnosti
-    text = re.sub(r'\bne nužno (trade|čine)\b', r'ne \1 nužno', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bne nužno (rade|čine)\b', r'ne \1 nužno', text, flags=re.IGNORECASE)
+    
+    # 11. Ispravka nepravilnog 'zabrinu o riziku' -> 'zabrinuti zbog rizika'
+    text = re.sub(r'\bkoji se (zabrinu|zabrinjavaju|zabrinjuju) o riziku\b', 'koji su zabrinuti zbog rizika', text, flags=re.IGNORECASE)
 
-    # 11. Dupli razmaci i čišćenje
+    # 12. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 

@@ -80,14 +80,29 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
     except Exception as e:
         return {"status": "error", "message": f"Greška pri učitavanju originalnog vokala: {e}"}
 
-    # Priprema segmenata za slanje na Modal bez prinudnog ubrzanja (max_duration = 0.0)
-    # jer ćemo vremensko rastezanje i usklađivanje raditi na nivou videa/audia u mergeru!
+    # Priprema segmenata za slanje na Modal sa dinamičkim length_scale faktorom
+    # kako bi Piper generisao audio direktno u optimalnom tempu za dužinu segmenta.
     modal_segments = []
     for idx, s in enumerate(translated_segments):
+        orig_duration = max(0.05, s["end"] - s["start"])
+        char_count = len(s["text"])
+        
+        # Procena prirodnog trajanja na srpskom (Piper-Marko model)
+        # Prosečno 16 karaktera u sekundi + 0.2s fiksna pauza
+        estimated_duration = (char_count / 16.0) + 0.2
+        target_scale = orig_duration / estimated_duration
+        
+        # Ograničavamo length_scale između 0.75 (brži izgovor) i 1.25 (sporiji izgovor)
+        # kako bi glas zvučao prirodno bez preteranog ubrzanja/usporavanja
+        length_scale = min(max(target_scale, 0.75), 1.25)
+        
+        print(f"[TTS V2] Segment {s['id']} (video_dur={orig_duration:.2f}s, chars={char_count}) -> proračunat length_scale: {length_scale:.2f}", flush=True)
+        
         modal_segments.append({
             "id": str(s["id"]),
             "text": s["text"],
-            "max_duration": 0.0
+            "max_duration": 0.0,
+            "length_scale": float(round(length_scale, 2))
         })
     
     payload = {

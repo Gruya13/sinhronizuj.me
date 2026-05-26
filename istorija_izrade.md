@@ -1020,6 +1020,22 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         2. Implementirao sam reaktivno stanje `videoError` i `onError` hendler na nivou video plejera koji prevodi i ispisuje precizan uzrok greške direktno na ekranu (npr. mrežna greška, neispravan kodek ili nepodržan format).
 - **Status:** Završeno, ažurirano lokalno i gurnuto na granu `development`.
 
+### 26.05.2026. 20:21 — Dinamički tempo govora za normalizaciju brzine segmenata i ispravke prevoda
+- **Zahtev / Problem:**
+    1. Korisnik je primetio da su neki delovi videa prebrzi (do 1.31x), dok su neki spori. Želi ujednačen i prirodan tempo govora kroz ceo video.
+    2. Potrebne su korekcije nekih preostalih nepravilnih prevoda na osnovu poslednjeg outputa.
+- **Urađeno:**
+    - **Rešavanje tempa govora preko Piper `length_scale` parametra:**
+        - Umesto da sve segmente generišemo u fiksnoj brzini `1.0` pa ih FFmpegom ubrzavamo/rastežemo (što zvuči neprirodno), implementirao sam dinamički proračun ciljne brzine na backendu (`backend/worker/tts_engine.py`).
+        - Proračun procenjuje prirodno trajanje izgovora na osnovu dužine teksta (prosek 16 karaktera/s + 0.2s tihe pauze) i poredi sa trajanjem originalnog video segmenta.
+        - Generisani odnos se šalje direktno Piper TTS-u na Modalu kao `length_scale` parametar (klampovan na bezbedne granice `[0.75, 1.25]`). Piper sada nativno generiše govor brže/sporije sa ispravnim promenama fonema, a naknadno FFmpeg istezanje je svedeno na nulu.
+    - **Unapređenje regex pravila za post-processing prevoda (`backend/worker/translator.py`):**
+        - Generalizovao sam pravilo za "odluke o zapošljavanju" da automatski obuhvati sve padeže (`odluka`, `odluke`, `odlukama` o pripremi/prijemu).
+        - Dodao sam automatsku ispravku neprirodnog lektorskog prevoda `koji se zabrinu o riziku` u pravilan `koji su zabrinuti zbog rizika`.
+        - Ispravio sam regex pravilo za negaciju nužnosti (`ne nužno rade/čine` -> `ne rade/čine nužno`) uklanjanjem slučajne engleske reči iz šablona.
+- **Status:** Implementirano, gurnuto na `development` granu, sinhronizovano na Hetzner serveru i Celery radnici su restartovani.
+
+
 
 
 
