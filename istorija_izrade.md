@@ -929,6 +929,26 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         5. **Subtilni Room Reverb (aecho=1.0:0.8:15:0.2)** sa kratkim kašnjenjem od 15ms kako bi se glas prirodno stopio sa pozadinskim zvucima videa.
 - **Status:** Uspešno implementirano, verifikovano i gurnuto na repozitorijum.
 
+### 26.05.2026. 18:38 — Popravka padeža za skraćenicu Ej Aj i doslednost obraćanja u lektoru
+- **Opis / Zahtev:**
+    Uočen je problem gde lektor propušta pravilan lokativ za "Ej Aj" (npr. ostavlja "o Ej Aj" umesto "o Ej Aju") i meša lica u obraćanju unutar iste rečenice (npr. jednina "želiš" i množina "pratite"). Takođe, bukvalan prevod "latest in AI and robotics" je glasio "najnovijim o Ej Aj i robotikama".
+- **Urađeno:**
+    - **Pravila deklinacije po predlozima (`backend/worker/translator.py`):**
+        U Lektor promptu sam u okviru Pravila 3 raspisao preciznu tabelu/listu sparivanja predloga i padeža za skraćenicu "Ej Aj":
+        * predlog `sa` (instrumental) -> `sa Ej Ajem`
+        * predlog `o` (lokativ) -> `o Ej Aju`
+        * predlog `od` (genitiv) -> `od Ej Aja`
+        * predlog `u` (lokativ) -> `u Ej Aju`
+        * predlog `za` (akuzativ) -> `za Ej Aj`
+    - **Pravilo za dosledno obraćanje (`backend/worker/translator.py`):**
+        Dodato je pravilo o strogoj doslednosti u gramatičkom licu (ti vs vi). Za moderne video snimke propisano je isključivo neformalno jedninsko obraćanje (ti), tako da se "želiš ... pratite" koriguje u "želiš ... prati".
+    - **Pravilo za prevođenje trendova (`backend/worker/translator.py`):**
+        Propisano je preformulisanje fraze "latest in AI and robotics" u prirodne srpske konstrukcije ("najnovijem o Ej Aju i robotici" ili "najnovijim dešavanjima iz sveta Ej Aja i robotike").
+    - **Testiranje i provera (`scratch/test_lektor_cases.py`):**
+        Segment 4: *"Ako želiš da ostaneš u toku sa najnovijim o Ej Aj i robotikama, pratite za više."* je uspešno i u potpunosti korigovan u: **"Ako želiš da ostaneš u toku sa najnovijim o Ej Aju i robotici, prati za više."**. Svi ostali padežni oblici ("sa Ej Ajem", "o Ej Aju") takođe rade savršeno bez mešanja.
+- **Status:** Uspešno implementirano, testirano i gurnuto na repozitorijum.
+
+
 
 
 
