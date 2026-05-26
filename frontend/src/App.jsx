@@ -24,7 +24,10 @@ function App() {
   const [uploadState, setUploadState] = useState('idle'); // idle, uploading, completed, error
 
   const [terminalOpen, setTerminalOpen] = useState(true);
-  const [debuggingMode, setDebuggingMode] = useState(() => localStorage.getItem('sinhronizuj_me_debug_mode') === 'true');
+  const [debuggingMode, setDebuggingMode] = useState(() => {
+    const saved = localStorage.getItem('sinhronizuj_me_debug_mode');
+    return saved === null ? true : saved === 'true';
+  });
 
   // Interaktivni Studio v2 state-ovi
   const [editedSegments, setEditedSegments] = useState([]);
@@ -594,6 +597,21 @@ function App() {
                   )}
                 </div>
               )}
+
+              {/* Studio Mod Toggle */}
+              <div className="debug-toggle-container" style={{ margin: '15px 0 20px 0', justifyContent: 'flex-start', width: '100%', padding: '10px 14px' }}>
+                <label className="debug-label" style={{ cursor: 'pointer' }}>
+                  <Terminal size={14} style={{ marginRight: '6px' }} /> Korak-po-korak pregled (Studio mod)
+                </label>
+                <label className="switch" style={{ marginLeft: 'auto' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={debuggingMode} 
+                    onChange={(e) => setDebuggingMode(e.target.checked)} 
+                  />
+                  <span className="slider"></span>
+                </label>
+              </div>
 
               {/* Akcije */}
               <div className="preview-actions-row">

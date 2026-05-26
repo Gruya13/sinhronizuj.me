@@ -863,4 +863,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
        Testovi su uspešno prošli, a generisani audio fajlovi su sačuvani u `scratch/output_institut.wav` i `scratch/output_clone_institut.wav` sa ispravnom srpskom sintezom i prenosom boje glasa.
 - **Status:** Uspešno implementirano, verifikovano i spremno za rad.
 
+### 26.05.2026. 10:46 — Poboljšanje UI Studio Moda i Objašnjenje za serbski_institut
+- **Opis / Problem:**
+    1. **Sorbian (Lužičkosrpski) jezik:** Ustanovljeno je da `serbski_institut` model sa HuggingFace-a (`rhasspy/piper-voices/sr`) zapravo koristi dataset na Donjolužičkosrpskom jeziku (dsb), a ne na srpskom (sr_RS). Zato sintetizovani glas zvuči strano i nerazumljivo za srpsko govorno područje. Korisniku je preporučeno korišćenje standardnih modela (Marko, Microsoft Nicholas/Sophie) koji su na čistom standardnom srpskom jeziku.
+    2. **Nedostatak preslušavanja audia pre spajanja:** Primećeno je da korisnik nije imao mogućnost preslušavanja jer je interfejs podrazumevano pokretao sinhronizaciju bez uključenog Debugging Moda (Studio mod), pošto je prekidač bio skriven na panelu za pregled videa.
+- **Urađeno:**
+    - **Podrazumevani Studio mod:** Ažuriran `debuggingMode` state u `App.jsx` da podrazumevano bude `true` ako vrednost nije eksplicitno podešena u `localStorage`.
+    - **Vidljivost prekidača na panelu za pregled:** Dodat prekidač za "Korak-po-korak pregled (Studio mod)" direktno na desnu stranu panela za pregled (`preview-details-panel`) iznad glavnog dugmeta "Sinhronizuj". Time se obezbeđuje maksimalna uočljivost i kontrola pre pokretanja procesa.
+- **Status:** Implementirano i spremno za testiranje.
+
+
 
