@@ -904,6 +904,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         Kreirana je testna skripta i poslat zahtev lektoru na Modalu. Rezultati potvrđuju da Qwen model sada savršeno deklinira frazu (npr. korigovano u "sa Ej Ajem" i "o Ej Aju").
 - **Status:** Uspešno implementirano, testirano i gurnuto na repozitorijum.
 
+### 26.05.2026. 18:03 — Sprečavanje nepostojećih množina u prevodu lektora (npr. "robotikama")
+- **Opis / Zahtev:**
+    Primećene su povremene gramatičke greške gde lektor prevodi ili ostavlja množinske oblike reči koje se na srpskom koriste isključivo u jednini (npr. "robotics" prevedeno kao "robotike" ili "robotikama" umesto "robotika" u jednini).
+- **Urađeno:**
+    - **Prompt Lektora (`backend/worker/translator.py`):**
+        U Pravilo 4 (Prirodni srpski izraz) dodato je eksplicitno upozorenje protiv korišćenja nepostojećih množinskih oblika za naučne oblasti i discipline (kao što je "robotika"). Dodat je i primer: `* 'se bavi robotikama' -> 'se bavi robotikom' (ako je u pitanju naučna oblast) ili 'se bavi robotima' (ako su mašine)`.
+    - **Testiranje (`scratch/test_lektor_cases.py`):**
+        U testnu skriptu je ubačen segment sa rečenicom: *"Rade sjajne stvari u robotikama."*. Pokretanjem testa, Lektor je rečenicu uspešno korigovao u ispravan jedninski oblik lokativa: *"Oni rade sjajne stvari u robotici."*.
+- **Status:** Uspešno implementirano, verifikovano i gurnuto na repozitorijum.
+
+
 
 
 
