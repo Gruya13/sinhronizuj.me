@@ -953,6 +953,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` koja je uspešno izvršila `flushdb()` na povezanoj Redis instanci.
 - **Status:** Završeno.
 
+### 26.05.2026. 19:10 — Usklađivanje prevodioca sa lektorom i optimizacija brzine videa
+- **Zahtev / Problem:**
+    Korisnik je prijavio da se u video snimku na kraju i dalje prevodi "Ej Aj i robotikama", kao i da ceo video deluje malo usporeno.
+- **Urađeno:**
+    - **Usklađivanje Qwen2-VL translatora (`backend/worker/translator.py`):**
+        Uočeno je da je lektor bio isključen ili je koristio stari kod na VPS-u zbog neažuriranog repozitorijuma na serveru. Kako bi pipeline bio maksimalno otporan, preneo sam pravila deklinacije "Ej Aj" (o Ej Aju, sa Ej Ajem, itd.), doslednosti obraćanja ("ti" umesto "vi") i jednine robotike ("robotika" / "robotici" umesto "robotikama") direktno u glavni prompt Qwen2-VL prevodioca (`translate_segments`).
+    - **Ažuriranje i deploy na VPS-u:**
+        Lokalne unekomitovane izmene na serveru su sklonjene pomoću `git stash`, uspešno je povučena najnovija verzija koda sa grane `development` i restartovani su docker kontejneri `sinhronizuj-worker` i `sinhronizuj-api`.
+    - **Optimizacija brzine videa (`backend/worker/merger.py`):**
+        U funkciji `merge_audio_and_video_dynamic` smanjen je parametar `max_video_stretch` sa `1.15` (15% maksimalno usporavanje videa) na `1.05` (5% maksimalno usporavanje). Time je postignuto da se video reprodukuje u gotovo prirodnoj brzini (razlika do 5% je vizuelno neprimetna za ljudsko oko), a glas se preko Rubberband filtera preciznije i brže prilagođava zadatom tajmingu.
+- **Status:** Izmene su testirane, gurnute na granu `development` i uspešno deploy-ovane/restartovane na Hetzner VPS-u.
+
+
 
 
 
