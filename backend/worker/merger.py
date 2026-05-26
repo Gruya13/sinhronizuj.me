@@ -18,12 +18,13 @@ def get_video_duration(path: str) -> float:
 
 def speedup_audio_file(input_path: str, speedup: float) -> str:
     """
-    Ubrzava audio fajl pomoću FFmpeg atempo filtera bez promene visine tona.
+    Ubrzava audio fajl pomoću FFmpeg rubberband filtera bez promene visine tona.
+    Daje znatno prirodniji glas u poređenju sa atempo.
     """
     output_path = input_path.replace(".wav", f"_speedup_{speedup:.2f}.wav")
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
-        "-filter:a", f"atempo={speedup}",
+        "-filter:a", f"rubberband=tempo={speedup}",
         output_path
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -43,7 +44,18 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
         
         # Ucitavamo audio fajlove u memoriju
         bg_audio = AudioSegment.from_wav(background_path)
-        dub_audio = AudioSegment.from_wav(dubbed_path)
+        
+        # Primenjujemo audio post-processing lanac na sinhronizovani vokal pomoću FFmpeg pre miksanja
+        processed_dubbed_path = dubbed_path.replace(".wav", "_processed.wav")
+        postprocess_cmd = [
+            "ffmpeg", "-y", "-i", dubbed_path,
+            "-af", "aresample=44100,highpass=f=80,lowpass=f=12000,compand=attacks=0.01:decays=0.1:points=-90/-90|-20/-10|0/-3,aecho=1.0:0.8:15:0.2",
+            processed_dubbed_path
+        ]
+        subprocess.run(postprocess_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        dub_audio = AudioSegment.from_wav(processed_dubbed_path)
+        if os.path.exists(processed_dubbed_path):
+            os.remove(processed_dubbed_path)
         
         # Audio inzenjering: podesavamo jacinu prema parametrima
         if background_vol != 0.0:
@@ -231,7 +243,16 @@ def merge_audio_and_video_dynamic(
                 audio_mix_filters.append(f"[{a_bg_out}]volume={bg_vol_str},aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_bg_res}]")
                 
                 a_tts_res = f"attsres{idx}"
-                audio_mix_filters.append(f"[{tts_input_idx}:a]volume={dub_vol_str},aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_tts_res}]")
+                # Primenjujemo resampling, EQ (highpass/lowpass), kompresor (compand) i room reverb (aecho) za bolju integraciju vokala
+                audio_mix_filters.append(
+                    f"[{tts_input_idx}:a]aresample=44100,"
+                    f"highpass=f=80,"
+                    f"lowpass=f=12000,"
+                    f"compand=attacks=0.01:decays=0.1:points=-90/-90|-20/-10|0/-3,"
+                    f"aecho=1.0:0.8:15:0.2,"
+                    f"volume={dub_vol_str},"
+                    f"aformat=sample_fmts=fltp:channel_layouts=stereo[{a_tts_res}]"
+                )
                 
                 a_mix_out = f"amix{idx}"
                 audio_mix_filters.append(f"[{a_bg_res}][{a_tts_res}]amix=inputs=2:duration=first[{a_mix_out}]")

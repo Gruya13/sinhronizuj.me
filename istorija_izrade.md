@@ -914,6 +914,22 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         U testnu skriptu je ubačen segment sa rečenicom: *"Rade sjajne stvari u robotikama."*. Pokretanjem testa, Lektor je rečenicu uspešno korigovao u ispravan jedninski oblik lokativa: *"Oni rade sjajne stvari u robotici."*.
 - **Status:** Uspešno implementirano, verifikovano i gurnuto na repozitorijum.
 
+### 26.05.2026. 18:25 — Poboljšanje audio kvaliteta i spajanja vokala (Rubber Band i Post-processing)
+- **Opis / Zahtev:**
+    Zahtev za poboljšanje kvaliteta spojenog govora. Standardni `atempo` filter stvara metalni prizvuk i jeku pri dinamičkom ubrzanju vokala, dok suvi sintetizovani vokali odudaraju od akustike okruženja videa.
+- **Urađeno:**
+    - **Rubber Band integracija (`backend/worker/merger.py`):**
+        Promenjena funkcija `speedup_audio_file` da umesto FFmpeg filtera `atempo` koristi visokokvalitetni `rubberband` filter za promenu brzine vokala. Na lokalnom sistemu je već pre-instalirana i podržana biblioteka `librubberband`.
+    - **Audio Post-processing lanac (`backend/worker/merger.py`):**
+        U funkcijama za spajanje zvuka i videa (`merge_audio_and_video` i `merge_audio_and_video_dynamic`) integrisan je napredni filter lanac za vokale:
+        1. **Resampling** na 44100 Hz (kako bi svi filteri radili ispravno bez obzira na ulaz).
+        2. **Highpass filter (80Hz)** za uklanjanje niskofrekventne buke i "tutnjave".
+        3. **Lowpass filter (12kHz)** za otklanjanje šuma i visokofrekventnih artifakata.
+        4. **Dynamic Range Compressor (compand)** za izjednačavanje glasnoće i stabilizaciju nivoa zvuka.
+        5. **Subtilni Room Reverb (aecho=1.0:0.8:15:0.2)** sa kratkim kašnjenjem od 15ms kako bi se glas prirodno stopio sa pozadinskim zvucima videa.
+- **Status:** Uspešno implementirano, verifikovano i gurnuto na repozitorijum.
+
+
 
 
 
