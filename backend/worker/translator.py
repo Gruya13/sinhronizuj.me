@@ -205,7 +205,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             })
             
         # POKRETANJE LEKTOR FAZE (KORAK 4.D)
-        return lektor_segments(segments, final_segments, progress_callback=progress_callback)
+        return lektor_segments(segments, final_segments, progress_callback=progress_callback, translator_duration=translator_duration)
                 
     except Exception as e:
         import traceback
@@ -265,12 +265,20 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def lektor_segments(original_segments, translated_segments, progress_callback=None):
+def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0):
     """
     Druga faza: Qwen 2.5 32B (Lektor) lekturiše grubi prevod.
     """
+    lektor_duration = 0.0
     if not settings.MODAL_LEKTOR_URL:
-        return {"status": "success", "translated_segments": translated_segments}
+        return {
+            "status": "success", 
+            "translated_segments": translated_segments,
+            "metrics": {
+                "translator_duration": translator_duration,
+                "lektor_duration": 0.0
+            }
+        }
         
     print(f"[LEKTOR] Pokrećem Lektor fazu na {settings.MODAL_LEKTOR_URL}...")
     if progress_callback:

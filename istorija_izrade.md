@@ -1058,6 +1058,18 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` u virtuelnom okruženju, čime je uspešno izvršen `flushdb()` na povezanoj Redis instanci.
 - **Status:** Završeno.
 
+### 27.05.2026. 08:02 — Ispravka NameError baga sa `translator_duration` i `lektor_duration`
+- **Zahtev / Problem:**
+    Korisnik je prijavio grešku pri novom zahtevu: `name 'translator_duration' is not defined`.
+- **Urađeno:**
+    - **Analiza:** 
+        Funkcija `translate_segments` u `translator.py` poziva `lektor_segments` na kraju uspešnog rada i vraća njen rezultat. Međutim, promenljiva `translator_duration` je bila lokalna u `translate_segments` i nije bila definisana niti prosleđena u `lektor_segments`, koja je pokušavala da je vrati u rečniku pod ključem `metrics`. Pored toga, `lektor_duration` nije bila pre-definisana/inicijalizovana pre `try` bloka unutar `lektor_segments`, pa je u slučaju bilo kakve greške (ili neaktivnosti) pre postavljanja tajmera dolazilo do `NameError` prilikom njenog čitanja.
+    - **Ispravka:**
+        * Modifikovao sam potpis funkcije `lektor_segments` da prima `translator_duration` argument sa podrazumevanom vrednošću `0.0`.
+        * Prosledio sam `translator_duration` iz funkcije `translate_segments` prilikom poziva `lektor_segments`.
+        * Inicijalizovao sam `lektor_duration = 0.0` na samom početku `lektor_segments` kako bi bila uvek definisana bez obzira na putanju izvršavanja i greške.
+- **Status:** Završeno, testirano sintaksnom proverom i gurnuto na granu `development`.
+
 
 
 
