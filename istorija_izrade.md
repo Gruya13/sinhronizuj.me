@@ -1091,6 +1091,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Kreirao sam datoteku `tok_podataka_pipeline.txt` u korenu projekta, sa jasnim ASCII dijagramom toka podataka i detaljnim opisom (ulaz, proces, izlaz) svih 11 koraka u pipeline-u (od inicijalizacije zahteva, preko Demucs-a, Whisper-a, Qwen-VL-a, Lektora, Piper TTS-a, Dynamic Time Stretching-a, Wav2Lip-a, do finalnog miksovanja).
 - **Status:** Završeno, komitovano i gurnuto na granu `development` (kako lokalno, tako i na VPS).
 
+### 27.05.2026. 08:48 — Kreiranje Markdown verzije dokumenta toka podataka
+- **Zahtev:** Korisnik je tražio da se isti opis toka podataka generiše u obliku Markdown (`.md`) fajla.
+- **Urađeno:** Kreirao sam datoteku `tok_podataka_pipeline.md` u korenu projekta, sa svim formatiranim naslovima, dijagramom u obliku Mermaid koda, i listama koje su čitljive u svim MD parserima.
+- **Status:** Završeno, komitovano i gurnuto na granu `development` (lokalno i na VPS-u).
+
 
 
 
