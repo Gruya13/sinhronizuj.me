@@ -1130,6 +1130,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     4. **Verifikacija:** Pokretanjem `scratch/test_lektor_cases.py` potvrđeno je da Lektor radi besprekorno, brzo (zahvaljujući prefix-caching-u) i vraća sve segmente gramatički ispravno deklinirane (npr. "sa Ej Ajem", "o Ej Aju").
 - **Status:** Uspešno završeno i verifikovano na Modal GPU-u. Kôd je spreman za rad.
 
+### 27.05.2026. 09:30 — Ispravka UnboundLocalError-a za promenljivu 'os' u Celery radniku
+- **Problem:**
+    Prilikom pokretanja procesa sinhronizacije, Celery radnik je bacao grešku `UnboundLocalError: cannot access local variable 'os' where it is not associated with a value` na liniji 25.
+- **Uzrok:**
+    Unutar funkcije `process_video_task` na liniji 305 postojao je redundantan uvoz `import os`. Python kompajler zbog ovoga tretira `os` kao lokalnu promenljivu za celu funkciju, pa je njen poziv na samom početku funkcije (linija 25) pre nego što se stigne do linije 305 izazivao grešku.
+- **Rešenje:**
+    Uklonili smo suvišni `import os` iz tela funkcije, pošto je `os` već uvezen na globalnom nivou na vrhu fajla.
+- **Status:** Uspešno rešeno, testirano i spremno za deploy.
+
 
 
 

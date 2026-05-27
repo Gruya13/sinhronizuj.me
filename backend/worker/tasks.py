@@ -302,7 +302,6 @@ def process_video_task(self, video_url: str, debug: bool = False):
             add_phase_cost("tts", "Sinteza glasa (OpenVoice)", "L4", total_duration_tts, 0.00025)
             
             # Eksponiramo generisani audio URL za preslušavanje na frontendu
-            import os
             dubbed_filename = os.path.basename(tts_result["dubbed_audio_path"])
             progress_metadata['dubbed_audio_url'] = f"/videos/{dubbed_filename}"
             
