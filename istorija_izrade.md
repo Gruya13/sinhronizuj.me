@@ -1070,6 +1070,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Inicijalizovao sam `lektor_duration = 0.0` na samom početku `lektor_segments` kako bi bila uvek definisana bez obzira na putanju izvršavanja i greške.
 - **Status:** Završeno, testirano sintaksnom proverom i gurnuto na granu `development`.
 
+### 27.05.2026. 08:06 — Čišćenje Redis baze podataka
+- **Zahtev:** Korisnik je tražio čišćenje Redis baze kako bi mogao da pošalje novi zahtev.
+- **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` u virtuelnom okruženju, čime je uspešno izvršen `flushdb()` na povezanoj Redis instanci.
+- **Status:** Završeno.
+
 
 
 
