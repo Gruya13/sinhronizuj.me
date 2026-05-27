@@ -280,7 +280,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             }
         }
         
-    batch_size = 10
+    batch_size = 5
     parsed_lektor_dict = {}
     lektor_duration = 0.0
     
@@ -370,7 +370,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.2,
-                "max_tokens": 800
+                "max_tokens": 400
             }
             
             lektor_output = call_modal_endpoint(

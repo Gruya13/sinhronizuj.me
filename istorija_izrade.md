@@ -1139,6 +1139,22 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     Uklonili smo suvišni `import os` iz tela funkcije, pošto je `os` već uvezen na globalnom nivou na vrhu fajla.
 - **Status:** Uspešno rešeno, testirano i spremno za deploy.
 
+### 27.05.2026. 21:54 — Integracija Resemble Enhance modela za poboljšanje audio kvaliteta (100% lokalno)
+- **Opis / Zahtev:**
+    Korisnik je prijavio nezadovoljstvo sa trenutnim kvalitetom sintetizovanog i kloniranog audia (robotska intonacija i metalni prizvuk/šumovi u pozadini). Zahtevana je analiza i implementacija rešenja koja značajno poboljšava kvalitet, uz obavezan uslov da sistem ostane u potpunosti offline (bez korišćenja eksternih cloud API-ja).
+- **Urađeno:**
+    - **Integracija Resemble Enhance u radnika (`modal_workers/tts_openvoice.py`):**
+        1.  Dodao sam `resemble-enhance` biblioteku u pip instalacije unutar Modal Image definicije, a u sistemske apt pakete dodao sam `git-lfs` i pokrenuo `git lfs install` jer resemble-enhance preuzima težine sa Hugging Face-a preko LFS-a.
+        2.  U setup fazi (`@modal.enter()`) implementirao sam automatsku inicijalizaciju i preuzimanje težina za oba modela (`denoise` i `enhance`) nad dummy tihim podacima. Time se sprečava preklapanje niti pri paralelnom preuzimanju i obezbeđuje se da se težine trajno keširaju u `/models_nfs/hf_cache`.
+        3.  Implementirao sam dvostepeni proces obrade u `_generate_segment`:
+            *   **Korak 1 (Denoise):** Audio generisan preko OpenVoice V2 se prvo čisti pomoću `denoise` funkcije koja uspešno otklanja šum i metalne artefakte.
+            *   **Korak 2 (Enhance):** Očišćeni audio se zatim propušta kroz `enhance` CFM model sa parametrima `nfe=64`, `solver="midpoint"`, `lambd=0.9` i `tau=0.3` (temperatura smanjena sa 0.5 na 0.3 radi veće stabilnosti i prirodnosti zvuka).
+        4.  Uklonio sam raniji problem sa mešanjem veličine slova u nazivu solvera (`"Midpoint"` -> `"midpoint"`) koji je blokirao izvršavanje generatora i preusmeravao ga na fallback režim (isključivo originalni 22kHz zvuk).
+        5.  Izvršio sam deploy i ponovno pokretanje radnika na Modalu (`sm-tts-openvoice`).
+        6.  Dodao sam punu podršku za dinamičko predefinisanje parametara kvaliteta zvuka (`enhance_denoise`, `enhance_nfe`, `enhance_solver`, `enhance_lambd`, `enhance_tau`) direktno kroz JSON payload API poziva, što omogućava testiranje različitih kombinacija bez potrebe za stalnim redeployment-om.
+        7.  Na osnovu povratnih informacija i upoređivanja generisanih testova, postavio sam `tau=0.3` kao novu podrazumevanu vrednost jer pruža najprirodniji glas.
+- **Status:** Uspešno implementirano, testirano i podrazumevane vrednosti su podešene.
+
 
 
 

@@ -36,14 +36,15 @@ def download_models():
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "ffmpeg", "portaudio19-dev", "build-essential", "espeak-ng")
+    .apt_install("git", "git-lfs", "ffmpeg", "portaudio19-dev", "build-essential", "espeak-ng")
     .run_commands(
+        "git lfs install",
         "git clone https://github.com/myshell-ai/OpenVoice.git /opt/OpenVoice"
     )
     .pip_install(
         "torch", "torchaudio", "transformers", "soundfile", "scipy", "librosa", 
         "huggingface-hub", "speechbrain", "silero-vad", "eng-to-ipa", "pypinyin", "cn2an", "jieba", "fastapi", "piper-tts",
-        "inflect", "unidecode", "wavmark", "pydub", "whisper-timestamped"
+        "inflect", "unidecode", "wavmark", "pydub", "whisper-timestamped", "resemble-enhance"
     )
 )
 
@@ -94,9 +95,22 @@ class OpenVoiceWorker:
         self.tone_color_converter.load_ckpt(
             f"{self.ov_path}/converter/checkpoint.pth"
         )
+        
+        # Inicijalizacija Resemble Enhance (preuzimanje modela ako ne postoji)
+        print("Preuzimam/Inicijalizujem Resemble Enhance model...")
+        from resemble_enhance.enhancer.inference import denoise as resemble_denoise_fn
+        from resemble_enhance.enhancer.inference import enhance as resemble_enhance_fn
+        try:
+            dummy_wav = torch.zeros(22050, dtype=torch.float32)
+            dummy_denoised, denoise_sr = resemble_denoise_fn(dummy_wav, 22050, self.device)
+            _, _ = resemble_enhance_fn(dummy_denoised, denoise_sr, self.device, nfe=1, solver="midpoint", lambd=0.9, tau=0.5)
+            print("Resemble Enhance model uspešno inicijalizovan i spreman.")
+        except Exception as e:
+            print(f"[Resemble Enhance Init WARNING] {e}")
+            
         print("Svi modeli su uspešno inicijalizovani.")
 
-    def _generate_segment(self, segment, ref_se_path, base_se_path):
+    def _generate_segment(self, segment, ref_se_path, base_se_path, enhance_params=None):
         """
         Sintetizuje tekst u govor pomoću Piper-a (bazni model Marko) i menja mu boju glasa
         prema referentnim speeker embedding-ovima pomoću OpenVoice-a.
@@ -146,6 +160,43 @@ class OpenVoiceWorker:
                 message="@MyShell"
             )
             
+            if enhance_params is None:
+                enhance_params = {
+                    "denoise": True,
+                    "nfe": 64,
+                    "solver": "midpoint",
+                    "lambd": 0.9,
+                    "tau": 0.3
+                }
+            
+            # 3. Poboljšanje zvuka pomoću Resemble Enhance (Denoise & Bandwidth Extension)
+            try:
+                import torchaudio
+                from resemble_enhance.enhancer.inference import denoise as resemble_denoise_fn
+                from resemble_enhance.enhancer.inference import enhance as resemble_enhance_fn
+                
+                dwav, sr = torchaudio.load(tmp_final_wav)
+                dwav = dwav.mean(dim=0)  # Konverzija u mono ako je stereo
+                
+                # 1. Korak: Denoise (ako je omogućeno)
+                if enhance_params.get("denoise", True):
+                    dwav, sr = resemble_denoise_fn(dwav, sr, self.device)
+                
+                # 2. Korak: Enhance (CFM model)
+                wav_enhanced, new_sr = resemble_enhance_fn(
+                    dwav, sr, self.device, 
+                    nfe=enhance_params.get("nfe", 64), 
+                    solver=enhance_params.get("solver", "midpoint"), 
+                    lambd=enhance_params.get("lambd", 0.9), 
+                    tau=enhance_params.get("tau", 0.5)
+                )
+                
+                # Čuvanje poboljšanog audia nazad na disk
+                torchaudio.save(tmp_final_wav, wav_enhanced.unsqueeze(0).cpu(), new_sr)
+                print(f"[Resemble Enhance] Uspešno poboljšan segment {seg_id} (sa {sr}Hz na {new_sr}Hz)")
+            except Exception as enh_err:
+                print(f"[Resemble Enhance WARNING] Neuspešno poboljšanje segmenta {seg_id}: {enh_err}")
+                
             # Čitanje finalnog fajla i konverzija u base64
             with open(tmp_final_wav, "rb") as f:
                 audio_b64 = base64.b64encode(f.read()).decode('utf-8')
@@ -180,6 +231,14 @@ class OpenVoiceWorker:
             ref_audio_b64 = data.get('reference_audio_base64')
             ref_text = data.get('reference_text')
             segments = data.get('segments')
+            
+            enhance_params = {
+                "denoise": data.get("enhance_denoise", True),
+                "nfe": data.get("enhance_nfe", 64),
+                "solver": data.get("enhance_solver", "midpoint"),
+                "lambd": data.get("enhance_lambd", 0.9),
+                "tau": data.get("enhance_tau", 0.3)
+            }
             
             if not ref_audio_b64:
                 return {"error": "Nedostaje parametar: reference_audio_base64"}
@@ -266,7 +325,8 @@ class OpenVoiceWorker:
                         return self._generate_segment(
                             seg,
                             ref_se_path=ref_se_path,
-                            base_se_path=base_se_path
+                            base_se_path=base_se_path,
+                            enhance_params=enhance_params
                         )
                     except Exception as e:
                         return {"id": seg.get("id"), "error": str(e)}
@@ -288,7 +348,7 @@ class OpenVoiceWorker:
                 
                 print("[OpenVoice] Pokrećem pojedinačnu konverziju...")
                 single_segment = {"id": "0", "text": text}
-                res = self._generate_segment(single_segment, ref_se_path, base_se_path)
+                res = self._generate_segment(single_segment, ref_se_path, base_se_path, enhance_params)
                 
                 for f in [ref_se_path, base_se_path]:
                     if os.path.exists(f): os.remove(f)
