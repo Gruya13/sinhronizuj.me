@@ -1086,6 +1086,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Očistio sam Redis bazu ponovo kako bi korisnik mogao da pošalje čist zahtev.
 - **Status:** Završeno.
 
+### 27.05.2026. 08:46 — Kreiranje detaljnog opisa toka podataka (Pipeline Flow)
+- **Zahtev:** Korisnik je tražio kreiranje tekstualnog fajla u korenu projekta koji detaljno opisuje kretanje podataka i funkcionisanje svakog koraka u pipeline-u.
+- **Urađeno:** Kreirao sam datoteku `tok_podataka_pipeline.txt` u korenu projekta, sa jasnim ASCII dijagramom toka podataka i detaljnim opisom (ulaz, proces, izlaz) svih 11 koraka u pipeline-u (od inicijalizacije zahteva, preko Demucs-a, Whisper-a, Qwen-VL-a, Lektora, Piper TTS-a, Dynamic Time Stretching-a, Wav2Lip-a, do finalnog miksovanja).
+- **Status:** Završeno, komitovano i gurnuto na granu `development` (kako lokalno, tako i na VPS).
+
 
 
 
