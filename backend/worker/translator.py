@@ -53,8 +53,12 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     """
     Poziva Modal Serverless Translator (Qwen2-VL) koristeći vLLM OpenAI Vision format.
     """
+    import time
+    translator_duration = 0.0
+    lektor_duration = 0.0
+
     if not segments:
-        return {"status": "success", "translated_segments": []}
+        return {"status": "success", "translated_segments": [], "metrics": {"translator_duration": 0.0, "lektor_duration": 0.0}}
 
     if not settings.MODAL_TRANSLATOR_URL:
         print("[WARNING] MODAL_TRANSLATOR_URL nije definisan. Vraćam originalni tekst.")
@@ -63,7 +67,11 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "translated_segments": [
                 {"id": s.get("id", i), "start": s["start"], "end": s["end"], "text": s["text"], "original_text": s["text"]} 
                 for i, s in enumerate(segments)
-            ]
+            ],
+            "metrics": {
+                "translator_duration": 0.0,
+                "lektor_duration": 0.0
+            }
         }
 
     # Priprema tekstualnog ulaza
@@ -152,12 +160,14 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             base_url += '/v1'
         url = f"{base_url}/chat/completions"
         
+        t_start_trans = time.time()
         output = call_modal_endpoint(
             url=url, 
             payload=payload, 
             timeout_seconds=900,
             progress_callback=progress_callback
         )
+        translator_duration = time.time() - t_start_trans
         
         try:
             raw_output = output["choices"][0]["message"]["content"]
@@ -352,12 +362,14 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         }
         
         url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+        t_start_lektor = time.time()
         lektor_output = call_modal_endpoint(
             url=url,
             payload=lektor_payload,
             timeout_seconds=900,
             progress_callback=None
         )
+        lektor_duration = time.time() - t_start_lektor
         
         try:
             lektor_raw = lektor_output["choices"][0]["message"]["content"]
@@ -394,4 +406,11 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         if "text" in seg:
             seg["text"] = clean_translation_text(seg["text"])
             
-    return {"status": "success", "translated_segments": translated_segments}
+    return {
+        "status": "success", 
+        "translated_segments": translated_segments,
+        "metrics": {
+            "translator_duration": translator_duration,
+            "lektor_duration": lektor_duration
+        }
+    }

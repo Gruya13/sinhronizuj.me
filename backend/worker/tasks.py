@@ -28,8 +28,23 @@ def process_video_task(self, video_url: str, debug: bool = False):
         'detail': "Priprema radnog prostora...",
         'logs': [],
         'waiting_for_user': False,
-        'waiting_step': None
+        'waiting_step': None,
+        'costs': {
+            'phases': {},
+            'total_usd': 0.0
+        }
     }
+
+    def add_phase_cost(phase_id, name, gpu, duration, rate):
+        cost = duration * rate
+        progress_metadata['costs']['phases'][phase_id] = {
+            "name": name,
+            "gpu": gpu,
+            "duration_sec": round(duration, 2),
+            "cost_usd": round(cost, 5)
+        }
+        total = sum(p["cost_usd"] for p in progress_metadata['costs']['phases'].values())
+        progress_metadata['costs']['total_usd'] = round(total, 5)
 
     def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None, waiting=False, waiting_step=None):
         if step_name: progress_metadata['current_step'] = step_name
@@ -103,11 +118,14 @@ def process_video_task(self, video_url: str, debug: bool = False):
     # --- FAZA 2: Separacija Zvuka ---
     update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na Modalu...")
     from backend.worker.audio_sep import separate_audio
+    t_start_sep = time.time()
     sep_result = separate_audio(
         result['audio_path'],
         progress_callback=lambda detail: update_progress(detail=detail)
     )
+    duration_sep = time.time() - t_start_sep
     if sep_result["status"] == "error": return sep_result
+    add_phase_cost("separation", "Izolacija vokala (Demucs)", "T4", duration_sep, 0.00018)
     update_progress(completed_step="Vokal izolovan")
     time.sleep(1)
     wait_for_user("Separacija vokala")
@@ -134,12 +152,15 @@ def process_video_task(self, video_url: str, debug: bool = False):
     print(f"[ASR] Generisan dinamički prompt: {initial_prompt}", flush=True)
 
     from backend.worker.transcriber import transcribe_audio
+    t_start_trans = time.time()
     transcription_result = transcribe_audio(
         sep_result["vocals_path"],
         initial_prompt=initial_prompt,
         progress_callback=lambda detail: update_progress(detail=detail)
     )
+    duration_trans = time.time() - t_start_trans
     if transcription_result["status"] == "error": return transcription_result
+    add_phase_cost("transcription", "Prepoznavanje govora (Whisper)", "T4", duration_trans, 0.00018)
     
     segments_ui = []
     for i, s in enumerate(transcription_result["segments"]):
@@ -157,12 +178,14 @@ def process_video_task(self, video_url: str, debug: bool = False):
     # --- FAZA 4: Vizuelni Kontekst i Prevod ---
     update_progress("Generisanje vizuelnog konteksta...", 50, detail="Ekstrakcija ključnih frejmova za analizu...")
     from backend.worker.preprocessor import extract_visual_context, upload_to_minio
+    t_start_vc = time.time()
     preview_path = extract_visual_context(result["video_path"])
-    
     visual_context_url = None
     if preview_path:
         visual_context_url = upload_to_minio(preview_path)
         update_progress(visual_context_url=visual_context_url)
+    duration_vc = time.time() - t_start_vc
+    add_phase_cost("visual_context", "Generisanje vizuelnog konteksta (Lokalno)", "Lokalni VPS", duration_vc, 0.0)
     
     update_progress("Prevođenje (Modal + Multimodal)...", 60, detail="Analiza vizuelnog konteksta i slanje segmenata na Qwen-VL...")
     from backend.worker.translator import translate_segments
@@ -173,6 +196,16 @@ def process_video_task(self, video_url: str, debug: bool = False):
         progress_callback=lambda detail: update_progress(detail=detail)
     )
     if translation_result["status"] == "error": return translation_result
+    
+    # Dodajemo cene za prevođenje i lekturu
+    metrics = translation_result.get("metrics", {})
+    duration_trans = metrics.get("translator_duration", 0.0)
+    duration_lektor = metrics.get("lektor_duration", 0.0)
+    
+    if duration_trans > 0:
+        add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_trans, 0.00033)
+    if duration_lektor > 0:
+        add_phase_cost("lektor", "Lektura teksta (Qwen 32B)", "A100-80GB", duration_lektor, 0.00140)
     
     for i, s in enumerate(translation_result["translated_segments"]):
         if i < len(segments_ui):
@@ -219,13 +252,21 @@ def process_video_task(self, video_url: str, debug: bool = False):
             except Exception as e:
                 print(f"Greska pri ucitavanju editovanih segmenata za TTS: {e}", flush=True)
 
+        t_start_tts = time.time()
         tts_result = synthesize_audio(
             sep_result["vocals_path"], 
             translation_result["translated_segments"],
             voice_type=selected_voice,
             progress_callback=lambda detail: update_progress(detail=detail)
         )
+        duration_tts = time.time() - t_start_tts
         if tts_result["status"] == "error": return tts_result
+        
+        # Akumuliramo trošak u slučaju da korisnik regeneriše glas više puta
+        existing_tts = progress_metadata['costs']['phases'].get("tts", {})
+        existing_duration = existing_tts.get("duration_sec", 0.0)
+        total_duration_tts = existing_duration + duration_tts
+        add_phase_cost("tts", "Sinteza glasa (OpenVoice)", "L4", total_duration_tts, 0.00025)
         
         # Eksponiramo generisani audio URL za preslušavanje na frontendu
         import os
@@ -266,6 +307,7 @@ def process_video_task(self, video_url: str, debug: bool = False):
         print(f"Greska pri ucitavanju podesavanja miksera: {e}", flush=True)
 
     from backend.worker.merger import merge_audio_and_video, merge_audio_and_video_dynamic
+    t_start_merge = time.time()
     if tts_result.get("tts_segments"):
         merge_result = merge_audio_and_video_dynamic(
             result["video_path"], 
@@ -282,12 +324,15 @@ def process_video_task(self, video_url: str, debug: bool = False):
             background_vol=background_vol,
             dubbed_vol=dubbed_vol
         )
+    duration_merge = time.time() - t_start_merge
     if merge_result["status"] == "error": return merge_result
+    add_phase_cost("merger", "Audio-video miksovanje (Lokalno)", "Lokalni VPS", duration_merge, 0.0)
     update_progress(completed_step="Video spojen")
     
     # --- FAZA 7: Lip Sync ---
     update_progress("Lip Sync provera...", 95)
     from backend.worker.lipsync import has_sufficient_faces, apply_lip_sync
+    t_start_lip = time.time()
     needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
     
     if needs_lipsync:
@@ -296,13 +341,20 @@ def process_video_task(self, video_url: str, debug: bool = False):
         final_output = lip_result["lipsync_video_path"] if lip_result["status"] != "error" else merge_result["final_video_path"]
     else:
         final_output = merge_result["final_video_path"]
+    duration_lip = time.time() - t_start_lip
+    
+    if needs_lipsync:
+        add_phase_cost("lipsync", "Lip Sync sinhronizacija (Wav2Lip)", "Lokalni VPS", duration_lip, 0.0)
+    else:
+        add_phase_cost("lipsync", "Lip Sync preskočen (nema lica)", "Lokalni VPS", duration_lip, 0.0)
     
     update_progress("Obrada završena", 100, "Obrada završena")
     
     return {
         "status": "completed", 
         "url": video_url,
-        "final_video_path": final_output
+        "final_video_path": final_output,
+        "costs": progress_metadata.get("costs")
     }
 
 @celery_app.task(name="backend.worker.tasks.cleanup_old_files")

@@ -1035,6 +1035,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         - Ispravio sam regex pravilo za negaciju nužnosti (`ne nužno rade/čine` -> `ne rade/čine nužno`) uklanjanjem slučajne engleske reči iz šablona.
 - **Status:** Implementirano, gurnuto na `development` granu, sinhronizovano na Hetzner serveru i Celery radnici su restartovani.
 
+### 27.05.2026. 07:42 — Implementacija praćenja i prikaza troškova procesiranja (Compute Costs) u UI
+- **Zahtev:** Korisnik je odobrio brainstormovani predlog za praćenje i prikaz troškova procesiranja (compute costs) na UI-ju u realnom vremenu i na kraju obrade.
+- **Urađeno:**
+    - **Merenje vremena u prevodiocu (`backend/worker/translator.py`):**
+        Dodao sam merenje trajanja poziva za prevođenje (Qwen-VL na A10G GPU) i lekturu (Qwen 2.5 32B na A100-80GB GPU) pomoću `time.time()`, i te metrike prosledio u povratnom rečniku.
+    - **Celery Radnik (`backend/worker/tasks.py`):**
+        - Inicijalizovao sam `costs` rečnik u `progress_metadata` i definisao pomoćnu funkciju `add_phase_cost` koja preračunava sekunde u USD na osnovu tarife za odgovarajući hardver (T4 za Demucs/Whisper, L4 za OpenVoice, A10G za Qwen-VL, A100 za Lektora, $0 za lokalni VPS).
+        - Ugradio sam tajmere za merenje trajanja separacije vokala, transkripcije, generisanja vizuelnog konteksta, prevođenja, lekture, sinteze glasa (uz akumulaciju kod regeneracija), miksovanja i Lip Sync-a.
+        - Sve troškove redovno ažuriram kroz `update_progress` i na kraju vraćam u finalnom rezultatu zadatka.
+    - **API status ruta (`backend/main.py`):**
+        Modifikovao sam `/api/v1/status/{task_id}` endpoint da vraća `costs` objekat na vrhovnom nivou odgovora i u stanju `PROGRESS` i u stanju `SUCCESS`.
+    - **React Frontend (`frontend/src/App.jsx` & `frontend/src/index.css`):**
+        - Uveo sam React stanje `costs` koje čuva i ažurira informacije o troškovima sa API-ja.
+        - Dodao sam live prikaz troškova u bočnu traku (Sidebar) tokom same obrade, koji takođe prikazuje trenutno aktivni GPU.
+        - Kreirao sam prelepu, staklenu (Glassmorphism) karticu sa detaljnim izveštajem o trajanju i ceni svake faze na krajnjem ekranu (ispod plejera).
+        - Uspešno build-ovao frontend bez ikakvih grešaka.
+- **Status:** Uspešno implementirano i spremno za testiranje i deploy.
 
 
 

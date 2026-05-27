@@ -20,6 +20,7 @@ function App() {
   const [modalStatus, setModalStatus] = useState({ status: 'Učitavam...', active_workers: 0 });
   const [visualContextUrl, setVisualContextUrl] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [costs, setCosts] = useState(null);
   
   const [previewFile, setPreviewFile] = useState(null);
   const [uploadState, setUploadState] = useState('idle'); // idle, uploading, completed, error
@@ -62,6 +63,7 @@ function App() {
     localStorage.removeItem('sinhronizuj_me_task_id');
     consecutiveErrorsRef.current = 0;
     setEditedSegments([]);
+    setCosts(null);
   };
 
   const STEPS = [
@@ -177,6 +179,9 @@ function App() {
             setStatus('Sve završeno!');
             setProgressData({ percent: 100, completed_steps: STEPS });
             setLoading(false);
+            if (data.costs) {
+              setCosts(data.costs);
+            }
             localStorage.removeItem('sinhronizuj_me_task_id');
             clearInterval(interval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
@@ -195,6 +200,9 @@ function App() {
               }
             } else {
               setStatus(data.status || 'ČEKANJE...');
+            }
+            if (data.costs) {
+              setCosts(data.costs);
             }
           }
         } catch (err) { 
@@ -893,6 +901,23 @@ function App() {
                     </div>
                   </div>
 
+                  {costs && (
+                    <div className="sidebar-card highlight-card">
+                      <div className="card-title"><Cpu size={16}/> Trošak obrade</div>
+                      <div className="time-stats">
+                         <div className="time-item"><span>Procena:</span> <strong className="glow-text">${costs.total_usd?.toFixed(4)}</strong></div>
+                         {costs.phases && Object.keys(costs.phases).length > 0 && (
+                           <div className="time-item">
+                             <span>Aktivni GPU:</span>
+                             <strong style={{ color: "#38bdf8", textShadow: "0 0 8px rgba(56,189,248,0.3)" }}>
+                               {costs.phases[Object.keys(costs.phases)[Object.keys(costs.phases).length - 1]]?.gpu || "T4"}
+                             </strong>
+                           </div>
+                         )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="steps-checklist">
                     {STEPS.map((step, idx) => {
                       const isCompleted = progressData?.completed_steps?.includes(step);
@@ -947,6 +972,32 @@ function App() {
                   ⚠️ Greška plejera: {videoError}
                 </div>
               )}
+              {costs && (
+                <div className="compute-stats-card">
+                  <h4>📊 DETALJAN IZVEŠTAJ O TROŠKOVIMA PROCESIRANJA</h4>
+                  <div className="total-cost-badge">
+                    <span>Ukupan trošak (Modal serverless):</span>
+                    <strong className="glow-text">${costs.total_usd?.toFixed(4)} USD</strong>
+                  </div>
+                  <div className="phases-list">
+                    {Object.entries(costs.phases || {}).map(([key, phase]) => (
+                      <div key={key} className="phase-row">
+                        <div className="phase-info">
+                          <span className="phase-name">{phase.name}</span>
+                          <span className="phase-gpu">{phase.gpu}</span>
+                        </div>
+                        <div className="phase-metrics">
+                          <span className="phase-duration">{phase.duration_sec?.toFixed(1)}s</span>
+                          <span className="phase-cost">
+                            {phase.cost_usd > 0 ? `$${phase.cost_usd?.toFixed(4)}` : "Besplatno"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="result-actions">
                 <button onClick={() => window.location.reload()} className="new-task-btn">Sinhronizuj novi video</button>
                 <a href={videoUrl} download className="download-btn">Preuzmi Video</a>

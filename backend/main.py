@@ -179,6 +179,8 @@ def get_task_status(task_id: str):
     }
     if task_result.status == "PROGRESS":
         response["progress_data"] = task_result.info
+        if isinstance(task_result.info, dict) and "costs" in task_result.info:
+            response["costs"] = task_result.info["costs"]
     if task_result.status == "SUCCESS":
         result = task_result.result
         if result and isinstance(result, dict) and result.get("status") == "error":
@@ -187,6 +189,8 @@ def get_task_status(task_id: str):
         elif result and isinstance(result, dict) and "final_video_path" in result:
             video_filename = os.path.basename(result["final_video_path"])
             response["video_url"] = f"/videos/{video_filename}"
+            if "costs" in result:
+                response["costs"] = result["costs"]
     elif task_result.status == "FAILURE":
         response["error"] = str(task_result.info)
     return response
