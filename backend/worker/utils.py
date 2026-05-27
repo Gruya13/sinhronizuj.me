@@ -6,33 +6,51 @@ def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 600, pro
     """
     Poziva sinhroni Modal webhook endpoint (FastAPI) i čeka na rezultat.
     Modal automatski održava konekciju otvorenom dok se zadatak ne izvrši (ili do timeout-a).
+    Uključuje automatski retry mehanizam kod mrežnih grešaka i hladnih startova.
     """
     headers = {
         "Content-Type": "application/json"
     }
     
-    print(f"[MODAL] Pozivam endpoint: {url}")
-    if progress_callback:
-        progress_callback(detail="Modal radnik se budi (Cold Start u toku)... ⏳")
-        
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)
-        response.raise_for_status()
-        result = response.json()
-        
-        if "error" in result:
-            raise Exception(f"Modal posao vratio grešku: {result['error']}")
-            
-        print(f"[MODAL] Posao završen uspešno!")
+    max_retries = 5
+    retry_delay = 5.0
+    
+    for attempt in range(1, max_retries + 1):
+        print(f"[MODAL] Pozivam endpoint (Pokušaj {attempt}/{max_retries}): {url}")
         if progress_callback:
-            progress_callback(detail="Zadatak na Modal-u je uspešno završen.")
+            if attempt == 1:
+                progress_callback(detail="Inicijalizujem Modal radnika (Cold Start u toku)... ⏳")
+            else:
+                progress_callback(detail=f"Ponovni pokušaj poziva Modal-a ({attempt}/{max_retries})... ⏳")
+                
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)
             
-        return result
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Mrežna greška pri komunikaciji sa Modalom: {e}"
-        print(f"[ERROR] {error_msg}")
-        raise Exception(error_msg)
+            # Ako dobijemo 502/503/504, to ukazuje na hladan start ili privremeno preopterećenje
+            if response.status_code in [502, 503, 504]:
+                print(f"[MODAL WARNING] Dobijen status {response.status_code} od Modala. Mogući hladni start. Čekam...")
+                time.sleep(retry_delay * attempt)
+                continue
+                
+            response.raise_for_status()
+            result = response.json()
+            
+            if "error" in result:
+                raise Exception(f"Modal posao vratio grešku: {result['error']}")
+                
+            print(f"[MODAL] Posao završen uspešno!")
+            if progress_callback:
+                progress_callback(detail="Zadatak na Modal-u je uspešno završen.")
+                
+            return result
+            
+        except (requests.exceptions.RequestException, Exception) as e:
+            print(f"[MODAL WARNING] Pokušaj {attempt} nije uspeo. Greška: {e}")
+            if attempt == max_retries:
+                error_msg = f"Greška pri komunikaciji sa Modalom nakon {max_retries} pokušaja: {e}"
+                print(f"[ERROR] {error_msg}")
+                raise Exception(error_msg)
+            time.sleep(retry_delay * attempt)
 
 def normalize_audio(audio_path: str, target_dbfs: float = -20.0):
     """

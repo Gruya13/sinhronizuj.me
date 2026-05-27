@@ -1104,6 +1104,32 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * Preimenovao sam i prilagodio korak "Finalni Miks" da bude Korak 10 i da kao ulaze prima rastegnuti video direktno iz Merger koraka (`stretched_video.mp4`) umesto `lip_synced_video.mp4`.
 - **Status:** Završeno, komitovano i gurnuto na granu `development` (lokalno i na VPS-u).
 
+### 27.05.2026. 09:20 — Implementacija izolacije radnog prostora, čišćenja i paralelne ekstrakcije u Celery radniku
+- **Zahtevi / Problemi:**
+    1. Konkurentni Celery taskovi su mogli da gaze fajlove jedni drugima jer su koristili isti korenski `settings.TEMP_WORKSPACE`. Potrebno je uspostaviti izolaciju radnog prostora po svakom zadatku i obezbediti automatsko brisanje privremenih fajlova.
+    2. Sekvencijalna ekstrakcija vizuelnog konteksta (frejmova) usporava pipeline. Potrebno je pokrenuti ekstrakciju paralelno u pozadinskoj niti dok rade ostali koraci.
+    3. Prilagođavanje cene lekture na Modalu za novu `A10G` GPU instancu.
+- **Urađeno:**
+    - **Izolovani task-workspace (`backend/worker/tasks.py`):**
+        * Na početku obrade kreira se pod-direktorijum na osnovu `task_id` (npr. `temp_workspace/<task_id>`) i `settings.TEMP_WORKSPACE` se privremeno preusmerava na njega.
+        * Ceo tok obrade je uvijen u `try-finally` blok. Na kraju uspešne obrade u `try` bloku, finalni video i dubbed audio se prebacuju u korenski `temp_workspace` kako bi ih web server mogao bezbedno servirati preko `/videos/` statičke rute, a u `finally` bloku se vraća originalni `settings.TEMP_WORKSPACE` i potpuno uklanja izolovani task direktorijum sa diska.
+    - **Pozadinska nit za vizuelni kontekst (`backend/worker/tasks.py`):**
+        * Odmah po završetku preuzimanja videa (Faza 1) startuje se pozadinska nit (`threading.Thread`) koja vrši ekstrakciju ključnih frejmova i njihov upload na MinIO.
+        * Na početku Faze 4 (Generisanje vizuelnog konteksta) Celery zadatak samo sačeka završetak ove niti preko `.join()` ako ona već nije završila svoj rad. Time se vreme generisanja vizuelnog konteksta smanjuje gotovo na nulu.
+    - **Cene compute resursa (`backend/worker/tasks.py`):**
+        * Izmenjena cena za lektorsku fazu tako da koristi tarifu za `A10G` ($0.00033/s) umesto $0.00140/s, pošto je lektor uspešno migriran na jeftiniju grafiku.
+- **Status:** Uspešno implementirano, provereno py_compile verifikacijom, i spremno za testiranje na serveru.
+
+### 27.05.2026. 09:40 — Stabilizacija Lektora na Modalu i optimizacija veličine batch-a
+- **Problem:**
+    Lektor je bacao grešku `ValueError: This model's maximum context length is 4096 tokens. However, you requested 4668 tokens (3168 in the messages, 1500 in the completion).` jer je kombinacija velikog srpskog prompta sa pravilima, 15 segmenata po batch-u i parametra `max_tokens=1500` prelazila fizički limit modela na A10G instanci.
+- **Rešenje:**
+    1. **Smanjenje veličine batch-a:** Smanjili smo veličinu batch-a u `backend/worker/translator.py` sa 15 na 10 segmenata po pozivu, čime smo značajno skratili ulazni prompt.
+    2. **Smanjenje max_tokens:** Smanjili smo rezervisani prostor za generisanje odgovora (`max_tokens`) sa 1500 na 800 tokena, što je više nego dovoljno za 10 segmenata srpskog prevoda.
+    3. **Osvežavanje Modal kontejnera:** Zaustavili smo stari kontejner sa limitom od 2048 tokena (`modal app stop sinhronizuj-lektor`) i deploy-ovali novu verziju sa limitom od 4096 tokena na Modalu.
+    4. **Verifikacija:** Pokretanjem `scratch/test_lektor_cases.py` potvrđeno je da Lektor radi besprekorno, brzo (zahvaljujući prefix-caching-u) i vraća sve segmente gramatički ispravno deklinirane (npr. "sa Ej Ajem", "o Ej Aju").
+- **Status:** Uspešno završeno i verifikovano na Modal GPU-u. Kôd je spreman za rad.
+
 
 
 

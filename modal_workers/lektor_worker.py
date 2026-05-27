@@ -20,7 +20,7 @@ image = (
 app = modal.App("sinhronizuj-lektor")
 
 @app.function(
-    gpu="A100-80GB",
+    gpu="A10G",
     image=image,
     volumes={"/root/.cache/huggingface": huggingface_cache},
     scaledown_window=1800, # Kontejner ostaje topao 30 minuta nakon poslednjeg zahteva
@@ -30,25 +30,25 @@ app = modal.App("sinhronizuj-lektor")
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
     """
-    Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct model.
+    Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct AWQ model.
     """
     import subprocess
     from modal.experimental import stop_fetching_inputs
 
-    # Komanda za pokretanje vLLM servera sa traženim optimizacijama za A100-80GB
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", "Qwen/Qwen2.5-32B-Instruct",
+        "--model", "Qwen/Qwen2.5-32B-Instruct-AWQ",
+        "--quantization", "awq_marlin",
         "--served-model-name", "qwen-lektor",
         "--tensor-parallel-size", "1",
         "--gpu-memory-utilization", "0.95",
-        "--max-model-len", "32768",
+        "--max-model-len", "4096",
         "--enable-prefix-caching",
         "--enable-chunked-prefill",
         "--port", "8000"
     ]
 
-    print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-32B-Instruct")
+    print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-32B-Instruct-AWQ")
     subprocess.Popen(cmd)
 
 if __name__ == "__main__":
