@@ -1075,6 +1075,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` u virtuelnom okruženju, čime je uspešno izvršen `flushdb()` na povezanoj Redis instanci.
 - **Status:** Završeno.
 
+### 27.05.2026. 08:14 — Sinhronizacija koda i restart kontejnera na Hetzner VPS-u
+- **Zahtev:** Korisnik je primetio da se troškovi ne prikazuju ni tokom ni nakon generacije.
+- **Urađeno:**
+    - **Analiza:** Prethodno implementirane izmene za praćenje troškova su bile poslate na GitHub, ali nisu bile povučene na Hetzner serveru, niti su Celery radnik i API kontejneri bili restartovani. Zbog toga je VPS izvršavao stari kod koji nije slao podatke o troškovima.
+    - **Akcija:** 
+        * Pristupio sam VPS-u (`178.104.214.78`) preko SSH i pozicionirao se u `/opt/sinhronizuj-me`.
+        * Povukao sam najnoviji kod sa grane `development`.
+        * Restartovao sam sve Docker kontejnere (`docker compose down && docker compose up -d`) kako bi se učitao novi kod na serveru.
+        * Očistio sam Redis bazu ponovo kako bi korisnik mogao da pošalje čist zahtev.
+- **Status:** Završeno.
+
 
 
 
