@@ -6,7 +6,7 @@ Ovaj dokument detaljno opisuje kako se podaci kreću, transformišu i procesiraj
 1. PREGLED STRUKTURE I TOKA PODATAKA
 ================================================================================
 
-UI (React) ---> FastAPI API ---> Celery (Redis) ---> [PIPELINE RADNICI (Modal.com)] ---> FFmpeg/LipSync ---> Finalni Video
+UI (React) ---> FastAPI API ---> Celery (Redis) ---> [PIPELINE RADNICI (Modal.com)] ---> FFmpeg Merger ---> Finalni Video
 
 +--------------------+     1. Video URL / Fajl      +---------------------+
 |   React Frontend   | ---------------------------> |     FastAPI API     |
@@ -56,12 +56,7 @@ UI (React) ---> FastAPI API ---> Celery (Redis) ---> [PIPELINE RADNICI (Modal.co
                                                                |
                                                                v
                                                         +------------+
-                                                        | 10.Wav2Lip | [Lip Sync sinhronizacija usana]
-                                                        +------------+
-                                                               |
-                                                               v
-                                                        +------------+
-                                                        |11. FFmpeg  | [Finalni miks i MP4 izlaz]
+                                                        |10. FFmpeg  | [Finalni miks i MP4 izlaz]
                                                         +------------+
 
 ================================================================================
@@ -203,23 +198,10 @@ KORAK 9: Dinamičko Spajanje i Rastezanje Videa (Merger & Time Stretching)
   - `stretched_bg.wav` (Rastegnuta pozadinska muzika u savršenom tajmingu sa videom).
 
 --------------------------------------------------------------------------------
-KORAK 10: Sinhronizacija Usana (Wav2Lip)
+KORAK 10: Finalni Miks i Generisanje Izlaza
 --------------------------------------------------------------------------------
 * Ulazni podaci:
   - Rastegnuti video `stretched_video.mp4`.
-  - Spojeni srpski vokal `merged_vocals.wav`.
-* Proces:
-  1. Fajlovi se šalju na Modal Wav2Lip endpoint koji pokreće AI model za sinhronizaciju usana na A10G/L4 GPU.
-  2. Model pronalazi lica u svakom frejmu videa i menja donju polovinu lica (usta i vilicu) govornika u realnom vremenu tako da se savršeno kreću u ritmu srpskog govora.
-* Izlazni podaci:
-  - `lip_synced_video.mp4` (Video sa izmenjenim pokretima usana, ali bez zvuka).
-  - Trošak: Vreme rada se računa po A10G tarifi ($0.00033/s).
-
---------------------------------------------------------------------------------
-KORAK 11: Finalni Miks i Generisanje Izlaza
---------------------------------------------------------------------------------
-* Ulazni podaci:
-  - Video sa sinhronizovanim usnama `lip_synced_video.mp4`.
   - Srpska vokalna traka `merged_vocals.wav`.
   - Pozadinska muzika `stretched_bg.wav`.
 * Proces:

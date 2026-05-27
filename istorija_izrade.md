@@ -1096,6 +1096,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Kreirao sam datoteku `tok_podataka_pipeline.md` u korenu projekta, sa svim formatiranim naslovima, dijagramom u obliku Mermaid koda, i listama koje su čitljive u svim MD parserima.
 - **Status:** Završeno, komitovano i gurnuto na granu `development` (lokalno i na VPS-u).
 
+### 27.05.2026. 08:52 — Uklanjanje Wav2Lip-a (Sinhronizacije usana) iz opisa toka podataka
+- **Zahtev:** Korisnik je tražio da se iz toka podataka izbaci korak za sinhronizaciju usana (Wav2Lip) jer još uvek ne radi kako treba.
+- **Urađeno:** Modifikovao sam i `.txt` i `.md` verziju fajla (`tok_podataka_pipeline.txt` i `tok_podataka_pipeline.md`):
+    * Uklonio sam Wav2Lip iz ASCII i Mermaid dijagrama toka.
+    * Obrisao sam sekciju za Wav2Lip korak.
+    * Preimenovao sam i prilagodio korak "Finalni Miks" da bude Korak 10 i da kao ulaze prima rastegnuti video direktno iz Merger koraka (`stretched_video.mp4`) umesto `lip_synced_video.mp4`.
+- **Status:** Završeno, komitovano i gurnuto na granu `development` (lokalno i na VPS-u).
+
 
 
 

@@ -8,7 +8,7 @@ Ovaj dokument detaljno opisuje kako se podaci kreću, transformišu i procesiraj
 
 Sistem je organizovan po principu klijent-server arhitekture sa raspodeljenim asinhronim zadacima:
 
-**React Frontend** (UI) $\rightarrow$ **FastAPI API** (Server) $\rightarrow$ **Celery & Redis** (Red/Zadaci) $\rightarrow$ **Modal.com GPU** (Modeli) $\rightarrow$ **FFmpeg & LipSync** $\rightarrow$ **Finalni Video**
+**React Frontend** (UI) $\rightarrow$ **FastAPI API** (Server) $\rightarrow$ **Celery & Redis** (Red/Zadaci) $\rightarrow$ **Modal.com GPU** (Modeli) $\rightarrow$ **FFmpeg Merger** $\rightarrow$ **Finalni Video**
 
 ```mermaid
 flowchart TD
@@ -27,7 +27,6 @@ flowchart TD
         Translator[Translator: Qwen2-VL Multimodal]
         Lektor[Lektor: Qwen 2.5 32B Instruct]
         TTS[TTS Engine: Piper sr_Marko]
-        Wav2Lip[Wav2Lip: Sinhronizacija usana]
     end
 
     UI -->|1. Upload & Pokretanje| Task
@@ -41,9 +40,8 @@ flowchart TD
     Demucs -->|Muzika / Pozadina| Merger
     
     Merger -->|7. Dynamic Stretching & Audio Speedup| Merger
-    Merger -->|8. Rastegnut video + Srpski vokal| Wav2Lip
-    Wav2Lip -->|9. Finalni video sa sinhronizovanim usnama| Task
-    Task -->|10. Završeno| UI
+    Merger -->|8. Finalni video sa srpskim vokalom| Task
+    Task -->|9. Završeno| UI
 ```
 
 ---
@@ -184,22 +182,9 @@ flowchart TD
 
 ---
 
-### Korak 10: Sinhronizacija Usana (Wav2Lip)
+### Korak 10: Finalni Miks i Generisanje Izlaza
 * **Ulazni podaci:**
   - Rastegnuti video `stretched_video.mp4`.
-  - Spojeni srpski vokal `merged_vocals.wav`.
-* **Proces:**
-  1. Fajlovi se šalju na Modal Wav2Lip endpoint koji pokreće AI model za sinhronizaciju usana na A10G/L4 GPU.
-  2. Model pronalazi lica u svakom frejmu videa i menja donju polovinu lica (usta i vilicu) govornika u realnom vremenu tako da se savršeno kreću u ritmu srpskog govora.
-* **Izlazni podaci:**
-  - `lip_synced_video.mp4` (Video sa izmenjenim pokretima usana, ali bez zvuka).
-  - **Trošak:** Vreme rada se računa po A10G tarifi ($0.00033/s).
-
----
-
-### Korak 11: Finalni Miks i Generisanje Izlaza
-* **Ulazni podaci:**
-  - Video sa sinhronizovanim usnama `lip_synced_video.mp4`.
   - Srpska vokalna traka `merged_vocals.wav`.
   - Pozadinska muzika `stretched_bg.wav`.
 * **Proces:**
