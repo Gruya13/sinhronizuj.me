@@ -1053,6 +1053,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         - Uspešno build-ovao frontend bez ikakvih grešaka.
 - **Status:** Uspešno implementirano i spremno za testiranje i deploy.
 
+### 27.05.2026. 07:44 — Čišćenje Redis baze podataka
+- **Zahtev:** Korisnik je tražio čišćenje Redis baze kako bi mogao da pošalje novi zahtev.
+- **Urađeno:** Pokrenuta je skripta `scratch/flush_redis.py` u virtuelnom okruženju, čime je uspešno izvršen `flushdb()` na povezanoj Redis instanci.
+- **Status:** Završeno.
+
 
 
 
