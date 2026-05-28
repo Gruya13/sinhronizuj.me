@@ -192,7 +192,7 @@ class OpenVoiceWorker:
                         nfe=enhance_params.get("nfe", 64), 
                         solver=enhance_params.get("solver", "midpoint"), 
                         lambd=enhance_params.get("lambd", 0.9), 
-                        tau=enhance_params.get("tau", 0.5)
+                        tau=enhance_params.get("tau", 0.2)
                     )
                     
                     # Čuvanje poboljšanog audia nazad na disk
@@ -260,6 +260,36 @@ class OpenVoiceWorker:
                 # Snimanje referentnog audia na disk
                 with open(tmp_ref_path, "wb") as f:
                     f.write(base64.b64decode(ref_audio_b64))
+                    
+                # Poboljšanje referentnog audia pre ekstrakcije SE pomoću Resemble Enhance
+                if not disable_enhance:
+                    try:
+                        import torchaudio
+                        from resemble_enhance.enhancer.inference import denoise as resemble_denoise_fn
+                        from resemble_enhance.enhancer.inference import enhance as resemble_enhance_fn
+                        
+                        print("[OpenVoice] Poboljšavam referentni audio pomoću Resemble Enhance pre ekstrakcije SE...")
+                        ref_dwav, ref_sr = torchaudio.load(tmp_ref_path)
+                        ref_dwav = ref_dwav.mean(dim=0)  # Konverzija u mono
+                        
+                        # Denoise
+                        if enhance_params.get("denoise", True):
+                            ref_dwav, ref_sr = resemble_denoise_fn(ref_dwav, ref_sr, self.device)
+                        
+                        # Enhance
+                        ref_enhanced, ref_new_sr = resemble_enhance_fn(
+                            ref_dwav, ref_sr, self.device,
+                            nfe=enhance_params.get("nfe", 64),
+                            solver=enhance_params.get("solver", "midpoint"),
+                            lambd=enhance_params.get("lambd", 0.9),
+                            tau=enhance_params.get("tau", 0.2)
+                        )
+                        
+                        # Čuvanje poboljšanog referentnog audia nazad
+                        torchaudio.save(tmp_ref_path, ref_enhanced.unsqueeze(0).cpu(), ref_new_sr)
+                        print(f"[OpenVoice] Referentni audio uspešno poboljšan (sr={ref_new_sr}Hz)")
+                    except Exception as enh_err:
+                        print(f"[OpenVoice WARNING] Neuspešno poboljšanje referentnog audia pre SE: {enh_err}")
                     
                 # 1. Ekstrakcija Speaker Embedding-a (SE) za referentni target glas
                 print("[OpenVoice] Ekstrakujem SE za referentni audio...")

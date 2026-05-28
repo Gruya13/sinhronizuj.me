@@ -60,7 +60,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
             good_segments = sorted(good_segments, key=lambda x: x["start"])
             
             # Spajamo audio delove i tekst
-            ref_sub_audio = AudioSegment.silent(duration=0)
+            ref_sub_audio = None
             ref_text_parts = []
             
             for seg in good_segments:
@@ -68,7 +68,14 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 end_ms = int(seg["end"] * 1000)
                 # Isecanje i spajanje
                 chunk = ref_audio_all[start_ms:end_ms]
-                ref_sub_audio += chunk
+                
+                # Dodajemo blagi fade_in i fade_out da eliminišemo pucketanje na krajevima segmenata
+                chunk = chunk.fade_in(50).fade_out(50)
+                
+                if ref_sub_audio is None:
+                    ref_sub_audio = chunk
+                else:
+                    ref_sub_audio = ref_sub_audio.append(chunk, crossfade=100)
                 ref_text_parts.append(seg["original_text"])
                 
             # Izvoz u buffer
@@ -130,7 +137,9 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         "reference_text": ref_text,
         "voice_type": voice_type,
         "disable_openvoice": disable_openvoice,
-        "disable_enhance": disable_enhance
+        "disable_enhance": disable_enhance,
+        "enhance_tau": settings.ENHANCE_TAU,
+        "enhance_lambd": settings.ENHANCE_LAMBD
     }
 
     print(f"[TTS V2] Pozivam Modal OpenVoice V2 (Paralelno) za {len(translated_segments)} segmenata sa dynamic duration limitiranjem...")

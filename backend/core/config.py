@@ -28,6 +28,9 @@ class Settings:
     DISABLE_OPENVOICE: bool = os.getenv("DISABLE_OPENVOICE", "False").lower() == "true"
     DISABLE_ENHANCE: bool = os.getenv("DISABLE_ENHANCE", "False").lower() == "true"
     
+    ENHANCE_TAU: float = float(os.getenv("ENHANCE_TAU", "0.2"))
+    ENHANCE_LAMBD: float = float(os.getenv("ENHANCE_LAMBD", "0.9"))
+    
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
 
 settings = Settings()
