@@ -1155,16 +1155,43 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         7.  Na osnovu povratnih informacija i upoređivanja generisanih testova, postavio sam `tau=0.3` kao novu podrazumevanu vrednost jer pruža najprirodniji glas.
 - **Status:** Uspešno implementirano, testirano i podrazumevane vrednosti su podešene.
 
+### 27.05.2026. 23:05 — Otklanjanje greške mešanja engleskog zvuka u finalni video (FFmpeg Stream Duplication Bug)
+- **Problem:**
+    Nakon završetka obrade, izlazni video bi i dalje sadržao originalni engleski audio (iako je `dubbed_*.wav` fajl bio uspešno generisan na srpskom jeziku).
+- **Uzrok:**
+    Unutar `backend/worker/merger.py` (i u statičkom `merge_audio_and_video` i u dinamičkom `merge_audio_and_video_dynamic` mikseru), međulebel vokala (`[voc]` u statičkom, odnosno `[attsres{idx}]` u dinamičkom) je bio korišćen dva puta u istom filter_complex grafikonu (jednom za `sidechaincompress` i jednom za `amix`).
+    U FFmpeg-u je ponovno korišćenje istog filter lebla bez `asplit` filtera nevažeće. Kada naiđe na ovo, FFmpeg ne prijavljuje uvek fatalnu grešku, već automatski mapira prvi neupotrebljeni audio strim iz ulaza (što je u našem slučaju bio `[0:1]`, tj. originalni audio sa engleskim glasom iz video fajla) da popuni drugu poziciju. To je dovelo do mešanja engleskog vokala u finalni audio miks.
+- **Rešenje:**
+    1. U `merge_audio_and_video` smo dodali `asplit=2[voc1][voc2]` za vokalni strim, i promenili da se `[voc1]` šalje u `sidechaincompress`, a `[voc2]` u `amix`.
+    2. U `merge_audio_and_video_dynamic` smo na isti način za svaki govorni segment dodali `asplit=2` na kraju procesnog lanca vokala: `stereo,asplit=2[{a_tts_res_side}][{a_tts_res_mix}]`. Promenili smo da `sidechaincompress` koristi `[{a_tts_res_side}]`, a `amix` koristi `[{a_tts_res_mix}]`.
+    3. Uspešno smo restartovali Celery radnike i testiranjem (preko transkripcije izvučenog zvuka iz novokreiranog videa) potvrdili da izlazni video sada sadrži isključivo srpski audio (prepoznat kao `hr/sr`).
+- **Status:** Uspešno rešeno i verifikovano na serveru.
 
+### 27.05.2026. 23:24 — Otklanjanje robotskog/metalnog kvaliteta kloniranog glasa u pipeline-u
+- **Problem:**
+    Klonirani srpski glas u pipeline-u je zvučao robotski, metalno i mutno (loš kvalitet), iako je u standalone testovima (`scratch/test_cloning.py`) sa `tau=0.3` zvučao izuzetno prirodno.
+- **Uzrok:**
+    U `test_cloning.py` referentni isečak za prepoznavanje karakteristika govornika (Speaker Embedding) uziman je direktno iz **originalnog audio zapisa** video fajla (pre bilo kakve obrade).
+    Nasuprot tome, u produkcionom pipeline-u (`backend/worker/tasks.py`), kao referentni fajl za kloniranje prosleđivan je `sep_result["vocals_path"]` (izolovani vokal dobijen preko Demucs modela). 
+    Iako Demucs odlično odvaja vokal od muzike, on unosi značajna fazna izobličenja, metalni šum i gubitak visokih frekvencija. Kada OpenVoice V2 analizira taj oštećeni zvuk, on ga tretira kao prirodnu karakteristiku glasa i klonira "metalni/robotski" šum u generisani govor.
+- **Rešenje:**
+    Izmenili smo `backend/worker/tasks.py` tako da pri pozivu `synthesize_audio` prosleđujemo originalni čisti audio zapis videa (`result["audio_path"]`) umesto Demucs vokala (`sep_result["vocals_path"]`). Budući da OpenVoice V2 poseduje robustan Voice Activity Detector (VAD), on uspešno ignoriše pozadinsku muziku iz originalnog snimka i izvlači čist Speaker Embedding bez Demucs anomalija.
+- **Status:** Uspešno implementirano, radnici su restartovani i spremni za novi test.
 
+### 28.05.2026. 08:55 — Implementacija "Očisti Redis" dugmeta u korisničkom interfejsu (UI)
+- **Problem:**
+    Korisnik je morao ručno da zahteva ili izvršava komandu za pražnjenje Redis baze kada želi da poništi trenutno stanje i pošalje novi video na obradu.
+- **Rešenje:**
+    1. **Backend (`backend/main.py`):** Kreiran je novi API endpoint `POST /api/v1/redis/flush` koji bezbedno poziva `flushall` na aktivnoj Redis instanci, koristeći parametre konekcije iz `.env` konfiguracije.
+    2. **Frontend (`frontend/src/App.jsx`):** Dodato je novo dugme "Očisti Redis" sa ikonicom kante (`Trash2`) u gornjem zaglavlju interfejsa (`hybrid-monitor`). Dugme traži potvrdu pre izvršenja i, nakon uspešnog odgovora sa backend-a, automatski resetuje lokalno stanje studija (`resetStudio()`).
+- **Status:** Uspešno implementirano i postavljeno na server.
 
-
-
-
-
-
-
-
-
-
-
+### 28.05.2026. 09:40 — Implementacija konfiguracionih prekidača za testiranje i isključivanje OpenVoice i Resemble Enhance
+- **Opis / Zahtev:**
+    Korisnik je primetio da dosta reči u kloniranom srpskom govoru zvuči kao da ima američki naglasak (što nastaje usled prenosa ritma i intonacije originalnog engleskog govornika kroz OpenVoice V2 i uticaja Resemble Enhance modela koji je treniran na engleskom). Zahtevano je da se omogući fleksibilno isključivanje Resemble Enhance-a i OpenVoice-a radi testiranja i izolacije ovog problema, te da se projekat zadrži u potpunosti offline (bez korišćenja API servisa kao što je ElevenLabs).
+- **Urađeno:**
+    1. **Konfiguracija (`backend/core/config.py` i `.env`):** Dodali smo nove konfiguracione parametre `DISABLE_OPENVOICE` i `DISABLE_ENHANCE` (podrazumevano postavljeni na `False`) u bekenu.
+    2. **Pozivanje i prenos parametara (`backend/worker/tasks.py` i `backend/worker/tts_engine.py`):** Ažurirali smo funkciju `synthesize_audio` i njen payload koji se šalje na Modal da prenosi ove parametre.
+    3. **Modal Worker (`modal_workers/tts_openvoice.py`):** Modifikovali smo metodu `task` da prihvata `disable_openvoice` i `disable_enhance`. Ako je `disable_openvoice=True`, sistem preskače ekstrakciju Speaker Embedding-a (SE) i ToneColor konverziju, i samo kopira sirovi Piper Marko audio u finalni fajl. Ako je `disable_enhance=True`, preskače se Resemble Enhance proces. Takođe je osigurano bezbedno brisanje privremenih fajlova sa NFS-a.
+    4. **Deploy i Verifikacija:** Uradili smo deploy nove verzije na Modal i verifikovali funkcionalnost preko test skripte `scratch/test_tts_options.py`. Svi režimi rada (čist Piper, Piper + OpenVoice, Piper + Enhance, i sve uključeno) su uspešno generisali audio zapise u `temp_workspace`.
+- **Status:** Uspešno implementirano, deploy-ovano na Modal i spremno za testiranje različitih režima rada.

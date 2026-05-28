@@ -287,9 +287,11 @@ def process_video_task(self, video_url: str, debug: bool = False):
     
             t_start_tts = time.time()
             tts_result = synthesize_audio(
-                sep_result["vocals_path"], 
+                result["audio_path"], 
                 translation_result["translated_segments"],
                 voice_type=selected_voice,
+                disable_openvoice=settings.DISABLE_OPENVOICE,
+                disable_enhance=settings.DISABLE_ENHANCE,
                 progress_callback=lambda detail: update_progress(detail=detail)
             )
             duration_tts = time.time() - t_start_tts

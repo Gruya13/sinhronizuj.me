@@ -6,7 +6,9 @@ from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 from backend.worker.preprocessor import upload_to_minio
 
-def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", progress_callback=None) -> dict:
+def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", 
+                     disable_openvoice: bool = False, disable_enhance: bool = False,
+                     progress_callback=None) -> dict:
     """
     Poziva Modal Serverless Fish Speech (TTS) za paralelnu sintezu segmenata.
     Zatim spaja izgenerisane audio delove na tacne vremenske pozicije pomocu pydub-a.
@@ -109,7 +111,9 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         "segments": modal_segments,
         "reference_audio_base64": ref_b64,
         "reference_text": ref_text,
-        "voice_type": voice_type
+        "voice_type": voice_type,
+        "disable_openvoice": disable_openvoice,
+        "disable_enhance": disable_enhance
     }
 
     print(f"[TTS V2] Pozivam Modal OpenVoice V2 (Paralelno) za {len(translated_segments)} segmenata sa dynamic duration limitiranjem...")

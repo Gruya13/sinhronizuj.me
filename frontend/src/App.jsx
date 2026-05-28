@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, CloudUpload, RefreshCw } from 'lucide-react';
+import { Play, Loader2, CheckCircle2, AlertCircle, Clock, Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, Paperclip, CloudUpload, RefreshCw, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
 
@@ -47,6 +47,26 @@ function App() {
   const terminalRef = useRef(null);
   const fileInputRef = useRef(null);
   const consecutiveErrorsRef = useRef(0);
+
+  const handleFlushRedis = async () => {
+    if (!window.confirm("Da li ste sigurni da želite da očistite kompletnu Redis bazu? Ovo će prekinuti sve aktivne zadatke.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/redis/flush`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || "Redis baza je uspešno očišćena.");
+        resetStudio();
+      } else {
+        alert("Greška: " + (data.detail || "Neuspešno čišćenje baze."));
+      }
+    } catch (err) {
+      alert("Mrežna greška pri čišćenju Redis-a: " + err.message);
+    }
+  };
 
   const resetStudio = () => {
     setTaskId(null);
@@ -466,6 +486,40 @@ function App() {
               <span className={status.includes("Prevođenje") ? "active-worker" : ""}>Qwen 32B</span>
               <span className={status.includes("Sinteza") ? "active-worker" : ""}>Fish TTS</span>
             </div>
+          </div>
+          <div className="monitor-divider" />
+          <div className="monitor-section" style={{ justifyContent: 'center' }}>
+            <button 
+              onClick={handleFlushRedis} 
+              className="flush-redis-btn" 
+              style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#f87171',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                transition: 'all 0.2s',
+                fontFamily: 'inherit'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <Trash2 size={12} /> Očisti Redis
+            </button>
           </div>
         </div>
 

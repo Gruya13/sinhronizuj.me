@@ -170,6 +170,19 @@ def save_voice_settings(task_id: str, request: VoiceSettingsRequest):
     }), ex=3600)
     return {"status": "success", "message": "Podešavanja glasa sačuvana."}
 
+@app.post("/api/v1/redis/flush")
+def flush_redis():
+    import redis
+    import re
+    try:
+        match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+        redis_host = match.group(1) if match else "redis"
+        r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+        r.flushall()
+        return {"status": "success", "message": "Redis je uspešno očišćen (izvršena komanda flushall)."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Greška pri brisanju Redis baze: {str(e)}")
+
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
     task_result = AsyncResult(task_id, app=celery_app)

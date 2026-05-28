@@ -25,6 +25,9 @@ class Settings:
     MINIO_PUBLIC_ENDPOINT: str = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://178.104.214.78:9000")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
     
+    DISABLE_OPENVOICE: bool = os.getenv("DISABLE_OPENVOICE", "False").lower() == "true"
+    DISABLE_ENHANCE: bool = os.getenv("DISABLE_ENHANCE", "False").lower() == "true"
+    
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
 
 settings = Settings()

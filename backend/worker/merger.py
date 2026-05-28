@@ -61,9 +61,9 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
         # Ulaz 1 je pozadina (muzika), ulaz 2 je srpski glas. Glas stišava pozadinu.
         filter_complex = (
             f"[1:a]{bg_vol_str},aresample=44100[bg]; "
-            f"[2:a]{dub_vol_str},aresample=44100[voc]; "
-            f"[bg][voc]sidechaincompress=threshold=0.1:ratio=5:attack=15:release=250:makeup=1.0[compressed_bg]; "
-            f"[compressed_bg][voc]amix=inputs=2:duration=first:dropout_transition=0[outa]"
+            f"[2:a]{dub_vol_str},aresample=44100,asplit=2[voc1][voc2]; "
+            f"[bg][voc1]sidechaincompress=threshold=0.1:ratio=5:attack=15:release=250:makeup=1.0[compressed_bg]; "
+            f"[compressed_bg][voc2]amix=inputs=2:duration=first:dropout_transition=0[outa]"
         )
         
         command = [
@@ -237,7 +237,8 @@ def merge_audio_and_video_dynamic(
                 a_bg_res = f"abgres{idx}"
                 audio_mix_filters.append(f"[{a_bg_out}]volume={bg_vol_str},aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_bg_res}]")
                 
-                a_tts_res = f"attsres{idx}"
+                a_tts_res_side = f"attsres_side{idx}"
+                a_tts_res_mix = f"attsres_mix{idx}"
                 # Primenjujemo resampling, EQ (highpass/lowpass), kompresor (compand) i room reverb (aecho) za bolju integraciju vokala
                 audio_mix_filters.append(
                     f"[{tts_input_idx}:a]aresample=44100,"
@@ -246,15 +247,15 @@ def merge_audio_and_video_dynamic(
                     f"compand=attacks=0.01:decays=0.1:points=-90/-90|-20/-10|0/-3,"
                     f"aecho=1.0:0.8:15:0.2,"
                     f"volume={dub_vol_str},"
-                    f"aformat=sample_fmts=fltp:channel_layouts=stereo[{a_tts_res}]"
+                    f"aformat=sample_fmts=fltp:channel_layouts=stereo,asplit=2[{a_tts_res_side}][{a_tts_res_mix}]"
                 )
                 
                 a_comp_bg = f"acompbg{idx}"
                 # Primenjujemo sidechaincompress: vokal dinamički stišava pozadinsku muziku
-                audio_mix_filters.append(f"[{a_bg_res}][{a_tts_res}]sidechaincompress=threshold=0.1:ratio=5:attack=15:release=250:makeup=1.0[{a_comp_bg}]")
+                audio_mix_filters.append(f"[{a_bg_res}][{a_tts_res_side}]sidechaincompress=threshold=0.1:ratio=5:attack=15:release=250:makeup=1.0[{a_comp_bg}]")
                 
                 a_mix_out = f"amix{idx}"
-                audio_mix_filters.append(f"[{a_comp_bg}][{a_tts_res}]amix=inputs=2:duration=first:dropout_transition=0[{a_mix_out}]")
+                audio_mix_filters.append(f"[{a_comp_bg}][{a_tts_res_mix}]amix=inputs=2:duration=first:dropout_transition=0[{a_mix_out}]")
                 concat_mix_labels.append(a_mix_out)
                 
                 # Vocals-only stream za LipSync
