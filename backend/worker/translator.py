@@ -255,13 +255,31 @@ def clean_translation_text(text: str) -> str:
     # 9. Osnivačka dokumenta (članke o firmi kako bi je registrovala -> dokumente za registraciju kako bi registrovala firmu)
     text = re.sub(r'\bčlanke o firmi kako bi je registrovala\b', 'dokumente za registraciju kako bi registrovala firmu', text, flags=re.IGNORECASE)
     
-    # 10. Prirodniji raspored reči za negaciju nužnosti
+    # 10. Prirodniji raspored reči za negaciju nužnosti i redosled
     text = re.sub(r'\bne nužno (rade|čine)\b', r'ne \1 nužno', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bda to ne nužno čine\b', 'da to ne čine nužno', text, flags=re.IGNORECASE)
     
     # 11. Ispravka nepravilnog 'zabrinu o riziku' -> 'zabrinuti zbog rizika'
     text = re.sub(r'\bkoji se (zabrinu|zabrinjavaju|zabrinjuju) o riziku\b', 'koji su zabrinuti zbog rizika', text, flags=re.IGNORECASE)
 
-    # 12. Dupli razmaci i čišćenje
+    # 12. Ispravka "Nemam lice" -> "Nema lice" (za seg-5, opis robota Lune)
+    text = re.sub(r'\bNemam lice\b', 'Nema lice', text, flags=re.IGNORECASE)
+    
+    # 13. Ispravka "veliki log na zidu" / "veliki log" -> "veliki logo"
+    text = re.sub(r'\bveliki log na zidu\b', 'veliki logo na zidu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
+    
+    # 14. Ispravka "žele ovo budućnost" -> "žele takvu budućnost"
+    text = re.sub(r'\bžele ovo budućnost\b', 'žele takvu budućnost', text, flags=re.IGNORECASE)
+    
+    # 15. Ispravka "pođeti po zlu" -> "poći po zlu"
+    text = re.sub(r'\bpođeti po zlu\b', 'poći po zlu', text, flags=re.IGNORECASE)
+    
+    # 16. Ispravka "pratite za više" -> "prati za više" (usklađivanje ti/vi obraćanja)
+    text = re.sub(r'\bpratite za više\b', 'prati za više', text, flags=re.IGNORECASE)
+
+    # 17. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
