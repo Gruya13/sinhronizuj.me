@@ -1195,3 +1195,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     3. **Modal Worker (`modal_workers/tts_openvoice.py`):** Modifikovali smo metodu `task` da prihvata `disable_openvoice` i `disable_enhance`. Ako je `disable_openvoice=True`, sistem preskače ekstrakciju Speaker Embedding-a (SE) i ToneColor konverziju, i samo kopira sirovi Piper Marko audio u finalni fajl. Ako je `disable_enhance=True`, preskače se Resemble Enhance proces. Takođe je osigurano bezbedno brisanje privremenih fajlova sa NFS-a.
     4. **Deploy i Verifikacija:** Uradili smo deploy nove verzije na Modal i verifikovali funkcionalnost preko test skripte `scratch/test_tts_options.py`. Svi režimi rada (čist Piper, Piper + OpenVoice, Piper + Enhance, i sve uključeno) su uspešno generisali audio zapise u `temp_workspace`.
 - **Status:** Uspešno implementirano, deploy-ovano na Modal i spremno za testiranje različitih režima rada.
+
+### 28.05.2026. 09:50 — Implementacija automatskog spajanja govornih segmenata za kvalitetniji referentni glas
+- **Opis / Zahtev:**
+    Analizom produkcionog rada ustanovljeno je da kvalitet kloniranog glasa u gotovim videima varira i često bude u rangu čistog robotskog Piper modela. Utvrđeno je da automatski izbor referentnog govornika izdvaja prekratke uzorke (ispod 3 sekunde) ili čak tišinu/muziku iz video intro-a, što onemogućava OpenVoice da izvuče stabilan Speaker Embedding. Zahtevano je da se implementira automatsko sakupljanje i spajanje više jasnih govornih segmenata kako bi se uvek obezbedilo 8+ sekundi čistog govora za kloniranje glasa.
+- **Urađeno:**
+    - **Ažuriranje `backend/worker/tts_engine.py`:**
+        1. Modifikovali smo logiku pripreme referentnog audia tako da prolazi kroz transkribovane segmente i selektuje one koji imaju validan engleski tekst i traju preko 1.5 sekundi.
+        2. Sistem asimilira segmente redom dok ne dostigne trajanje od barem 8.0 sekundi. Ako nema dovoljno dugih segmenata, dodaje i kraće (preko 0.5s) kako bi sakupio bar 5.0 sekundi čistog govora.
+        3. Selekcija se zatim sortira po vremenskom redosledu i segmenti se spajaju pomoću `pydub.AudioSegment`, a njihovi tekstovi se spajaju u celoviti `ref_text`.
+        4. Fallback na prvih 15 sekundi videa se aktivira isključivo ako u celom transkriptu ne postoji nijedan govorni segment.
+    - **Infrastrukturni restart:** Restartovali smo lokalne procese FastAPI (Uvicorn) i Celery radnika kako bi se učitao novi kod na serveru.
+- **Status:** Uspešno implementirano, radnici su osveženi i sistem je spreman za testiranje sa realnim videima.

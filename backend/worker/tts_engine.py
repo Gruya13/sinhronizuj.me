@@ -28,38 +28,55 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         progress_callback(detail="Priprema referentnog audia...")
     
     try:
-        # Pronađi prvi segment sa validnim original_text i vremenima
-        ref_segment = None
+        # Sakupi više segmenata za bolji referentni glas (ciljamo 5-10 sekundi ukupno)
+        good_segments = []
+        total_duration = 0.0
+        
         for seg in translated_segments:
             if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
                 duration = seg["end"] - seg["start"]
-                if 3.0 <= duration <= 15.0: # Idealno 3 do 15 sekundi
-                    ref_segment = seg
-                    break
-                    
-        # Ako nismo našli idealan, uzmi bilo koji koji ima original_text i traje bar 1 sekundu
-        if not ref_segment:
-            for seg in translated_segments:
-                if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
-                    if seg["end"] - seg["start"] > 1.0:
-                        ref_segment = seg
+                if duration >= 1.5: # Samo segmenti koji imaju dovoljno govora
+                    good_segments.append(seg)
+                    total_duration += duration
+                    if total_duration >= 8.0: # Dovoljno nam je 8 sekundi
                         break
                         
+        # Ako nismo nakupili dovoljno od dužih, probajmo da dodamo i kraće od 1.5s (ali > 0.5s)
+        if total_duration < 5.0:
+            for seg in translated_segments:
+                if seg not in good_segments:
+                    if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
+                        duration = seg["end"] - seg["start"]
+                        if duration >= 0.5:
+                            good_segments.append(seg)
+                            total_duration += duration
+                            if total_duration >= 8.0:
+                                break
+                                
         ref_audio_all = AudioSegment.from_wav(vocals_path)
         
-        if ref_segment and "original_text" in ref_segment and ref_segment.get("start") is not None:
-            start_ms = int(ref_segment["start"] * 1000)
-            end_ms = int(ref_segment["end"] * 1000)
+        if good_segments:
+            # Sortiramo ih po vremenu početka kako bi se spojili prirodnim redosledom
+            good_segments = sorted(good_segments, key=lambda x: x["start"])
             
-            # Iseci audio za taj segment
-            ref_sub_audio = ref_audio_all[start_ms:end_ms]
+            # Spajamo audio delove i tekst
+            ref_sub_audio = AudioSegment.silent(duration=0)
+            ref_text_parts = []
             
+            for seg in good_segments:
+                start_ms = int(seg["start"] * 1000)
+                end_ms = int(seg["end"] * 1000)
+                # Isecanje i spajanje
+                chunk = ref_audio_all[start_ms:end_ms]
+                ref_sub_audio += chunk
+                ref_text_parts.append(seg["original_text"])
+                
             # Izvoz u buffer
             buffer = io.BytesIO()
             ref_sub_audio.export(buffer, format="wav")
             ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            ref_text = ref_segment["original_text"]
-            print(f"[TTS V2] Uspešno isečen referentni segment ({ref_segment['start']}s - {ref_segment['end']}s) za glas: '{ref_text}'")
+            ref_text = " ".join(ref_text_parts)
+            print(f"[TTS V2] Uspešno spojeno {len(good_segments)} referentnih segmenata (ukupno trajanje: {total_duration:.2f}s) za kloniranje glasa.")
         else:
             # Fallback na prvih 15 sekundi celog vokala
             duration_ms = len(ref_audio_all)
