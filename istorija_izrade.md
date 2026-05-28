@@ -1207,3 +1207,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         4. Fallback na prvih 15 sekundi videa se aktivira isključivo ako u celom transkriptu ne postoji nijedan govorni segment.
     - **Infrastrukturni restart:** Restartovali smo lokalne procese FastAPI (Uvicorn) i Celery radnika na lokalnoj mašini, a takođe smo preko SSH-a uradili git pull i `docker compose up -d --build` za sve kontejnere (`sinhronizuj-api`, `sinhronizuj-worker`, `sinhronizuj-beat`) na Hetzner VPS-u kako bi izmene bile aktivirane na stvarnom serveru.
 - **Status:** Uspešno implementirano, deploy-ovano na Modal, i u potpunosti primenjeno i aktivirano na Hetzner VPS-u. Sistem je spreman za testiranje sa realnim videima.
+
+### 28.05.2026. 10:05 — Aktivacija lektorskih ispravki i prelazak na Demucs vokal na produkcionom serveru (VPS)
+- **Opis / Zahtev:**
+    Korisnik je primetio da je kvalitet glasa u gotovim videima i dalje nepromenjen (robotski, Piper nivo) i da se greške u prevodu (kao što su "Nemam lice", "veliki log", "pođeti po zlu", gramatički redosled "ne nužno čine" i mešanje ti/vi obraćanja) i dalje pojavljuju. Utvrđeno je da lokalne izmene u `backend/worker/tasks.py` (koje vraćaju referentni audio na čisti Demucs vokal `sep_result["vocals_path"]`) i u `backend/worker/translator.py` (koje kroz regex pravila u `clean_translation_text` automatski ispravljaju ove greške) nisu bile komitovane i prebačene na produkcioni Hetzner VPS pre poslednjeg testa.
+- **Urađeno:**
+    1. **Kod:** Potvrđeno je da lokalni fajlovi sadrže sva neophodna regex pravila za automatsku lekturu i ispravku uočenih grešaka u prevodu, kao i prelazak sa `result["audio_path"]` na `sep_result["vocals_path"]` za OpenVoice kloniranje (zahvaljujući Resemble Enhance modelu koji čisti metalni šum sa vokala).
+    2. **Verzija:** Komitovane su i gurnute (push) lokalne izmene na GitHub granu `development`.
+    3. **Deployment na VPS-u:** Preko SSH veze smo ažurirali kod na Hetzner VPS-u (`git fetch` i `git reset --hard origin/development`) i uspešno pokrenuli rebuild i restart svih Docker kontejnera (`sinhronizuj-api`, `sinhronizuj-worker`, `sinhronizuj-beat`).
+- **Status:** Uspešno primenjeno i pokrenuto na serveru. Sistem je u potpunosti spreman za novi test sa ispravljenim kvalitetom zvuka i očišćenim prevodom.
