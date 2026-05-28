@@ -1205,5 +1205,5 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         2. Sistem asimilira segmente redom dok ne dostigne trajanje od barem 8.0 sekundi. Ako nema dovoljno dugih segmenata, dodaje i kraće (preko 0.5s) kako bi sakupio bar 5.0 sekundi čistog govora.
         3. Selekcija se zatim sortira po vremenskom redosledu i segmenti se spajaju pomoću `pydub.AudioSegment`, a njihovi tekstovi se spajaju u celoviti `ref_text`.
         4. Fallback na prvih 15 sekundi videa se aktivira isključivo ako u celom transkriptu ne postoji nijedan govorni segment.
-    - **Infrastrukturni restart:** Restartovali smo lokalne procese FastAPI (Uvicorn) i Celery radnika kako bi se učitao novi kod na serveru.
-- **Status:** Uspešno implementirano, radnici su osveženi i sistem je spreman za testiranje sa realnim videima.
+    - **Infrastrukturni restart:** Restartovali smo lokalne procese FastAPI (Uvicorn) i Celery radnika na lokalnoj mašini, a takođe smo preko SSH-a uradili git pull i `docker compose up -d --build` za sve kontejnere (`sinhronizuj-api`, `sinhronizuj-worker`, `sinhronizuj-beat`) na Hetzner VPS-u kako bi izmene bile aktivirane na stvarnom serveru.
+- **Status:** Uspešno implementirano, deploy-ovano na Modal, i u potpunosti primenjeno i aktivirano na Hetzner VPS-u. Sistem je spreman za testiranje sa realnim videima.
