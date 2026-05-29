@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,8 +34,6 @@ def test_translator():
     }
     
     print(f"Šaljem zahtev na {url}...")
-    start_time = time.time() if 'time' in globals() else 0
-    import time
     start_time = time.time()
     try:
         response = requests.post(url, json=payload, timeout=120)

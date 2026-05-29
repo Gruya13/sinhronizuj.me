@@ -1,0 +1,32 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ development, main ]
+  pull_request:
+    branches: [ development, main ]
+
+jobs:
+  lint-and-syntax:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Preuzimanje koda
+      uses: actions/checkout@v4
+
+    - name: Podešavanje Python okruženja
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalacija osnovnih alata za proveru koda
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff
+
+    - name: Provera sintakse koda (Ruff Linter)
+      # Ruff proverava samo kritične greške (sintaksa, nedefinisana imena itd.)
+      # kako stilski propusti ne bi blokirali build.
+      run: |
+        ruff check --select=E9,F63,F7,F82 backend modal_workers test
