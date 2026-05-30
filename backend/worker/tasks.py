@@ -326,7 +326,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 voice_type=voice_type,
                 disable_openvoice=settings.DISABLE_OPENVOICE,
                 disable_enhance=settings.DISABLE_ENHANCE,
-                progress_callback=lambda detail: update_progress(detail=detail)
+                progress_callback=lambda detail: update_progress(detail=detail),
+                all_segments=segments
             )
             duration_tts = time.time() - t_start_tts
             if tts_result["status"] == "error":

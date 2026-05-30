@@ -8,7 +8,7 @@ from backend.worker.preprocessor import upload_to_minio
 
 def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", 
                      disable_openvoice: bool = False, disable_enhance: bool = False,
-                     progress_callback=None) -> dict:
+                     progress_callback=None, all_segments: list = None) -> dict:
     """
     Poziva Modal Serverless Fish Speech (TTS) za paralelnu sintezu segmenata.
     Zatim spaja izgenerisane audio delove na tacne vremenske pozicije pomocu pydub-a.
@@ -32,25 +32,30 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         good_segments = []
         total_duration = 0.0
         
-        for seg in translated_segments:
-            if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
+        # Koristimo sve segmente projekta za referentni glas ako su obezbeđeni
+        ref_source_segments = all_segments if all_segments else translated_segments
+        
+        for seg in ref_source_segments:
+            orig_txt = seg.get("original_text") or seg.get("original")
+            if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
                 duration = seg["end"] - seg["start"]
                 if duration >= 1.5: # Samo segmenti koji imaju dovoljno govora
                     good_segments.append(seg)
                     total_duration += duration
-                    if total_duration >= 8.0: # Dovoljno nam je 8 sekundi
+                    if total_duration >= 10.0: # Dovoljno nam je 10 sekundi
                         break
                         
         # Ako nismo nakupili dovoljno od dužih, probajmo da dodamo i kraće od 1.5s (ali > 0.5s)
-        if total_duration < 5.0:
-            for seg in translated_segments:
+        if total_duration < 6.0:
+            for seg in ref_source_segments:
                 if seg not in good_segments:
-                    if seg.get("original_text") and seg.get("start") is not None and seg.get("end") is not None:
+                    orig_txt = seg.get("original_text") or seg.get("original")
+                    if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
                         duration = seg["end"] - seg["start"]
                         if duration >= 0.5:
                             good_segments.append(seg)
                             total_duration += duration
-                            if total_duration >= 8.0:
+                            if total_duration >= 10.0:
                                 break
                                 
         ref_audio_all = AudioSegment.from_wav(vocals_path)
@@ -76,7 +81,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                     ref_sub_audio = chunk
                 else:
                     ref_sub_audio = ref_sub_audio.append(chunk, crossfade=100)
-                ref_text_parts.append(seg["original_text"])
+                ref_text_parts.append(seg.get("original_text") or seg.get("original"))
                 
             # Izvoz u buffer
             buffer = io.BytesIO()

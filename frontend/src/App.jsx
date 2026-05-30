@@ -381,7 +381,16 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voice_type: selectedVoice })
       });
-      if (!res.ok) throw new Error("TTS failed");
+      if (!res.ok) {
+        let errorMsg = "TTS failed";
+        try {
+          const errData = await res.json();
+          if (errData && errData.detail) {
+            errorMsg = errData.detail;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
       const data = await res.json();
       
       // Ažuriramo zvučni fajl za preslušavanje

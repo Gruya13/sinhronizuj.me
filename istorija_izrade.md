@@ -1268,3 +1268,18 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Celery (`backend/worker/tasks.py`):** Prosledio sam `self` instancu kao prvi argument pri pozivima `analyze_video_task(self, ...)` i `render_video_task(self, ...)` u legacy tasku.
     - **React (`frontend/src/App.jsx`):** Uveo sam pretragu aktivnog segmenta po ID-ju na početku editora segmenta (`project.segments.find(s => s.id === selectedSegmentId)`) čime je interfejs postao imun na razlike između ID-ja i indeksa.
 - **Status:** Završeno, kompajlirano, verifikovano i uspešno poslato na granu `development` na GitHubu.
+
+### 30.05.2026. 15:45 — Ispravka TTS greške za pojedinačne segmente na studijskom interfejsu (VAD fallback)
+- **Zahtev / Problem:** Korisnik je prijavio grešku `TTS greška: TTS failed` prilikom pokušaja generisanja probnog glasa na vremenskoj liniji za segment [3]. Analizom logova utvrđeno je da OpenVoice baca `AssertionError: input audio is too short` jer VAD (Voice Activity Detection) ne pronalazi zvučne splits u previše kratkom ili tihom pojedinačnom segmentu koji je prosleđen kao referenca. Takođe, na frontendu je prikazivana samo generička poruka o grešci bez detalja sa bekenda.
+- **Urađeno:**
+    - **Modal Worker (`modal_workers/tts_openvoice.py`):**
+        * Dodao sam `try-except` blok oko poziva `se_extractor.get_se` sa `vad=True`. Ukoliko ekstrakcija sa VAD filterom baci bilo kakvu grešku, automatski se aktivira fallback koji poziva ekstrakciju sa `vad=False` na celom segmentu, eliminišući prekid rada usled prekratkog referentnog audia.
+    - **TTS Engine (`backend/worker/tts_engine.py`):**
+        * Uveo sam novi parametar `all_segments` u funkciju `synthesize_audio`. Kada se generiše probni glas za samo jedan segment, funkcija sada koristi sve segmente projekta kako bi sastavila duži i stabilniji referentni audio (ciljano 10 sekundi govora iz celog videa) umesto da se oslanja isključivo na taj jedan pojedinačni segment.
+        * Omogućio sam proveru i `"original_text"` i `"original"` ključeva u segmentima radi maksimalne robusnosti.
+    - **Backend API (`backend/main.py` i `backend/worker/tasks.py`):**
+        * Ažurirao sam API endpoint `/api/v1/project/{project_id}/segment/{segment_id}/tts` i Celery task `render_video_task` da prosleđuju sve segmente projekta (`all_segments=segments`) u poziv `synthesize_audio`.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * Izmenio sam funkciju `handleTestSegmentTTS` tako da čita detaljan opis greške iz tela API odgovora (`errData.detail`) i prikazuje je u `alert` prozoru umesto fiksne i neinformativne poruke "TTS failed".
+- **Status:** Uspešno implementirano, nova verzija radnika deploy-ovana na Modal, promene integrisane u backend i frontend.
+

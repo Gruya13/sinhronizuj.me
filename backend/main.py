@@ -209,7 +209,8 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
         single_tts_segment,
         voice_type=request.voice_type,
         disable_openvoice=settings.DISABLE_OPENVOICE,
-        disable_enhance=settings.DISABLE_ENHANCE
+        disable_enhance=settings.DISABLE_ENHANCE,
+        all_segments=segments
     )
     
     if tts_result["status"] == "error":

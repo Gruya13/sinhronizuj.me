@@ -296,7 +296,11 @@ class OpenVoiceWorker:
                 processed_dir = f"/tmp/processed_{req_uuid}"
                 os.makedirs(processed_dir, exist_ok=True)
                 
-                target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=True)
+                try:
+                    target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=True)
+                except Exception as e:
+                    print(f"[OpenVoice WARNING] Ekstrakcija sa vad=True nije uspela: {e}. Pokušavam sa vad=False...")
+                    target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=False)
                 
                 # 2. Generisanje/Učitavanje baznog SE za Marko Piper model
                 base_se_cache_path = f"{VOLUME_PATH}/openvoice_v2/base_se.pt"
