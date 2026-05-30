@@ -204,58 +204,94 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     if target_segment is None:
         raise HTTPException(status_code=404, detail="Segment nije pronađen.")
         
-    # Pokrećemo brzu sintezu samo za taj jedan segment
-    from backend.worker.tts_engine import synthesize_audio
-    
-    # Formatiramo segment za funkciju sinteze
-    single_tts_segment = [{
-        "id": target_segment["id"],
-        "start": target_segment["start"],
-        "end": target_segment["end"],
-        "text": request.text,
-        "original_text": target_segment["original"]
-    }]
-    
-    print(f"[API TTS] Pokrećem probni segment TTS za {project_id} seg-{segment_id} sa tekstom: {request.text}")
-    
-    tts_result = synthesize_audio(
-        project_data["vocals_path"],
-        single_tts_segment,
-        voice_type=request.voice_type,
-        disable_openvoice=settings.DISABLE_OPENVOICE,
-        disable_enhance=settings.DISABLE_ENHANCE,
-        all_segments=segments
-    )
-    
-    if tts_result["status"] == "error":
-        raise HTTPException(status_code=500, detail=f"TTS sinteza nije uspela: {tts_result.get('message')}")
-        
-    # Uzimamo generisani fajl
-    res_segments = tts_result.get("tts_segments", [])
-    if not res_segments:
-        raise HTTPException(status_code=500, detail="TTS nije vratio metapodatke o segmentu.")
-        
-    # Primenjujemo audio modifikatore (volume, speed, pitch)
-    from backend.worker.utils import apply_audio_modifiers
+    # Definišemo putanje za probni i sirovi (raw) fajl
     probni_filename = f"tts_probni_{project_id}_{segment_id}.wav"
     stable_probni_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, probni_filename)
     
-    apply_audio_modifiers(
-        generated_seg["path"],
-        stable_probni_path,
-        volume=request.volume,
-        speed=request.speed,
-        pitch=request.pitch
+    raw_filename = f"tts_raw_{project_id}_{segment_id}.wav"
+    stable_raw_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, raw_filename)
+    
+    from backend.worker.utils import apply_audio_modifiers
+    from pydub import AudioSegment
+    
+    # Proveravamo da li je tekst i glas isti i da li već imamo sirovi fajl na serveru
+    is_fast_adjust = (
+        os.path.exists(stable_raw_path) and 
+        target_segment.get("translated") == request.text and 
+        target_segment.get("voice_type") == request.voice_type
     )
     
-    # Učitavamo tačno novo trajanje nakon modifikacija
-    from pydub import AudioSegment
-    try:
-        updated_audio = AudioSegment.from_wav(stable_probni_path)
-        actual_duration = len(updated_audio) / 1000.0
-    except Exception:
-        actual_duration = generated_seg["duration"]
-    
+    if is_fast_adjust:
+        print(f"[API TTS] Brzo podešavanje audia (bez Modal TTS-a) za {project_id} seg-{segment_id}", flush=True)
+        apply_audio_modifiers(
+            stable_raw_path,
+            stable_probni_path,
+            volume=request.volume,
+            speed=request.speed,
+            pitch=request.pitch
+        )
+        try:
+            updated_audio = AudioSegment.from_wav(stable_probni_path)
+            actual_duration = len(updated_audio) / 1000.0
+        except Exception:
+            actual_duration = target_segment.get("tts_duration", target_segment["end"] - target_segment["start"])
+    else:
+        # Pokrećemo brzu sintezu samo za taj jedan segment (jer je tekst ili glas izmenjen)
+        from backend.worker.tts_engine import synthesize_audio
+        
+        single_tts_segment = [{
+            "id": target_segment["id"],
+            "start": target_segment["start"],
+            "end": target_segment["end"],
+            "text": request.text,
+            "original_text": target_segment["original"]
+        }]
+        
+        print(f"[API TTS] Pokrećem punu sintezu TTS za {project_id} seg-{segment_id} sa tekstom: {request.text}")
+        
+        tts_result = synthesize_audio(
+            project_data["vocals_path"],
+            single_tts_segment,
+            voice_type=request.voice_type,
+            disable_openvoice=settings.DISABLE_OPENVOICE,
+            disable_enhance=settings.DISABLE_ENHANCE,
+            all_segments=segments
+        )
+        
+        if tts_result["status"] == "error":
+            raise HTTPException(status_code=500, detail=f"TTS sinteza nije uspela: {tts_result.get('message')}")
+            
+        res_segments = tts_result.get("tts_segments", [])
+        if not res_segments:
+            raise HTTPException(status_code=500, detail="TTS nije vratio metapodatke o segmentu.")
+            
+        generated_seg = res_segments[0]
+        
+        # Čuvamo sirovi (raw) fajl na serveru za buduća brza podešavanja
+        import shutil
+        shutil.copy2(generated_seg["path"], stable_raw_path)
+        
+        # Primenjujemo audio modifikatore (volume, speed, pitch)
+        apply_audio_modifiers(
+            generated_seg["path"],
+            stable_probni_path,
+            volume=request.volume,
+            speed=request.speed,
+            pitch=request.pitch
+        )
+        
+        try:
+            updated_audio = AudioSegment.from_wav(stable_probni_path)
+            actual_duration = len(updated_audio) / 1000.0
+        except Exception:
+            actual_duration = generated_seg["duration"]
+            
+        # Čistimo privremene fajlove nastale tokom ove izolovane sinteze
+        if os.path.exists(generated_seg["path"]):
+            os.remove(generated_seg["path"])
+        if os.path.exists(tts_result["dubbed_audio_path"]):
+            os.remove(tts_result["dubbed_audio_path"])
+            
     # Ažuriramo metapodatke u nacrtu u Redis-u
     old_duration = target_segment.get("tts_duration")
     old_duration_ms = int(old_duration * 1000) if old_duration else int((target_segment["end"] - target_segment["start"]) * 1000)
@@ -295,16 +331,10 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     project_data["segments"] = segments
     r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
     
-    # Čistimo privremene fajlove nastale tokom ove izolovane sinteze
-    if os.path.exists(generated_seg["path"]):
-        os.remove(generated_seg["path"])
-    if os.path.exists(tts_result["dubbed_audio_path"]):
-        os.remove(tts_result["dubbed_audio_path"])
-        
     return {
         "status": "success",
         "audio_url": f"/videos/{probni_filename}",
-        "duration": generated_seg["duration"]
+        "duration": actual_duration
     }
 
 @app.post("/api/v1/project/{project_id}/generate-all-tts")

@@ -44,6 +44,7 @@ function App() {
   const [generatingAllTTS, setGeneratingAllTTS] = useState(false);
   const [dubbedBuster, setDubbedBuster] = useState(Date.now());
   const [segmentEditorTab, setSegmentEditorTab] = useState("text"); // text or audio
+  const [activeDubbedAudioUrl, setActiveDubbedAudioUrl] = useState(null);
 
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
@@ -173,6 +174,13 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/v1/project/${projId}`);
       if (!res.ok) throw new Error("Neuspešno učitavanje projekta.");
       const data = await res.json();
+      if (data.segments) {
+        data.segments = data.segments.map(s => ({
+          ...s,
+          last_generated_volume: s.volume !== undefined ? s.volume : 0.0,
+          last_generated_speed: s.speed !== undefined ? s.speed : 1.0
+        }));
+      }
       setProject(data);
       if (data.costs) setCosts(data.costs);
       if (data.segments && data.segments.length > 0) {
@@ -422,6 +430,8 @@ function App() {
             volume, 
             speed, 
             pitch, 
+            last_generated_volume: volume,
+            last_generated_speed: speed,
             status: "previewed" 
           };
         }
@@ -466,9 +476,14 @@ function App() {
       const data = await res.json();
       
       // Ažuriramo segmente i putanju za dubbed audio
+      const mappedSegs = data.segments.map(s => ({
+        ...s,
+        last_generated_volume: s.volume !== undefined ? s.volume : 0.0,
+        last_generated_speed: s.speed !== undefined ? s.speed : 1.0
+      }));
       setProject(prev => ({
         ...prev,
-        segments: data.segments,
+        segments: mappedSegs,
         dubbed_audio_path: data.dubbed_audio_url
       }));
       setDubbedBuster(Date.now());
@@ -549,7 +564,7 @@ function App() {
     }
   };
 
-  // Praćenje vremena video reprodukcije
+  // Praćenje vremena video reprodukcije i sinhronizacija zvuka
   useEffect(() => {
     if (isPlaying && videoRef.current) {
       playheadIntervalRef.current = setInterval(() => {
@@ -557,30 +572,113 @@ function App() {
           const t = videoRef.current.currentTime;
           setCurrentTime(t);
 
-          // Resinhronizacija audia ako pobegne za više od 150ms
+          // Realtime podešavanje jačine zvuka i brzine na osnovu aktivnog segmenta i delte na slajderu
+          const currentSeg = project?.segments.find(s => t >= s.start && t <= s.end);
+
           if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
+            const baseVolumeLinear = Math.min(Math.max(Math.pow(10, dubVolume / 20), 0), 1);
+            let finalVolume = baseVolumeLinear;
+            let finalSpeed = 1.0;
+
+            if (currentSeg) {
+              // Delta volume
+              const currentVol = currentSeg.volume !== undefined ? currentSeg.volume : 0.0;
+              const lastGenVol = currentSeg.last_generated_volume !== undefined ? currentSeg.last_generated_volume : 0.0;
+              const deltaVol = currentVol - lastGenVol;
+              if (deltaVol !== 0) {
+                const deltaVolLinear = Math.pow(10, deltaVol / 20);
+                finalVolume = Math.min(Math.max(baseVolumeLinear * deltaVolLinear, 0), 1);
+              }
+
+              // Delta speed
+              const currentSpeed = currentSeg.speed !== undefined ? currentSeg.speed : 1.0;
+              const lastGenSpeed = currentSeg.last_generated_speed !== undefined ? currentSeg.last_generated_speed : 1.0;
+              const deltaSpeed = currentSpeed / lastGenSpeed;
+              if (deltaSpeed !== 1.0) {
+                finalSpeed = deltaSpeed;
+              }
+            }
+
+            if (dubbedAudioRef.current.volume !== finalVolume) {
+              dubbedAudioRef.current.volume = finalVolume;
+            }
+
+            if (dubbedAudioRef.current.playbackRate !== finalSpeed) {
+              dubbedAudioRef.current.playbackRate = finalSpeed;
+            }
+            if (videoRef.current.playbackRate !== finalSpeed) {
+              videoRef.current.playbackRate = finalSpeed;
+            }
+
+            // Resinhronizacija audia ako pobegne za više od 150ms
             const diff = Math.abs(videoRef.current.currentTime - dubbedAudioRef.current.currentTime);
             if (diff > 0.15) {
               dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
             }
+          } else {
+            // Ako nismo na dubbed izvoru, vratimo playbackRate videa na 1.0
+            if (videoRef.current.playbackRate !== 1.0) {
+              videoRef.current.playbackRate = 1.0;
+            }
           }
 
           // Sinhronizuj selekciju segmenta u realnom vremenu
-          const matchingSeg = project?.segments.find(s => t >= s.start && t <= s.end);
-          if (matchingSeg && matchingSeg.id !== selectedSegmentId) {
-            setSelectedSegmentId(matchingSeg.id);
+          if (currentSeg && currentSeg.id !== selectedSegmentId) {
+            setSelectedSegmentId(currentSeg.id);
           }
         }
       }, 50);
     } else {
       clearInterval(playheadIntervalRef.current);
+      if (videoRef.current && videoRef.current.playbackRate !== 1.0) {
+        videoRef.current.playbackRate = 1.0;
+      }
+      if (dubbedAudioRef.current && dubbedAudioRef.current.playbackRate !== 1.0) {
+        dubbedAudioRef.current.playbackRate = 1.0;
+      }
     }
     return () => clearInterval(playheadIntervalRef.current);
-  }, [isPlaying, project, selectedSegmentId, activeAudioSource]);
+  }, [isPlaying, project, selectedSegmentId, activeAudioSource, dubVolume]);
 
   // Izvedena vrednost za putanju dubbed zvuka sa cache buster-om
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
   const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}?cb=${dubbedBuster}` : null;
+
+  // Preloading za dubbed audio da se izbegne seckanje pri regeneraciji segmenta
+  useEffect(() => {
+    if (!dubbedAudioUrl) {
+      setActiveDubbedAudioUrl(null);
+      return;
+    }
+    
+    // Ako video već svira, učitavamo u pozadini da izbegnemo prekid reprodukcije
+    if (isPlaying) {
+      const preloadAudio = new Audio();
+      preloadAudio.src = dubbedAudioUrl;
+      preloadAudio.preload = "auto";
+      
+      const handleCanPlayThrough = () => {
+        setActiveDubbedAudioUrl(dubbedAudioUrl);
+        preloadAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
+      };
+      
+      preloadAudio.addEventListener('canplaythrough', handleCanPlayThrough);
+      
+      // Failsafe ako učitavanje potraje predugo
+      const t = setTimeout(() => {
+        setActiveDubbedAudioUrl(dubbedAudioUrl);
+        preloadAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
+      }, 1200);
+      
+      return () => {
+        clearTimeout(t);
+        preloadAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
+      };
+    } else {
+      // Ako ne svira, možemo odmah primeniti novi URL
+      setActiveDubbedAudioUrl(dubbedAudioUrl);
+    }
+  }, [dubbedAudioUrl, isPlaying]);
 
   // Sinhronizacija mute stanja i reprodukcije u odnosu na selektovani izvor zvuka
   useEffect(() => {
@@ -588,7 +686,7 @@ function App() {
     const audio = dubbedAudioRef.current;
     if (!video) return;
 
-    if (activeAudioSource === "dubbed" && dubbedAudioUrl) {
+    if (activeAudioSource === "dubbed" && activeDubbedAudioUrl) {
       video.muted = true;
       if (audio) {
         if (isPlaying) {
@@ -604,7 +702,15 @@ function App() {
         audio.pause();
       }
     }
-  }, [activeAudioSource, isPlaying, dubbedAudioUrl]);
+  }, [activeAudioSource, isPlaying, activeDubbedAudioUrl]);
+
+  // Sinhronizacija jačine zvuka sinhronizovane trake (AI Glas) u realnom vremenu
+  useEffect(() => {
+    if (dubbedAudioRef.current) {
+      const linearVol = Math.min(Math.max(Math.pow(10, dubVolume / 20), 0), 1);
+      dubbedAudioRef.current.volume = linearVol;
+    }
+  }, [dubVolume, activeDubbedAudioUrl]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -937,6 +1043,19 @@ function App() {
               {/* Desna strana: Detaljan Editor Selektovanog Segmenta */}
               {(() => {
                 const activeSegment = project.segments.find(s => s.id === selectedSegmentId) || project.segments[0] || {};
+                
+                // Automatsko pokretanje regeneracije/podešavanja tona nakon što korisnik pusti slajder
+                const handleAutoAdjust = () => {
+                  handleTestSegmentTTS(
+                    selectedSegmentId,
+                    activeSegment.translated || "",
+                    activeSegment.voice_type,
+                    activeSegment.volume,
+                    activeSegment.speed,
+                    activeSegment.pitch
+                  );
+                };
+
                 return (
                   <div className="segment-editor-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1069,12 +1188,14 @@ function App() {
                               const val = parseFloat(e.target.value);
                               const updated = project.segments.map(s => {
                                 if (s.id === selectedSegmentId) {
-                                  return { ...s, volume: val, status: "edited" };
+                                  return { ...s, volume: val };
                                 }
                                 return s;
                               });
                               setProject({ ...project, segments: updated });
                             }}
+                            onMouseUp={handleAutoAdjust}
+                            onTouchEnd={handleAutoAdjust}
                             style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
                           />
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
@@ -1100,12 +1221,14 @@ function App() {
                               const val = parseFloat(e.target.value);
                               const updated = project.segments.map(s => {
                                 if (s.id === selectedSegmentId) {
-                                  return { ...s, speed: val, status: "edited" };
+                                  return { ...s, speed: val };
                                 }
                                 return s;
                               });
                               setProject({ ...project, segments: updated });
                             }}
+                            onMouseUp={handleAutoAdjust}
+                            onTouchEnd={handleAutoAdjust}
                             style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
                           />
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
@@ -1131,12 +1254,14 @@ function App() {
                               const val = parseInt(e.target.value);
                               const updated = project.segments.map(s => {
                                 if (s.id === selectedSegmentId) {
-                                  return { ...s, pitch: val, status: "edited" };
+                                  return { ...s, pitch: val };
                                 }
                                 return s;
                               });
                               setProject({ ...project, segments: updated });
                             }}
+                            onMouseUp={handleAutoAdjust}
+                            onTouchEnd={handleAutoAdjust}
                             style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
                           />
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
@@ -1151,7 +1276,7 @@ function App() {
                     {/* Upozorenje ako je prevod ili glas modifikovan a nije regenerisan */}
                     {activeSegment.status === "edited" && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '8px', color: '#facc15', fontSize: '0.8rem', marginTop: '10px', marginBottom: '10px' }}>
-                        <span>⚠️ Prevod, glas ili audio podešavanja su izmenjeni, generišite glas ponovo!</span>
+                        <span>⚠️ Prevod ili glas su izmenjeni, generišite glas ponovo!</span>
                       </div>
                     )}
 
@@ -1164,7 +1289,7 @@ function App() {
                         </div>
                       ) : (
                         <span style={{ flex: 1, fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                          Glas nije generisan za ovaj segment. Klikni "Generiši Probni Glas".
+                          Glas nije generisan za ovaj segment. Klikni "Regeneriši Probni Glas".
                         </span>
                       )}
                       
@@ -1180,7 +1305,7 @@ function App() {
                         disabled={loadingSegmentTTS[selectedSegmentId]}
                         className="glow-button"
                         style={{
-                          background: activeSegment.status === "edited" ? '#d97706' : '#3b82f6',
+                          background: '#8b5cf6',
                           boxShadow: 'none',
                           padding: '10px 16px',
                           fontSize: '0.85rem'
@@ -1188,10 +1313,8 @@ function App() {
                       >
                         {loadingSegmentTTS[selectedSegmentId] ? (
                           <Loader2 size={16} className="spinner-icon pulse-icon" />
-                        ) : activeSegment.status === "edited" ? (
-                          "🎙️ Regeneriši Probni Glas"
                         ) : (
-                          "🎙️ Generiši Probni Glas"
+                          "🎙️ Regeneriši Probni Glas"
                         )}
                       </button>
                     </div>
