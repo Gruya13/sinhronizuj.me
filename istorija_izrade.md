@@ -1300,4 +1300,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Ažurirao sam funkciju `handleTestSegmentTTS` i dugme za generisanje da čitaju i šalju glas konfigurisan za taj specifični segment.
 - **Status:** Uspešno implementirano, testirano lokalno i deploy-ovano na Hetzner VPS i Modal.
 
+### 30.05.2026. 15:58 — Implementacija generisanja celog zvuka, solo preklapanja traka i Spacebar play/pause prečice
+- **Zahtev:** Korisnik je tražio da se omogući generisanje glasa za ceo video odjednom, mogućnost prebacivanja/izbora aktivnog audia (između originalnog i novo-generisanog srpskog glasa) na vremenskoj liniji, kao i startovanje/stopiranje video reprodukcije pritiskom na taster Space.
+- **Urađeno:**
+    - **Backend API (`backend/main.py`):**
+        * Implementirao sam rutu `POST /api/v1/project/{project_id}/generate-all-tts` koja pokreće paralelnu sintezu za sve segmente u projektu odjednom, spaja ih u kompletan dub-miks (srpski zvučni zapis) i čuva putanju dubbed audia u Redis draftu.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Generisanje celog videa:** Dodao sam dugme "Generiši Glas za Ceo Video" u kontrolni panel koje sinhronizuje sve segmente odjednom i osvežava zvučne preview-ove na klijentu.
+        * **Solo preklapanje traka na Timeline-u:** Ugradio sam interaktivne tastere pill oblika direktno u zaglavlja zvučnih traka ("Originalni ENG Vokal" i "Srpski glas (TTS)"). Korisnik klikom bira koji zvučni tok želi da čuje.
+        * **Sinhronizacija reprodukcije:** Dodao sam skriveni `<audio>` plejer za dub-miks i povezao ga da svira, pauzira i resinhronizuje se u realnom vremenu (ako se raziđe za više od 150ms) sa HTML5 video plejerom, mjutujući originalni zvuk videa kada je srpska traka aktivna.
+        * **Spacebar Prečica:** Implementirao sam globalni event listener za taster Space koji kontroliše reprodukciju filma, bez ometanja kucanja ukoliko je fokus u textarea polju za unos prevoda.
+- **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške, izmene poslate na Hetzner VPS i kontejneri restartovani.
+
+
 

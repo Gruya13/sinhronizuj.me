@@ -40,12 +40,15 @@ function App() {
   const [rendering, setRendering] = useState(false);
   const [renderTaskId, setRenderTaskId] = useState(null);
   const [costs, setCosts] = useState(null);
+  const [activeAudioSource, setActiveAudioSource] = useState("original"); // original or dubbed
+  const [generatingAllTTS, setGeneratingAllTTS] = useState(false);
 
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
   const fileInputRef = useRef(null);
   const consecutiveErrorsRef = useRef(0);
   const playheadIntervalRef = useRef(null);
+  const dubbedAudioRef = useRef(null);
 
   // Monitor resursa
   useEffect(() => {
@@ -416,6 +419,56 @@ function App() {
     }
   };
 
+  // Generiši glas za ceo video
+  const handleGenerateAllTTS = async () => {
+    if (!project) return;
+    setGeneratingAllTTS(true);
+    try {
+      // Prvo sačuvamo nacrt
+      await handleSaveDraft();
+      
+      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/generate-all-tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voice_type: selectedVoice })
+      });
+      if (!res.ok) {
+        let errorMsg = "Sinteza celog videa nije uspela";
+        try {
+          const errData = await res.json();
+          if (errData && errData.detail) {
+            errorMsg = errData.detail;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+      const data = await res.json();
+      
+      // Ažuriramo segmente i putanju za dubbed audio
+      setProject(prev => ({
+        ...prev,
+        segments: data.segments,
+        dubbed_audio_path: data.dubbed_audio_url
+      }));
+      
+      // Keširamo sve generisane zvučne fajlove za pojedinačne segmente
+      const audios = {};
+      data.segments.forEach(s => {
+        if (s.tts_path) {
+          const filename = s.tts_path.split('/').pop();
+          audios[s.id] = `${API_BASE_URL}/videos/${filename}`;
+        }
+      });
+      setProbniAudios(audios);
+      
+      alert("Uspešno izgenerisan glas za ceo video! Sada možete prebaciti zvuk na vremenskoj liniji na 'Srpski glas (TTS)' da preslušate sinhronizaciju.");
+    } catch (err) {
+      alert("Greška pri generisanju celog videa: " + err.message);
+    } finally {
+      setGeneratingAllTTS(false);
+    }
+  };
+
   // Slanje projekta na Fazu 2 (Render)
   const handleRenderProject = async () => {
     if (!project) return;
@@ -481,6 +534,15 @@ function App() {
         if (videoRef.current) {
           const t = videoRef.current.currentTime;
           setCurrentTime(t);
+
+          // Resinhronizacija audia ako pobegne za više od 150ms
+          if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
+            const diff = Math.abs(videoRef.current.currentTime - dubbedAudioRef.current.currentTime);
+            if (diff > 0.15) {
+              dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
+            }
+          }
+
           // Sinhronizuj selekciju segmenta u realnom vremenu
           const matchingSeg = project?.segments.find(s => t >= s.start && t <= s.end);
           if (matchingSeg && matchingSeg.id !== selectedSegmentId) {
@@ -492,17 +554,73 @@ function App() {
       clearInterval(playheadIntervalRef.current);
     }
     return () => clearInterval(playheadIntervalRef.current);
-  }, [isPlaying, project, selectedSegmentId]);
+  }, [isPlaying, project, selectedSegmentId, activeAudioSource]);
+
+  // Izvedena vrednost za putanju dubbed zvuka
+  const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
+  const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null;
+
+  // Sinhronizacija mute stanja i reprodukcije u odnosu na selektovani izvor zvuka
+  useEffect(() => {
+    const video = videoRef.current;
+    const audio = dubbedAudioRef.current;
+    if (!video) return;
+
+    if (activeAudioSource === "dubbed" && dubbedAudioUrl) {
+      video.muted = true;
+      if (audio) {
+        if (isPlaying) {
+          audio.currentTime = video.currentTime;
+          audio.play().catch(err => console.error("Greška pri reprodukciji probnog miksa:", err));
+        } else {
+          audio.pause();
+        }
+      }
+    } else {
+      video.muted = false;
+      if (audio) {
+        audio.pause();
+      }
+    }
+  }, [activeAudioSource, isPlaying, dubbedAudioUrl]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
+      if (dubbedAudioRef.current) {
+        dubbedAudioRef.current.pause();
+      }
     } else {
       videoRef.current.play();
+      if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
+        dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
+        dubbedAudioRef.current.play().catch(err => console.error("Greška pri reprodukciji probnog miksa:", err));
+      }
     }
     setIsPlaying(!isPlaying);
   };
+
+  // Prečica za Spacebar play/pause
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        const active = document.activeElement;
+        if (active && (
+          active.tagName === 'INPUT' || 
+          active.tagName === 'TEXTAREA' || 
+          active.isContentEditable
+        )) {
+          return;
+        }
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, project, activeAudioSource]);
 
   // Pomoćna funkcija za iscrtavanje waveform barova u SVG-u
   const generateWaveformBars = (duration, id) => {
@@ -722,6 +840,13 @@ function App() {
                       }
                     }}
                   />
+                  {dubbedAudioUrl && (
+                    <audio 
+                      ref={dubbedAudioRef} 
+                      src={dubbedAudioUrl} 
+                      style={{ display: 'none' }} 
+                    />
+                  )}
                 </div>
                 
                 {/* Kontrole plejera */}
@@ -904,8 +1029,28 @@ function App() {
 
                 {/* 3. TRAKA: ORIGINALNI GOVOR (Engleski) */}
                 <div style={{ height: '54px', background: 'rgba(139, 92, 246, 0.03)', borderRadius: '6px', border: '1px solid rgba(139, 92, 246, 0.08)', position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '10px', top: '5px', fontSize: '0.7rem', color: 'rgba(139, 92, 246, 0.6)', zIndex: 5, pointerEvents: 'none', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                    <Mic size={10} style={{ display: 'inline', marginRight: '4px' }} /> Originalni govorni blokovi (ENG)
+                  <div style={{ position: 'absolute', left: '10px', top: '5px', zIndex: 5, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setActiveAudioSource("original"); }}
+                      style={{ 
+                        background: activeAudioSource === "original" ? 'rgba(139, 92, 246, 0.8)' : 'rgba(0,0,0,0.5)', 
+                        border: '1px solid rgba(139, 92, 246, 0.4)', 
+                        borderRadius: '4px', 
+                        color: '#fff', 
+                        fontSize: '0.65rem', 
+                        padding: '2px 8px', 
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        outline: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeAudioSource === "original" ? '#fff' : 'transparent', border: '1px solid #fff' }} />
+                      <Mic size={10} /> Originalni ENG Vokal {activeAudioSource === "original" ? "(Aktivno)" : ""}
+                    </button>
                   </div>
                   
                   {/* Renderujemo regione segmenata */}
@@ -920,7 +1065,12 @@ function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedSegmentId(seg.id);
-                          if (videoRef.current) videoRef.current.currentTime = seg.start;
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = seg.start;
+                            if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
+                              dubbedAudioRef.current.currentTime = seg.start;
+                            }
+                          }
                         }}
                         style={{
                           position: 'absolute',
@@ -954,8 +1104,38 @@ function App() {
 
                 {/* 4. TRAKA: SRPSKI SINHRONIZOVANI GLAS */}
                 <div style={{ height: '54px', background: 'rgba(34, 197, 94, 0.02)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.08)', position: 'relative' }}>
-                  <div style={{ position: 'absolute', left: '10px', top: '5px', fontSize: '0.7rem', color: 'rgba(34, 197, 94, 0.6)', zIndex: 5, pointerEvents: 'none', textTransform: 'uppercase', fontWeight: 'bold' }}>
-                    <Volume2 size={10} style={{ display: 'inline', marginRight: '4px' }} /> Srpski glas (TTS)
+                  <div style={{ position: 'absolute', left: '10px', top: '5px', zIndex: 5, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (!dubbedAudioUrl) {
+                          alert("Molimo vas da prvo generišete glas za ceo video klikom na 'Generiši Glas za Ceo Video'.");
+                          return;
+                        }
+                        setActiveAudioSource("dubbed"); 
+                      }}
+                      style={{ 
+                        background: activeAudioSource === "dubbed" ? 'rgba(34, 197, 94, 0.8)' : 'rgba(0,0,0,0.5)', 
+                        border: '1px solid rgba(34, 197, 94, 0.4)', 
+                        borderRadius: '4px', 
+                        color: '#fff', 
+                        fontSize: '0.65rem', 
+                        padding: '2px 8px', 
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        outline: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeAudioSource === "dubbed" ? '#fff' : 'transparent', border: '1px solid #fff' }} />
+                      <Volume2 size={10} /> Srpski glas (TTS) {activeAudioSource === "dubbed" ? "(Aktivno)" : ""}
+                    </button>
+                    {!dubbedAudioUrl && (
+                      <span style={{ fontSize: '0.65rem', color: '#64748b', fontStyle: 'italic' }}>(Potrebno generisati ceo glas)</span>
+                    )}
                   </div>
                   
                   {project.segments.map(seg => {
@@ -975,7 +1155,12 @@ function App() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedSegmentId(seg.id);
-                          if (videoRef.current) videoRef.current.currentTime = seg.start;
+                          if (videoRef.current) {
+                            videoRef.current.currentTime = seg.start;
+                            if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
+                              dubbedAudioRef.current.currentTime = seg.start;
+                            }
+                          }
                         }}
                         style={{
                           position: 'absolute',
@@ -996,7 +1181,7 @@ function App() {
                         {isLonger && (
                           <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((seg.tts_duration - (seg.end - seg.start)) / seg.tts_duration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444' }} title="Predugačko! Biće primenjeno usporavanje videa." />
                         )}
-
+ 
                         {/* Waveform */}
                         <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : 0.25 }}>
                           {generateWaveformBars(ttsDur, seg.id + 10).map((h, i) => (
@@ -1110,22 +1295,33 @@ function App() {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '300px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '300px' }}>
                   <button 
-                    onClick={handleSaveDraft}
-                    disabled={savingProject}
-                    className="new-task-btn"
-                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem' }}
-                  >
-                    {savingProject ? <Loader2 size={14} className="spinner-icon pulse-icon" /> : <Save size={14} />} Sačuvaj
-                  </button>
-                  <button 
-                    onClick={handleRenderProject}
+                    onClick={handleGenerateAllTTS}
+                    disabled={generatingAllTTS}
                     className="glow-button"
-                    style={{ flex: 2, justifyContent: 'center', fontSize: '0.85rem' }}
+                    style={{ background: 'var(--primary)', justifyContent: 'center', fontSize: '0.85rem', width: '100%' }}
                   >
-                    <Zap size={16} /> Renderuj Video
+                    {generatingAllTTS ? <Loader2 size={16} className="spinner-icon pulse-icon" /> : <Mic size={16} />} Generiši Glas za Ceo Video
                   </button>
+                  
+                  <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                    <button 
+                      onClick={handleSaveDraft}
+                      disabled={savingProject}
+                      className="new-task-btn"
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem' }}
+                    >
+                      {savingProject ? <Loader2 size={14} className="spinner-icon pulse-icon" /> : <Save size={14} />} Sačuvaj
+                    </button>
+                    <button 
+                      onClick={handleRenderProject}
+                      className="glow-button"
+                      style={{ flex: 2, justifyContent: 'center', fontSize: '0.85rem', background: '#22c55e', boxShadow: '0 0 10px rgba(34, 197, 94, 0.3)' }}
+                    >
+                      <Zap size={16} /> Renderuj Video
+                    </button>
+                  </div>
                 </div>
               </div>
 

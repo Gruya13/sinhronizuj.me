@@ -54,6 +54,9 @@ class SegmentTTSRequest(BaseModel):
     text: str
     voice_type: str = "clone"
 
+class GenerateAllTTSRequest(BaseModel):
+    voice_type: str = "clone"
+
 class RenderRequest(BaseModel):
     voice_type: str = "clone"
     background_volume: float = -5.0
@@ -251,6 +254,91 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
         "status": "success",
         "audio_url": f"/videos/{probni_filename}",
         "duration": generated_seg["duration"]
+    }
+
+@app.post("/api/v1/project/{project_id}/generate-all-tts")
+def generate_all_tts(project_id: str, request: GenerateAllTTSRequest):
+    """
+    Sintetizuje glas za sve segmente u projektu i pravi kompletan miks (dubbed audio) za preslušavanje na timeline-u.
+    """
+    r = get_redis_client()
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        raise HTTPException(status_code=404, detail="Projekat nije pronađen ili je istekao.")
+        
+    project_data = json.loads(draft_bytes)
+    segments = project_data["segments"]
+    
+    if not segments:
+        raise HTTPException(status_code=400, detail="Projekat nema segmenata za sintezu.")
+        
+    # Formatiramo sve segmente za funkciju sinteze
+    tts_segments = []
+    for s in segments:
+        tts_segments.append({
+            "id": s["id"],
+            "start": s["start"],
+            "end": s["end"],
+            "text": s["translated"],
+            "original_text": s["original"],
+            "voice_type": s.get("voice_type", request.voice_type)
+        })
+        
+    print(f"[API TTS ALL] Pokrećem sintezu svih {len(tts_segments)} segmenata za projekat {project_id}")
+    
+    from backend.worker.tts_engine import synthesize_audio
+    tts_result = synthesize_audio(
+        project_data["vocals_path"],
+        tts_segments,
+        voice_type=request.voice_type,
+        disable_openvoice=settings.DISABLE_OPENVOICE,
+        disable_enhance=settings.DISABLE_ENHANCE,
+        all_segments=segments
+    )
+    
+    if tts_result["status"] == "error":
+        raise HTTPException(status_code=500, detail=f"Sinteza celog videa nije uspela: {tts_result.get('message')}")
+        
+    res_segments = tts_result.get("tts_segments", [])
+    res_map = {s["id"]: s for s in res_segments}
+    
+    # Kopiramo dubbed fajl u temp_workspace za trajno serviranje na timeline-u
+    dubbed_filename = f"tts_full_{project_id}.wav"
+    stable_dubbed_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, dubbed_filename)
+    import shutil
+    shutil.copy2(tts_result["dubbed_audio_path"], stable_dubbed_path)
+    
+    # Ažuriramo segmente u Redis nacrtu
+    for s in segments:
+        if s["id"] in res_map:
+            res_s = res_map[s["id"]]
+            
+            # Kopiramo i pojedinačni segment u temp_workspace
+            seg_filename = f"tts_seg_{project_id}_{s['id']}.wav"
+            stable_seg_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, seg_filename)
+            shutil.copy2(res_s["path"], stable_seg_path)
+            
+            s["tts_path"] = stable_seg_path
+            s["tts_duration"] = res_s["duration"]
+            s["status"] = "previewed"
+            
+            # Čistimo privremene lokalne fajlove sinteze koji su kopirani
+            if os.path.exists(res_s["path"]):
+                os.remove(res_s["path"])
+                
+    project_data["segments"] = segments
+    project_data["dubbed_audio_path"] = stable_dubbed_path
+    
+    r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+    
+    # Čistimo privremeni dubbed fajl
+    if os.path.exists(tts_result["dubbed_audio_path"]):
+        os.remove(tts_result["dubbed_audio_path"])
+        
+    return {
+        "status": "success",
+        "dubbed_audio_url": f"/videos/{dubbed_filename}",
+        "segments": segments
     }
 
 @app.post("/api/v1/project/{project_id}/render")
