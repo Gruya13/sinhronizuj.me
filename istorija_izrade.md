@@ -1259,3 +1259,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Sinhronizovao sam playhead kursor sa HTML5 video plejerom u realnom vremenu.
         * Dodao sam brzu probnu sintezu pojedinačnih segmenata i audio mikser za jačine zvuka.
 - **Status:** Uspešno implementirano, potvrđeno kompajliranje Python datoteka i uspešan Vite build bez grešaka.
+
+### 30.05.2026. 14:36 — Stabilizacija i otklanjanje uočenih problema u dvofaznom modelu i interfejsu
+- **Uočeni problemi (kod analize izmena):**
+    1. **Celery Binding u tasks.py:** Faze `analyze_video_task` i `render_video_task` imaju `@celery_app.task(bind=True)`. Prilikom poziva u legacy `process_video_task` (koji služi kao 1-pass wrapper) pozivani su kao obične funkcije bez prosleđivanja `self` argumenta, što bi izazvalo `TypeError`.
+    2. **Mapiranje indeksa u App.jsx:** Editor segmenta je pristupao podacima o segmentima preko `project.segments[selectedSegmentId]`, pretpostavljajući da je ID segmenta jednak njegovom indeksu u nizu. Ako bi se ID-jevi razlikovali (npr. usled brisanja ili drugog sortiranja), dolazilo bi do praznih podataka i greške.
+- **Urađeno:**
+    - **Celery (`backend/worker/tasks.py`):** Prosledio sam `self` instancu kao prvi argument pri pozivima `analyze_video_task(self, ...)` i `render_video_task(self, ...)` u legacy tasku.
+    - **React (`frontend/src/App.jsx`):** Uveo sam pretragu aktivnog segmenta po ID-ju na početku editora segmenta (`project.segments.find(s => s.id === selectedSegmentId)`) čime je interfejs postao imun na razlike između ID-ja i indeksa.
+- **Status:** Završeno, kompajlirano, verifikovano i uspešno poslato na granu `development` na GitHubu.

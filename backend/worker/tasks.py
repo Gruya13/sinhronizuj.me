@@ -447,12 +447,12 @@ def process_video_task(self, video_url: str, debug: bool = False):
     task_id = self.request.id
     
     # 1. Pokrećemo analizu
-    analysis_res = analyze_video_task(video_url, debug)
+    analysis_res = analyze_video_task(self, video_url, debug)
     if analysis_res.get("status") == "error":
         return analysis_res
         
     # 2. Pokrećemo render sa podrazumevanim parametrima
-    render_res = render_video_task(task_id, voice_type="clone", background_vol=-5.0, dubbed_vol=0.0)
+    render_res = render_video_task(self, task_id, voice_type="clone", background_vol=-5.0, dubbed_vol=0.0)
     return render_res
 
 @celery_app.task(name="backend.worker.tasks.cleanup_old_files")

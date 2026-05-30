@@ -736,89 +736,92 @@ function App() {
               </div>
 
               {/* Desna strana: Detaljan Editor Selektovanog Segmenta */}
-              <div className="segment-editor-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Mic size={18} className="text-violet-400" /> Uređivanje Segmenta [{selectedSegmentId}]
-                  </h3>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b', background: 'rgba(0,0,0,0.2)', padding: '3px 8px', borderRadius: '6px' }}>
-                    Trajanje: {((project.segments[selectedSegmentId]?.end || 0) - (project.segments[selectedSegmentId]?.start || 0)).toFixed(2)}s
-                  </span>
-                </div>
-
-                {/* Originalni tekst */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Original (Engleski):</span>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.4' }}>
-                    "{project.segments[selectedSegmentId]?.original}"
-                  </div>
-                </div>
-
-                {/* Prevod tekst (Editabilno) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Prevod na Srpski:</span>
-                  <textarea
-                    className="edit-segment-textarea"
-                    value={project.segments[selectedSegmentId]?.translated || ""}
-                    onChange={(e) => {
-                      const updated = project.segments.map(s => {
-                        if (s.id === selectedSegmentId) {
-                          return { ...s, translated: e.target.value, status: "edited" };
-                        }
-                        return s;
-                      });
-                      setProject({ ...project, segments: updated });
-                    }}
-                  />
-                  
-                  {/* Karakteri limit vizuelni indikator */}
-                  {(() => {
-                    const seg = project.segments[selectedSegmentId];
-                    if (!seg) return null;
-                    const dur = seg.end - seg.start;
-                    const limit = Math.floor(dur * 20);
-                    const currentLen = seg.translated.length;
-                    const isOver = currentLen > limit;
-                    return (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px' }}>
-                        <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
-                          {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
-                        </span>
-                        <span style={{ color: isOver ? '#ef4444' : '#cbd5e1', fontWeight: '600' }}>
-                          {currentLen} / {limit}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Akcije za segment */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
-                  {/* Preslušavanje probnog TTS-a */}
-                  {probniAudios[selectedSegmentId] ? (
-                    <div style={{ flex: 1 }}>
-                      <audio src={probniAudios[selectedSegmentId]} controls style={{ width: '100%', height: '36px' }} />
+              {(() => {
+                const activeSegment = project.segments.find(s => s.id === selectedSegmentId) || project.segments[0] || {};
+                return (
+                  <div className="segment-editor-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Mic size={18} className="text-violet-400" /> Uređivanje Segmenta [{selectedSegmentId}]
+                      </h3>
+                      <span style={{ fontSize: '0.8rem', color: '#64748b', background: 'rgba(0,0,0,0.2)', padding: '3px 8px', borderRadius: '6px' }}>
+                        Trajanje: {((activeSegment.end || 0) - (activeSegment.start || 0)).toFixed(2)}s
+                      </span>
                     </div>
-                  ) : (
-                    <span style={{ flex: 1, fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
-                      Glas nije generisan za ovaj segment. Klikni "Generiši Probni Glas".
-                    </span>
-                  )}
-                  
-                  <button 
-                    onClick={() => handleTestSegmentTTS(selectedSegmentId, project.segments[selectedSegmentId].translated)}
-                    disabled={loadingSegmentTTS[selectedSegmentId]}
-                    className="glow-button"
-                    style={{ background: '#3b82f6', boxShadow: 'none', padding: '10px 16px', fontSize: '0.85rem' }}
-                  >
-                    {loadingSegmentTTS[selectedSegmentId] ? (
-                      <Loader2 size={16} className="spinner-icon pulse-icon" />
-                    ) : (
-                      "🎙️ Generiši Probni Glas"
-                    )}
-                  </button>
-                </div>
-              </div>
+
+                    {/* Originalni tekst */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Original (Engleski):</span>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                        "{activeSegment.original}"
+                      </div>
+                    </div>
+
+                    {/* Prevod tekst (Editabilno) */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Prevod na Srpski:</span>
+                      <textarea
+                        className="edit-segment-textarea"
+                        value={activeSegment.translated || ""}
+                        onChange={(e) => {
+                          const updated = project.segments.map(s => {
+                            if (s.id === selectedSegmentId) {
+                              return { ...s, translated: e.target.value, status: "edited" };
+                            }
+                            return s;
+                          });
+                          setProject({ ...project, segments: updated });
+                        }}
+                      />
+                      
+                      {/* Karakteri limit vizuelni indikator */}
+                      {(() => {
+                        const dur = (activeSegment.end || 0) - (activeSegment.start || 0);
+                        const limit = Math.floor(dur * 20);
+                        const currentLen = (activeSegment.translated || "").length;
+                        const isOver = currentLen > limit;
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px' }}>
+                            <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
+                              {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
+                            </span>
+                            <span style={{ color: isOver ? '#ef4444' : '#cbd5e1', fontWeight: '600' }}>
+                              {currentLen} / {limit}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Akcije za segment */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
+                      {/* Preslušavanje probnog TTS-a */}
+                      {probniAudios[selectedSegmentId] ? (
+                        <div style={{ flex: 1 }}>
+                          <audio src={probniAudios[selectedSegmentId]} controls style={{ width: '100%', height: '36px' }} />
+                        </div>
+                      ) : (
+                        <span style={{ flex: 1, fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                          Glas nije generisan za ovaj segment. Klikni "Generiši Probni Glas".
+                        </span>
+                      )}
+                      
+                      <button 
+                        onClick={() => handleTestSegmentTTS(selectedSegmentId, activeSegment.translated || "")}
+                        disabled={loadingSegmentTTS[selectedSegmentId]}
+                        className="glow-button"
+                        style={{ background: '#3b82f6', boxShadow: 'none', padding: '10px 16px', fontSize: '0.85rem' }}
+                      >
+                        {loadingSegmentTTS[selectedSegmentId] ? (
+                          <Loader2 size={16} className="spinner-icon pulse-icon" />
+                        ) : (
+                          "🎙️ Generiši Probni Glas"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* TIMELINE (VREMENSKA LINIJA SA TRAKAMA) */}
