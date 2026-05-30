@@ -1312,5 +1312,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * **Spacebar Prečica:** Implementirao sam globalni event listener za taster Space koji kontroliše reprodukciju filma, bez ometanja kucanja ukoliko je fokus u textarea polju za unos prevoda.
 - **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške, izmene poslate na Hetzner VPS i kontejneri restartovani.
 
+### 30.05.2026. 16:10 — Dodavanje primarnog selektora audio izvora u kontrolnu traku plejera
+- **Zahtev:** Korisnik je primetio da iako generisanje glasa za ceo video radi, nedostaje lakši i uočljiviji način za izbor primarnog audia (original ili srpska sinhronizacija) u samom video plejeru.
+- **Urađeno:**
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * Dodao sam novu kontrolnu grupu tastera **"Primarni zvuk:"** direktno u liniju kontrola video plejera (odmah pored prikaza trenutnog vremena).
+        * Korisnik može jednim klikom da izabere **"Original (ENG)"** ili **"AI Sinhronizovano (SR)"**.
+        * Tasteri svetle odgovarajućim bojama (ljubičasto i zeleno) u zavisnosti od toga šta je aktivno.
+        * Logika osigurava da ukoliko dub-miks još uvek nije generisan, korisnik dobije informaciju o tome da prvo treba da klikne na "Generiši Glas za Ceo Video".
+- **Status:** Uspešno dodato na frontendu, Vite build prošao bez greške.
+
+
 
 

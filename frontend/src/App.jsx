@@ -854,13 +854,56 @@ function App() {
                   <button 
                     onClick={togglePlay} 
                     className="play-pause-btn"
-                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifycontent: 'center', cursor: 'pointer', justifyContent: 'center' }}
+                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                   >
                     {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
                   </button>
                   
                   <div className="time-display" style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#94a3b8' }}>
                     {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || getVideoDuration())}
+                  </div>
+
+                  {/* Biranje primarnog audia za preslušavanje */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '8px', marginLeft: '12px' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600' }}>Primarni zvuk:</span>
+                    <button
+                      onClick={() => setActiveAudioSource("original")}
+                      style={{
+                        background: activeAudioSource === "original" ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
+                        border: activeAudioSource === "original" ? '1px solid #8b5cf6' : '1px solid transparent',
+                        color: activeAudioSource === "original" ? '#c084fc' : '#94a3b8',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Original (ENG)
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!dubbedAudioUrl) {
+                          alert("Molimo vas da prvo generišete glas za ceo video klikom na 'Generiši Glas za Ceo Video' na dnu desnog panela.");
+                          return;
+                        }
+                        setActiveAudioSource("dubbed");
+                      }}
+                      style={{
+                        background: activeAudioSource === "dubbed" ? 'rgba(34, 197, 94, 0.25)' : 'transparent',
+                        border: activeAudioSource === "dubbed" ? '1px solid #22c55e' : '1px solid transparent',
+                        color: activeAudioSource === "dubbed" ? '#4ade80' : '#94a3b8',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      AI Sinhronizovano (SR)
+                    </button>
                   </div>
 
                   <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '6px', marginLeft: 'auto', border: '1px solid rgba(255,255,255,0.08)' }}>
