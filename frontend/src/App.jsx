@@ -43,6 +43,7 @@ function App() {
   const [activeAudioSource, setActiveAudioSource] = useState("original"); // original or dubbed
   const [generatingAllTTS, setGeneratingAllTTS] = useState(false);
   const [dubbedBuster, setDubbedBuster] = useState(Date.now());
+  const [segmentEditorTab, setSegmentEditorTab] = useState("text"); // text or audio
 
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
@@ -174,6 +175,9 @@ function App() {
       const data = await res.json();
       setProject(data);
       if (data.costs) setCosts(data.costs);
+      if (data.segments && data.segments.length > 0) {
+        setSelectedSegmentId(data.segments[0].id);
+      }
       
       // Keširamo probne audije ako ih ima iz baze
       const audios = {};
@@ -376,14 +380,20 @@ function App() {
   };
 
   // Probna sinteza jednog segmenta
-  const handleTestSegmentTTS = async (segId, text, voiceType) => {
+  const handleTestSegmentTTS = async (segId, text, voiceType, volume = 0.0, speed = 1.0, pitch = 0.0) => {
     if (!project) return;
     setLoadingSegmentTTS(prev => ({ ...prev, [segId]: true }));
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/segment/${segId}/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice_type: voiceType || "clone" })
+        body: JSON.stringify({ 
+          text, 
+          voice_type: voiceType || "clone",
+          volume: volume !== undefined ? volume : 0.0,
+          speed: speed !== undefined ? speed : 1.0,
+          pitch: pitch !== undefined ? pitch : 0.0
+        })
       });
       if (!res.ok) {
         let errorMsg = "TTS failed";
@@ -404,7 +414,16 @@ function App() {
       // Ažuriramo trajanje segmenta lokalno u projektu
       const updatedSegments = project.segments.map(s => {
         if (s.id === segId) {
-          return { ...s, translated: text, voice_type: voiceType || "clone", tts_duration: data.duration, status: "previewed" };
+          return { 
+            ...s, 
+            translated: text, 
+            voice_type: voiceType || "clone", 
+            tts_duration: data.duration, 
+            volume, 
+            speed, 
+            pitch, 
+            status: "previewed" 
+          };
         }
         return s;
       });
@@ -929,75 +948,210 @@ function App() {
                       </span>
                     </div>
 
-                    {/* Originalni tekst */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Original (Engleski):</span>
-                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.4' }}>
-                        "{activeSegment.original}"
-                      </div>
-                    </div>
-
-                    {/* Prevod tekst (Editabilno) */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Prevod na Srpski:</span>
-                      <textarea
-                        className="edit-segment-textarea"
-                        value={activeSegment.translated || ""}
-                        onChange={(e) => {
-                          const updated = project.segments.map(s => {
-                            if (s.id === selectedSegmentId) {
-                              return { ...s, translated: e.target.value, status: "edited" };
-                            }
-                            return s;
-                          });
-                          setProject({ ...project, segments: updated });
+                    {/* Navigacija tabova */}
+                    <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', gap: '15px', marginBottom: '10px' }}>
+                      <button
+                        onClick={() => setSegmentEditorTab("text")}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          borderBottom: segmentEditorTab === "text" ? '2px solid #8b5cf6' : '2px solid transparent',
+                          color: segmentEditorTab === "text" ? '#fff' : '#64748b',
+                          padding: '6px 12px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '0.85rem',
+                          transition: 'all 0.15s'
                         }}
-                      />
-                      
-                      {/* Karakteri limit vizuelni indikator */}
-                      {(() => {
-                        const dur = (activeSegment.end || 0) - (activeSegment.start || 0);
-                        const limit = Math.floor(dur * 20);
-                        const currentLen = (activeSegment.translated || "").length;
-                        const isOver = currentLen > limit;
-                        return (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px' }}>
-                            <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
-                              {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
-                            </span>
-                            <span style={{ color: isOver ? '#ef4444' : '#cbd5e1', fontWeight: '600' }}>
-                              {currentLen} / {limit}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Odabir glasa za ovaj segment */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Glas za ovaj segment:</span>
-                      <select
-                        value={activeSegment.voice_type || "clone"}
-                        onChange={(e) => {
-                          const updated = project.segments.map(s => {
-                            if (s.id === selectedSegmentId) {
-                              return { ...s, voice_type: e.target.value, status: "edited" };
-                            }
-                            return s;
-                          });
-                          setProject({ ...project, segments: updated });
-                        }}
-                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
                       >
-                        <option value="clone">Kloniraj originalni glas (OpenVoice V2)</option>
-                        <option value="male">Muški glas (Piper - sr_Marko)</option>
-                      </select>
+                        📝 Tekst & Prevod
+                      </button>
+                      <button
+                        onClick={() => setSegmentEditorTab("audio")}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          borderBottom: segmentEditorTab === "audio" ? '2px solid #8b5cf6' : '2px solid transparent',
+                          color: segmentEditorTab === "audio" ? '#fff' : '#64748b',
+                          padding: '6px 12px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '0.85rem',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        🔊 Podešavanja Zvuka
+                      </button>
                     </div>
+
+                    {segmentEditorTab === "text" ? (
+                      <>
+                        {/* Originalni tekst */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Original (Engleski):</span>
+                          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.4' }}>
+                            "{activeSegment.original}"
+                          </div>
+                        </div>
+
+                        {/* Prevod tekst (Editabilno) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Prevod na Srpski:</span>
+                          <textarea
+                            className="edit-segment-textarea"
+                            value={activeSegment.translated || ""}
+                            onChange={(e) => {
+                              const updated = project.segments.map(s => {
+                                if (s.id === selectedSegmentId) {
+                                  return { ...s, translated: e.target.value, status: "edited" };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                          />
+                          
+                          {/* Karakteri limit vizuelni indikator */}
+                          {(() => {
+                            const dur = (activeSegment.end || 0) - (activeSegment.start || 0);
+                            const limit = Math.floor(dur * 20);
+                            const currentLen = (activeSegment.translated || "").length;
+                            const isOver = currentLen > limit;
+                            return (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px' }}>
+                                <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
+                                  {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
+                                </span>
+                                <span style={{ color: isOver ? '#ef4444' : '#cbd5e1', fontWeight: '600' }}>
+                                  {currentLen} / {limit}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Odabir glasa za ovaj segment */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Glas za ovaj segment:</span>
+                          <select
+                            value={activeSegment.voice_type || "clone"}
+                            onChange={(e) => {
+                              const updated = project.segments.map(s => {
+                                if (s.id === selectedSegmentId) {
+                                  return { ...s, voice_type: e.target.value, status: "edited" };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                            style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
+                          >
+                            <option value="clone">Kloniraj originalni glas (OpenVoice V2)</option>
+                            <option value="male">Muški glas (Piper - sr_Marko)</option>
+                          </select>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                        {/* Jačina zvuka (dB) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                            <span>Jačina zvuka (Volume):</span>
+                            <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.volume > 0 ? `+${activeSegment.volume}` : activeSegment.volume || 0} dB</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-20"
+                            max="10"
+                            step="1"
+                            value={activeSegment.volume !== undefined ? activeSegment.volume : 0}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const updated = project.segments.map(s => {
+                                if (s.id === selectedSegmentId) {
+                                  return { ...s, volume: val, status: "edited" };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                            style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                            <span>-20 dB (Tiho)</span>
+                            <span>0 dB (Default)</span>
+                            <span>+10 dB (Glasno)</span>
+                          </div>
+                        </div>
+
+                        {/* Brzina / Tempo (x) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                            <span>Brzina govora (Tempo):</span>
+                            <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.speed !== undefined ? activeSegment.speed.toFixed(1) : "1.0"}x</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="2.0"
+                            step="0.1"
+                            value={activeSegment.speed !== undefined ? activeSegment.speed : 1.0}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const updated = project.segments.map(s => {
+                                if (s.id === selectedSegmentId) {
+                                  return { ...s, speed: val, status: "edited" };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                            style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                            <span>0.5x (Sporo)</span>
+                            <span>1.0x (Normalno)</span>
+                            <span>2.0x (Brzo)</span>
+                          </div>
+                        </div>
+
+                        {/* Visina glasa (Pitch semitoni) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                            <span>Visina tona (Pitch):</span>
+                            <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.pitch > 0 ? `+${activeSegment.pitch}` : activeSegment.pitch || 0} st</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-6"
+                            max="6"
+                            step="1"
+                            value={activeSegment.pitch !== undefined ? activeSegment.pitch : 0}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              const updated = project.segments.map(s => {
+                                if (s.id === selectedSegmentId) {
+                                  return { ...s, pitch: val, status: "edited" };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                            style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                            <span>Dubok muški</span>
+                            <span>0 (Original)</span>
+                            <span>Visok piskav</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Upozorenje ako je prevod ili glas modifikovan a nije regenerisan */}
                     {activeSegment.status === "edited" && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '8px', color: '#facc15', fontSize: '0.8rem', marginTop: '10px', marginBottom: '10px' }}>
-                        <span>⚠️ Prevod ili glas su izmenjeni, generišite glas ponovo!</span>
+                        <span>⚠️ Prevod, glas ili audio podešavanja su izmenjeni, generišite glas ponovo!</span>
                       </div>
                     )}
 
@@ -1015,7 +1169,14 @@ function App() {
                       )}
                       
                       <button 
-                        onClick={() => handleTestSegmentTTS(selectedSegmentId, activeSegment.translated || "", activeSegment.voice_type)}
+                        onClick={() => handleTestSegmentTTS(
+                          selectedSegmentId, 
+                          activeSegment.translated || "", 
+                          activeSegment.voice_type,
+                          activeSegment.volume,
+                          activeSegment.speed,
+                          activeSegment.pitch
+                        )}
                         disabled={loadingSegmentTTS[selectedSegmentId]}
                         className="glow-button"
                         style={{

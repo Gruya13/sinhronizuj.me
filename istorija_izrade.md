@@ -1333,6 +1333,29 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * **Automatsko osvežavanje dubbed plejera (Cache Buster):** Dodao sam cache-buster parametar (`?cb=...`) na dub-miks zvučni URL i na pojedinačne zvučne URL adrese segmenta koji se osvežavaju pri svakoj uspešnoj regeneraciji segmenta, tako da klijent odmah učitava modifikovan ton izmenjenog segmenta u celokupnom dub-miksu bez ikakvog keširanja.
 - **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške.
 
+### 30.05.2026. 16:20 — Implementacija zvučnih modifikatora i tabova u segment editoru
+- **Zahtev:** Korisnik je prijavio da se ne vidi dugme za regeneraciju segmenta (usled toga što segment 0 nije bio selektovan po defaultu). Takođe, zatražio je dodavanje novog taba u desnom prozoru za uređivanje segmenta u kom će se nalaziti audio podešavanja za jačinu zvuka (dB), brzinu (tempo) i visinu tona (pitch), kao i opcije za fino podešavanje.
+- **Urađeno:**
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Default selekcija segmenta:** Dodao sam automatsku selekciju prvog segmenta projekta (`setSelectedSegmentId(data.segments[0].id)`) prilikom učitavanja projekta. Time je rešen problem gde je `selectedSegmentId` bio `0` (nepostojeći segment na početku), pa se akcije i dugme za generisanje nisu videli kako treba.
+        * **Tabovi u Editoru:** Podelio sam desni panel za uređivanje na dva taba: **📝 Tekst & Prevod** (original, prevod, odabir glasa) i **🔊 Podešavanja Zvuka**.
+        * **Zvučne kontrole:** Ugradio sam tri slajdera za kontrolu:
+            - *Jačina zvuka:* od `-20 dB` do `+10 dB` (default: 0 dB).
+            - *Brzina govora (Tempo):* od `0.5x` do `2.0x` (default: 1.0x).
+            - *Visina tona (Pitch):* od `-6 st` do `+6 st` (semitona, default: 0).
+        * **Povezivanje sa API-jem:** Modifikovao sam funkciju `handleTestSegmentTTS` tako da očitava ove vrednosti i šalje ih u POST zahtevu ka bekendu. Svaka promena slajdera postavlja status segmenta u `"edited"` i podstiče korisnika na regeneraciju.
+    - **Audio postprocesiranje (`backend/worker/utils.py`):**
+        * Kreirao sam helper funkciju `apply_audio_modifiers` koja koristi **FFmpeg** sa naprednim `rubberband` filterom (`rubberband=tempo={speed}:pitch={pitch_factor}`) za promenu brzine i visine tona bez chipmunk efekta, kao i filter `volume={volume}dB` za promenu jačine.
+    - **Backend API (`backend/main.py`):**
+        * Ažurirao sam Pydantic modele `SegmentItem` i `SegmentTTSRequest` da podržavaju `volume`, `speed` i `pitch` parametre.
+        * Modifikovao sam rutu `/save` da perzistira ova audio podešavanja u Redis nacrtu.
+        * Ugradio sam poziv `apply_audio_modifiers` u `/segment/{segment_id}/tts` rutu, i osigurao da se izmeri i vrati stvarna nova dužina trajanja zvuka nakon FFmpeg filtriranja.
+        * Ažurirao sam `/generate-all-tts` rutu da pre spajanja finalnog dub-miksa primeni modifikatore na svaki segment ponaosob i ponovo izgradi čist `final_mix` u realnom vremenu.
+    - **Celery Worker (`backend/worker/tasks.py`):**
+        * Ažurirao sam loop za sintezu nedostajućih vokala unutar `render_video_task` tako da primenjuje `apply_audio_modifiers` pre konačnog spajanja sa videom i pozadinskom muzikom.
+- **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške.
+
+
 
 
 

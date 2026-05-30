@@ -72,3 +72,47 @@ def normalize_audio(audio_path: str, target_dbfs: float = -20.0):
     except Exception as e:
         print(f"[NORMALIZE] Greška pri normalizaciji audia: {e}")
 
+
+def apply_audio_modifiers(input_path: str, output_path: str, volume: float = 0.0, speed: float = 1.0, pitch: float = 0.0):
+    """
+    Primenjuje jačinu zvuka (volume u dB), brzinu (speed/tempo) i visinu tona (pitch u semitonima)
+    koristeći FFmpeg sa rubberband filterom za visinu i brzinu.
+    """
+    import os
+    import shutil
+    import subprocess
+    
+    if not os.path.exists(input_path):
+        print(f"[AUDIO OPT] Ulazni fajl nije pronađen: {input_path}")
+        return
+        
+    filters = []
+    if volume is not None and volume != 0.0:
+        filters.append(f"volume={volume}dB")
+    if (speed is not None and speed != 1.0) or (pitch is not None and pitch != 0.0):
+        s_val = speed if speed is not None else 1.0
+        p_val = pitch if pitch is not None else 0.0
+        pitch_factor = 2.0 ** (p_val / 12.0)
+        filters.append(f"rubberband=tempo={s_val}:pitch={pitch_factor}")
+        
+    if not filters:
+        # Nema modifikacija, samo kopiramo fajl
+        shutil.copy2(input_path, output_path)
+        return
+        
+    filter_str = ",".join(filters)
+    cmd = [
+        "ffmpeg", "-y", "-i", input_path,
+        "-filter:a", filter_str,
+        output_path
+    ]
+    try:
+        print(f"[AUDIO OPT] Primenjujem filtere: {filter_str} na {input_path} -> {output_path}")
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    except subprocess.CalledProcessError as e:
+        stderr_output = e.stderr.decode('utf-8', errors='ignore')
+        print(f"[AUDIO OPT ERROR] FFmpeg nije uspeo: {stderr_output}")
+        # Fallback na prosto kopiranje
+        shutil.copy2(input_path, output_path)
+
+

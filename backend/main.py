@@ -46,6 +46,9 @@ class SegmentItem(BaseModel):
     tts_duration: Optional[float] = None
     status: Optional[str] = "draft"
     voice_type: Optional[str] = "clone"
+    volume: Optional[float] = 0.0
+    speed: Optional[float] = 1.0
+    pitch: Optional[float] = 0.0
 
 class SaveProjectRequest(BaseModel):
     segments: List[SegmentItem]
@@ -53,6 +56,9 @@ class SaveProjectRequest(BaseModel):
 class SegmentTTSRequest(BaseModel):
     text: str
     voice_type: str = "clone"
+    volume: float = 0.0
+    speed: float = 1.0
+    pitch: float = 0.0
 
 class GenerateAllTTSRequest(BaseModel):
     voice_type: str = "clone"
@@ -161,9 +167,12 @@ def save_project_draft(project_id: str, request: SaveProjectRequest):
         orig_id = orig_seg["id"]
         if orig_id in seg_map:
             req_seg = seg_map[orig_id]
-            # Ažuriramo prevedeni tekst i glas za segment
+            # Ažuriramo prevedeni tekst, glas i audio podešavanja za segment
             orig_seg["translated"] = req_seg.translated
             orig_seg["voice_type"] = req_seg.voice_type or orig_seg.get("voice_type", "clone")
+            orig_seg["volume"] = req_seg.volume if req_seg.volume is not None else orig_seg.get("volume", 0.0)
+            orig_seg["speed"] = req_seg.speed if req_seg.speed is not None else orig_seg.get("speed", 1.0)
+            orig_seg["pitch"] = req_seg.pitch if req_seg.pitch is not None else orig_seg.get("pitch", 0.0)
             orig_seg["status"] = "edited"
         updated_segments.append(orig_seg)
         
@@ -226,13 +235,26 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     if not res_segments:
         raise HTTPException(status_code=500, detail="TTS nije vratio metapodatke o segmentu.")
         
-    generated_seg = res_segments[0]
-    
-    # Kopiramo fajl iz task workspace-a (koji se prazni) u javni temp_workspace za stalno serviranje
+    # Primenjujemo audio modifikatore (volume, speed, pitch)
+    from backend.worker.utils import apply_audio_modifiers
     probni_filename = f"tts_probni_{project_id}_{segment_id}.wav"
     stable_probni_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, probni_filename)
-    import shutil
-    shutil.copy2(generated_seg["path"], stable_probni_path)
+    
+    apply_audio_modifiers(
+        generated_seg["path"],
+        stable_probni_path,
+        volume=request.volume,
+        speed=request.speed,
+        pitch=request.pitch
+    )
+    
+    # Učitavamo tačno novo trajanje nakon modifikacija
+    from pydub import AudioSegment
+    try:
+        updated_audio = AudioSegment.from_wav(stable_probni_path)
+        actual_duration = len(updated_audio) / 1000.0
+    except Exception:
+        actual_duration = generated_seg["duration"]
     
     # Ažuriramo metapodatke u nacrtu u Redis-u
     old_duration = target_segment.get("tts_duration")
@@ -241,7 +263,10 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     target_segment["translated"] = request.text
     target_segment["voice_type"] = request.voice_type
     target_segment["tts_path"] = stable_probni_path
-    target_segment["tts_duration"] = generated_seg["duration"]
+    target_segment["tts_duration"] = actual_duration
+    target_segment["volume"] = request.volume
+    target_segment["speed"] = request.speed
+    target_segment["pitch"] = request.pitch
     target_segment["status"] = "previewed"
     
     # Ako već postoji izgenerisan pun miks za ceo video, ažuriramo i njega dinamički!
@@ -328,29 +353,65 @@ def generate_all_tts(project_id: str, request: GenerateAllTTSRequest):
     res_segments = tts_result.get("tts_segments", [])
     res_map = {s["id"]: s for s in res_segments}
     
-    # Kopiramo dubbed fajl u temp_workspace za trajno serviranje na timeline-u
-    dubbed_filename = f"tts_full_{project_id}.wav"
-    stable_dubbed_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, dubbed_filename)
-    import shutil
-    shutil.copy2(tts_result["dubbed_audio_path"], stable_dubbed_path)
+    # Učitavamo originalni vokal da bismo znali ukupnu dužinu i napravili finalni miks sa svim podešavanjima
+    from pydub import AudioSegment
+    try:
+        ref_audio = AudioSegment.from_wav(project_data["vocals_path"])
+        video_duration_ms = len(ref_audio)
+    except Exception:
+        video_duration_ms = 30000  # fallback 30s
     
-    # Ažuriramo segmente u Redis nacrtu
+    final_mix = AudioSegment.silent(duration=video_duration_ms)
+    
+    # Ažuriramo segmente u Redis nacrtu i gradimo novi finalni miks sa svim podešavanjima
+    from backend.worker.utils import apply_audio_modifiers
+    import shutil
+    
     for s in segments:
         if s["id"] in res_map:
             res_s = res_map[s["id"]]
             
-            # Kopiramo i pojedinačni segment u temp_workspace
+            # Kopiramo i pojedinačni segment u temp_workspace sa primenom modifikatora
             seg_filename = f"tts_seg_{project_id}_{s['id']}.wav"
             stable_seg_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, seg_filename)
-            shutil.copy2(res_s["path"], stable_seg_path)
             
+            apply_audio_modifiers(
+                res_s["path"],
+                stable_seg_path,
+                volume=s.get("volume", 0.0),
+                speed=s.get("speed", 1.0),
+                pitch=s.get("pitch", 0.0)
+            )
+            
+            try:
+                seg_audio = AudioSegment.from_wav(stable_seg_path)
+                duration = len(seg_audio) / 1000.0
+            except Exception:
+                try:
+                    seg_audio = AudioSegment.from_wav(res_s["path"])
+                except Exception:
+                    seg_audio = AudioSegment.silent(duration=int((s["end"] - s["start"]) * 1000))
+                duration = res_s.get("duration", s["end"] - s["start"])
+                
             s["tts_path"] = stable_seg_path
-            s["tts_duration"] = res_s["duration"]
+            s["tts_duration"] = duration
             s["status"] = "previewed"
             
-            # Čistimo privremene lokalne fajlove sinteze koji su kopirani
             if os.path.exists(res_s["path"]):
                 os.remove(res_s["path"])
+                
+        # Dodajemo segment u finalni miks ako postoji na disku
+        if s.get("tts_path") and os.path.exists(s["tts_path"]):
+            try:
+                seg_audio = AudioSegment.from_wav(s["tts_path"])
+                start_ms = int(s["start"] * 1000)
+                final_mix = final_mix.overlay(seg_audio, position=start_ms)
+            except Exception as e:
+                print(f"[WARNING] Greška pri dodavanju segmenta {s['id']} u miks: {e}", flush=True)
+                
+    dubbed_filename = f"tts_full_{project_id}.wav"
+    stable_dubbed_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, dubbed_filename)
+    final_mix.export(stable_dubbed_path, format="wav")
                 
     project_data["segments"] = segments
     project_data["dubbed_audio_path"] = stable_dubbed_path

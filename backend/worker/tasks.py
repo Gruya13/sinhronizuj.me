@@ -340,15 +340,33 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             add_phase_cost("tts", "Sinteza govora (OpenVoice)", "L4", total_duration_tts, 0.00025)
             
             # Ažuriramo putanje u našim segmentima i kopiramo ih u stabilnu lokaciju
+            # Ažuriramo putanje u našim segmentima i kopiramo ih u stabilnu lokaciju sa primenom modifikatora
+            from backend.worker.utils import apply_audio_modifiers
             tts_map = {s["id"]: s for s in tts_result["tts_segments"]}
             for s in segments:
                 if s["id"] in tts_map:
                     res_seg = tts_map[s["id"]]
                     stable_seg_filename = f"tts_seg_{project_id}_{s['id']}.wav"
                     stable_seg_path = os.path.join(original_temp_workspace, stable_seg_filename)
-                    shutil.copy2(res_seg["path"], stable_seg_path)
+                    
+                    apply_audio_modifiers(
+                        res_seg["path"],
+                        stable_seg_path,
+                        volume=s.get("volume", 0.0),
+                        speed=s.get("speed", 1.0),
+                        pitch=s.get("pitch", 0.0)
+                    )
+                    
+                    # Provera novog trajanja posle modifikatora
+                    try:
+                        from pydub import AudioSegment
+                        updated_audio = AudioSegment.from_wav(stable_seg_path)
+                        actual_duration = len(updated_audio) / 1000.0
+                    except Exception:
+                        actual_duration = res_seg["duration"]
+                        
                     s["tts_path"] = stable_seg_path
-                    s["tts_duration"] = res_seg["duration"]
+                    s["tts_duration"] = actual_duration
                     
             # Ažuriramo draft u Redisu
             project_data["segments"] = segments
