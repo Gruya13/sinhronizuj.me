@@ -1322,6 +1322,18 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Logika osigurava da ukoliko dub-miks još uvek nije generisan, korisnik dobije informaciju o tome da prvo treba da klikne na "Generiši Glas za Ceo Video".
 - **Status:** Uspešno dodato na frontendu, Vite build prošao bez greške.
 
+### 30.05.2026. 16:15 — Podrška za dinamičko regenerisanje zvuka selektovanog segmenta i hot-patching dub-miksa
+- **Zahtev:** Korisnik je tražio da se omogući ponovno generisanje glasa za selektovani segment u slučaju da je prevod editovan ili da glas nije generisan kako treba.
+- **Urađeno:**
+    - **Backend API (`backend/main.py`):**
+        * Uveo sam napredno brisanje i preklapanje tona u postojećem dub-miksu (`dubbed_audio_path`) koristeći splicing tehniku (podela na: `part1 + silence + part3`), čime je uklonjeno puko mešanje zvuka (koje pydub overlay po defaultu radi) i obezbeđeno potpuno brisanje starog TTS glasa.
+        * Obezbedio sam čuvanje prethodne dužine TTS glasa (`old_duration_ms`) pre ažuriranja metapodataka kako bi se izbrisao tačan vremenski prozor u kom se nalazio stari glas tog segmenta.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Upozorenje i promena stila dugmeta:** Kada korisnik izmeni prevod ili glas za selektovani segment, status tog segmenta prelazi u `"edited"`, prikazuje se žuto upozorenje `⚠️ Prevod ili glas su izmenjeni, generišite glas ponovo!`, a dugme za generisanje tona menja tekst u `🎙️ Regeneriši Probni Glas` i dobija upečatljivu narandžastu boju.
+        * **Automatsko osvežavanje dubbed plejera (Cache Buster):** Dodao sam cache-buster parametar (`?cb=...`) na dub-miks zvučni URL i na pojedinačne zvučne URL adrese segmenta koji se osvežavaju pri svakoj uspešnoj regeneraciji segmenta, tako da klijent odmah učitava modifikovan ton izmenjenog segmenta u celokupnom dub-miksu bez ikakvog keširanja.
+- **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške.
+
+
 
 
 

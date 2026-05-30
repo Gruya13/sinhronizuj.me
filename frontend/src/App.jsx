@@ -42,6 +42,7 @@ function App() {
   const [costs, setCosts] = useState(null);
   const [activeAudioSource, setActiveAudioSource] = useState("original"); // original or dubbed
   const [generatingAllTTS, setGeneratingAllTTS] = useState(false);
+  const [dubbedBuster, setDubbedBuster] = useState(Date.now());
 
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
@@ -396,8 +397,8 @@ function App() {
       }
       const data = await res.json();
       
-      // Ažuriramo zvučni fajl za preslušavanje
-      const fullAudioUrl = `${API_BASE_URL}${data.audio_url}`;
+      // Ažuriramo zvučni fajl za preslušavanje sa cache buster-om
+      const fullAudioUrl = `${API_BASE_URL}${data.audio_url}?cb=${Date.now()}`;
       setProbniAudios(prev => ({ ...prev, [segId]: fullAudioUrl }));
       
       // Ažuriramo trajanje segmenta lokalno u projektu
@@ -408,6 +409,7 @@ function App() {
         return s;
       });
       setProject({ ...project, segments: updatedSegments });
+      setDubbedBuster(Date.now());
 
       // Odmah pusti zvuk da korisnik čuje
       const audio = new Audio(fullAudioUrl);
@@ -450,13 +452,14 @@ function App() {
         segments: data.segments,
         dubbed_audio_path: data.dubbed_audio_url
       }));
+      setDubbedBuster(Date.now());
       
-      // Keširamo sve generisane zvučne fajlove za pojedinačne segmente
+      // Keširamo sve generisane zvučne fajlove za pojedinačne segmente sa cache buster-om
       const audios = {};
       data.segments.forEach(s => {
         if (s.tts_path) {
           const filename = s.tts_path.split('/').pop();
-          audios[s.id] = `${API_BASE_URL}/videos/${filename}`;
+          audios[s.id] = `${API_BASE_URL}/videos/${filename}?cb=${Date.now()}`;
         }
       });
       setProbniAudios(audios);
@@ -556,9 +559,9 @@ function App() {
     return () => clearInterval(playheadIntervalRef.current);
   }, [isPlaying, project, selectedSegmentId, activeAudioSource]);
 
-  // Izvedena vrednost za putanju dubbed zvuka
+  // Izvedena vrednost za putanju dubbed zvuka sa cache buster-om
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
-  const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null;
+  const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}?cb=${dubbedBuster}` : null;
 
   // Sinhronizacija mute stanja i reprodukcije u odnosu na selektovani izvor zvuka
   useEffect(() => {
@@ -991,6 +994,13 @@ function App() {
                       </select>
                     </div>
 
+                    {/* Upozorenje ako je prevod ili glas modifikovan a nije regenerisan */}
+                    {activeSegment.status === "edited" && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', borderRadius: '8px', color: '#facc15', fontSize: '0.8rem', marginTop: '10px', marginBottom: '10px' }}>
+                        <span>⚠️ Prevod ili glas su izmenjeni, generišite glas ponovo!</span>
+                      </div>
+                    )}
+
                     {/* Akcije za segment */}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
                       {/* Preslušavanje probnog TTS-a */}
@@ -1008,10 +1018,17 @@ function App() {
                         onClick={() => handleTestSegmentTTS(selectedSegmentId, activeSegment.translated || "", activeSegment.voice_type)}
                         disabled={loadingSegmentTTS[selectedSegmentId]}
                         className="glow-button"
-                        style={{ background: '#3b82f6', boxShadow: 'none', padding: '10px 16px', fontSize: '0.85rem' }}
+                        style={{
+                          background: activeSegment.status === "edited" ? '#d97706' : '#3b82f6',
+                          boxShadow: 'none',
+                          padding: '10px 16px',
+                          fontSize: '0.85rem'
+                        }}
                       >
                         {loadingSegmentTTS[selectedSegmentId] ? (
                           <Loader2 size={16} className="spinner-icon pulse-icon" />
+                        ) : activeSegment.status === "edited" ? (
+                          "🎙️ Regeneriši Probni Glas"
                         ) : (
                           "🎙️ Generiši Probni Glas"
                         )}

@@ -235,12 +235,38 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     shutil.copy2(generated_seg["path"], stable_probni_path)
     
     # Ažuriramo metapodatke u nacrtu u Redis-u
+    old_duration = target_segment.get("tts_duration")
+    old_duration_ms = int(old_duration * 1000) if old_duration else int((target_segment["end"] - target_segment["start"]) * 1000)
+    
     target_segment["translated"] = request.text
     target_segment["voice_type"] = request.voice_type
     target_segment["tts_path"] = stable_probni_path
     target_segment["tts_duration"] = generated_seg["duration"]
     target_segment["status"] = "previewed"
     
+    # Ako već postoji izgenerisan pun miks za ceo video, ažuriramo i njega dinamički!
+    dubbed_path = project_data.get("dubbed_audio_path")
+    if dubbed_path and os.path.exists(dubbed_path):
+        try:
+            from pydub import AudioSegment
+            full_audio = AudioSegment.from_wav(dubbed_path)
+            new_seg_audio = AudioSegment.from_wav(stable_probni_path)
+            
+            start_ms = int(target_segment["start"] * 1000)
+            
+            # Uklanjamo stari glas u tom prozoru (postavljamo tišinu pomoću audio splicing-a)
+            part1 = full_audio[:start_ms]
+            part2 = AudioSegment.silent(duration=old_duration_ms)
+            part3 = full_audio[start_ms + old_duration_ms:]
+            full_audio = part1 + part2 + part3
+            
+            # Preklapamo novi generisani audio
+            full_audio = full_audio.overlay(new_seg_audio, position=start_ms)
+            full_audio.export(dubbed_path, format="wav")
+            print(f"[API TTS] Dinamički osvežen segment-{segment_id} unutar punog miksa: {dubbed_path}", flush=True)
+        except Exception as e:
+            print(f"[WARNING] Neuspešno dinamičko osvežavanje punog miksa: {e}", flush=True)
+            
     project_data["segments"] = segments
     r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
     
