@@ -4,12 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import os
+import json
+import redis
+import re
+from typing import List, Optional
 from celery.result import AsyncResult
 from backend.worker.celery_app import celery_app
 from backend.core.config import settings
 from botocore.config import Config
 
-app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhronizaciju videa", version="1.0.0")
+app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhronizaciju videa", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,17 +26,44 @@ app.add_middleware(
 os.makedirs(settings.TEMP_WORKSPACE, exist_ok=True)
 app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="videos")
 
+# Pomoćna funkcija za Redis konekciju
+def get_redis_client():
+    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
+    redis_host = match.group(1) if match else "redis"
+    return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+
 class VideoRequest(BaseModel):
     url: str
     debug: bool = False
 
+class SegmentItem(BaseModel):
+    id: int
+    start: float
+    end: float
+    original: str
+    translated: str
+    tts_path: Optional[str] = None
+    tts_duration: Optional[float] = None
+    status: Optional[str] = "draft"
+
+class SaveProjectRequest(BaseModel):
+    segments: List[SegmentItem]
+
+class SegmentTTSRequest(BaseModel):
+    text: str
+    voice_type: str = "clone"
+
+class RenderRequest(BaseModel):
+    voice_type: str = "clone"
+    background_volume: float = -5.0
+    dubbed_volume: float = 0.0
+
 @app.get("/")
 def read_root():
-    return {"message": "Sinhronizuj.me API je aktivan!"}
+    return {"message": "Sinhronizuj.me API je aktivan i ažuriran na v2.0 (Dvofazni)!"}
 
 @app.get("/api/v1/storage/upload_url")
 def get_upload_url(filename: str, content_type: str = 'video/mp4'):
-    # 1. Interni klijent za proveru bucket-a (brze unutar Docker mreze)
     s3_internal = boto3.client(
         's3',
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
@@ -42,7 +73,6 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
         region_name='us-east-1'
     )
     
-    # 2. Javni klijent ISKLJUCIVO za generisanje Presigned URL-a (ispravan potpis za klijenta)
     s3_public = boto3.client(
         's3',
         endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
@@ -80,108 +110,192 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
-    print(f"--- [API RECEIVE] Primljen zahtev: url={request.url}, debug={request.debug}", flush=True)
-    from backend.worker.tasks import process_video_task
-    # Koristimo striktno pozicione argumente
-    task = process_video_task.delay(request.url, request.debug)
+    print(f"--- [API RECEIVE] Pokrećem FAZU 1 (Analiza): url={request.url}", flush=True)
+    from backend.worker.tasks import analyze_video_task
+    # Pokrećemo analizu (Faza 1)
+    task = analyze_video_task.delay(request.url, request.debug)
     return {
         "status": "success",
-        "message": "Zadatak za sinhronizaciju je predat radniku.",
+        "message": "Započet asinhroni proces analize videa.",
         "task_id": task.id
     }
 
-class EditedSegmentsRequest(BaseModel):
-    segments: list
+# --- NOVE RUTE ZA DVOFAZNI PIPELINE ---
 
-class MixerSettingsRequest(BaseModel):
-    background_volume: float
-    dubbed_volume: float
+@app.get("/api/v1/project/{project_id}")
+def get_project_draft(project_id: str):
+    """
+    Učitava nacrt projekta iz Redis-a.
+    """
+    r = get_redis_client()
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        raise HTTPException(status_code=404, detail="Projekat nije pronađen ili je istekao.")
+    return json.loads(draft_bytes)
 
-class VoiceSettingsRequest(BaseModel):
-    voice: str
+@app.post("/api/v1/project/{project_id}/save")
+def save_project_draft(project_id: str, request: SaveProjectRequest):
+    """
+    Čuva najnovije izmene prevoda segmenata u Redis-u.
+    """
+    r = get_redis_client()
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        raise HTTPException(status_code=404, detail="Projekat nije pronađen.")
+        
+    project_data = json.loads(draft_bytes)
+    
+    # Ažuriramo segmente
+    updated_segments = []
+    seg_map = {s.id: s for s in request.segments}
+    
+    for orig_seg in project_data["segments"]:
+        orig_id = orig_seg["id"]
+        if orig_id in seg_map:
+            req_seg = seg_map[orig_id]
+            # Ažuriramo samo prevedeni tekst
+            orig_seg["translated"] = req_seg.translated
+            orig_seg["status"] = "edited"
+        updated_segments.append(orig_seg)
+        
+    project_data["segments"] = updated_segments
+    r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+    return {"status": "success", "message": "Promene na prevodu su sačuvane."}
 
+@app.post("/api/v1/project/{project_id}/segment/{segment_id}/tts")
+def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRequest):
+    """
+    Brza i izolovana sinteza glasa samo za jedan segment.
+    Omogućava korisniku da presluša prevod u realnom vremenu na vremenskoj liniji.
+    """
+    r = get_redis_client()
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        raise HTTPException(status_code=404, detail="Projekat nije pronađen.")
+        
+    project_data = json.loads(draft_bytes)
+    segments = project_data["segments"]
+    
+    # Pronalazimo traženi segment
+    target_segment = None
+    for s in segments:
+        if s["id"] == segment_id:
+            target_segment = s
+            break
+            
+    if target_segment is None:
+        raise HTTPException(status_code=404, detail="Segment nije pronađen.")
+        
+    # Pokrećemo brzu sintezu samo za taj jedan segment
+    from backend.worker.tts_engine import synthesize_audio
+    
+    # Formatiramo segment za funkciju sinteze
+    single_tts_segment = [{
+        "id": target_segment["id"],
+        "start": target_segment["start"],
+        "end": target_segment["end"],
+        "text": request.text,
+        "original_text": target_segment["original"]
+    }]
+    
+    print(f"[API TTS] Pokrećem probni segment TTS za {project_id} seg-{segment_id} sa tekstom: {request.text}")
+    
+    tts_result = synthesize_audio(
+        project_data["vocals_path"],
+        single_tts_segment,
+        voice_type=request.voice_type,
+        disable_openvoice=settings.DISABLE_OPENVOICE,
+        disable_enhance=settings.DISABLE_ENHANCE
+    )
+    
+    if tts_result["status"] == "error":
+        raise HTTPException(status_code=500, detail=f"TTS sinteza nije uspela: {tts_result.get('message')}")
+        
+    # Uzimamo generisani fajl
+    res_segments = tts_result.get("tts_segments", [])
+    if not res_segments:
+        raise HTTPException(status_code=500, detail="TTS nije vratio metapodatke o segmentu.")
+        
+    generated_seg = res_segments[0]
+    
+    # Kopiramo fajl iz task workspace-a (koji se prazni) u javni temp_workspace za stalno serviranje
+    probni_filename = f"tts_probni_{project_id}_{segment_id}.wav"
+    stable_probni_path = os.path.join(os.path.dirname(settings.TEMP_WORKSPACE), settings.TEMP_WORKSPACE, probni_filename)
+    import shutil
+    shutil.copy2(generated_seg["path"], stable_probni_path)
+    
+    # Ažuriramo metapodatke u nacrtu u Redis-u
+    target_segment["translated"] = request.text
+    target_segment["tts_path"] = stable_probni_path
+    target_segment["tts_duration"] = generated_seg["duration"]
+    target_segment["status"] = "previewed"
+    
+    project_data["segments"] = segments
+    r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+    
+    # Čistimo privremene fajlove nastale tokom ove izolovane sinteze
+    if os.path.exists(generated_seg["path"]):
+        os.remove(generated_seg["path"])
+    if os.path.exists(tts_result["dubbed_audio_path"]):
+        os.remove(tts_result["dubbed_audio_path"])
+        
+    return {
+        "status": "success",
+        "audio_url": f"/videos/{probni_filename}",
+        "duration": generated_seg["duration"]
+    }
+
+@app.post("/api/v1/project/{project_id}/render")
+def render_project(project_id: str, request: RenderRequest):
+    """
+    Pokreće drugu fazu (Render) sinhronizacije na Celery-ju.
+    """
+    from backend.worker.tasks import render_video_task
+    print(f"--- [API RECEIVE] Pokrećem FAZU 2 (Render) za projekat: {project_id}", flush=True)
+    task = render_video_task.delay(
+        project_id, 
+        request.voice_type, 
+        request.background_volume, 
+        request.dubbed_volume
+    )
+    return {
+        "status": "success",
+        "message": "Pokrenuto renderovanje finalnog videa.",
+        "task_id": task.id
+    }
+
+# --- KRAJ NOVIH RUTA ---
+
+# Legacy rute zadržane radi kompatibilnosti
 @app.post("/api/v1/continue/{task_id}")
 def continue_task(task_id: str):
-    """
-    Signalizira Celery zadatku da nastavi sa sledećim korakom u debugging modu.
-    """
-    import redis
-    import re
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    
-    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r = get_redis_client()
     r.set(f"task:{task_id}:continue", "true", ex=3600)
     return {"status": "success", "message": "Signal za nastavak poslat."}
 
 @app.post("/api/v1/regenerate-tts/{task_id}")
 def regenerate_tts(task_id: str):
-    """
-    Signalizira Celery zadatku da ponovo generiše TTS sa novim glasom/prevodom.
-    """
-    import redis
-    import re
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    
-    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    r = get_redis_client()
     r.set(f"task:{task_id}:continue", "regenerate", ex=3600)
     return {"status": "success", "message": "Zahtev za ponovno generisanje TTS-a poslat."}
 
-
 @app.post("/api/v1/edit-segments/{task_id}")
-def edit_segments(task_id: str, request: EditedSegmentsRequest):
-    import redis
-    import json
-    import re
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    
-    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
-    r.set(f"task:{task_id}:edited_segments", json.dumps(request.segments), ex=3600)
+def edit_segments(task_id: str, request: SaveProjectRequest):
+    r = get_redis_client()
+    r.set(f"task:{task_id}:edited_segments", json.dumps([s.dict() for s in request.segments]), ex=3600)
     return {"status": "success", "message": "Segmenti uspešno sačuvani."}
 
 @app.post("/api/v1/mixer-settings/{task_id}")
 def save_mixer_settings(task_id: str, request: MixerSettingsRequest):
-    import redis
-    import json
-    import re
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    
-    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    class MixerSettingsRequest(BaseModel):
+        background_volume: float
+        dubbed_volume: float
+    r = get_redis_client()
     r.set(f"task:{task_id}:mixer_settings", json.dumps({
         "background_volume": request.background_volume,
         "dubbed_volume": request.dubbed_volume
     }), ex=3600)
     return {"status": "success", "message": "Podešavanja miksera sačuvana."}
-
-@app.post("/api/v1/voice-settings/{task_id}")
-def save_voice_settings(task_id: str, request: VoiceSettingsRequest):
-    import redis
-    import json
-    import re
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    
-    r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
-    r.set(f"task:{task_id}:voice_settings", json.dumps({
-        "voice": request.voice
-    }), ex=3600)
-    return {"status": "success", "message": "Podešavanja glasa sačuvana."}
-
-@app.post("/api/v1/redis/flush")
-def flush_redis():
-    import redis
-    import re
-    try:
-        match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-        redis_host = match.group(1) if match else "redis"
-        r = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
-        r.flushall()
-        return {"status": "success", "message": "Redis je uspešno očišćen (izvršena komanda flushall)."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Greška pri brisanju Redis baze: {str(e)}")
 
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
@@ -204,16 +318,16 @@ def get_task_status(task_id: str):
             response["video_url"] = f"/videos/{video_filename}"
             if "costs" in result:
                 response["costs"] = result["costs"]
+        elif result and isinstance(result, dict) and "video_url" in result:
+            response["video_url"] = result["video_url"]
+            if "costs" in result:
+                response["costs"] = result["costs"]
     elif task_result.status == "FAILURE":
         response["error"] = str(task_result.info)
     return response
 
 @app.post("/api/v1/warmup")
 async def warmup_workers():
-    """
-    Pinguje asinhrono sve Modal workere kako bi započeo proces zagrevanja (cold start)
-    dok se fajl uploada na S3.
-    """
     import asyncio
     import httpx
     
@@ -224,30 +338,22 @@ async def warmup_workers():
         settings.MODAL_TTS_URL
     ]
     
-    # Filtriramo None ili prazne URL-ove
     urls = [url for url in urls if url]
-    
     if not urls:
         return {"status": "success", "message": "Nema konfigurisanih Modal URL-ova za zagrevanje."}
         
     print(f"[WARMUP] Započinjem zagrevanje za {len(urls)} Modal radnika: {urls}", flush=True)
     
-    # Asinhrono šaljemo lagane zahteve svim radnicima bez čekanja na odgovor
     async def ping(url: str):
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                # Za web_servere i asgi aplikacije GET je sasvim dovoljan da pokrene kontejner.
-                # Llama i TTS mogu vratiti error ili method not allowed, ali cold start će se okinuti.
-                # Šaljemo GET, a ako je method not allowed i dalje se kontejner budi.
                 print(f"[WARMUP] Pingujem: {url}", flush=True)
                 await client.get(url)
         except httpx.TimeoutException:
-            # Timeout je očekivan jer ne želimo da blokiramo (čim krene cold start može potrajati)
             print(f"[WARMUP] Ping timeout za {url} (ovo je očekivano i u redu).", flush=True)
         except Exception as e:
             print(f"[WARMUP] Ping izuzetak za {url}: {e} (cold start je verovatno okinut).", flush=True)
 
-    # Pokrećemo sve pingove asinhrono kao pozadinski zadatak
     for url in urls:
         asyncio.create_task(ping(url))
         
@@ -255,10 +361,6 @@ async def warmup_workers():
 
 @app.get("/api/v1/modal-status")
 def get_modal_global_status():
-    """
-    Vraća status Modal serverless radnika.
-    Budući da je Modal serverless, uvek je 'Spreman'.
-    """
     return {
         "status": "Spreman",
         "active_workers": "Auto-Scale",
@@ -284,12 +386,10 @@ async def hw_stats():
 
 @app.get("/api/v1/logs")
 def get_worker_logs():
-    # Dinamicka putanja: gleda u root projekta bez obzira na okruzenje
     log_path = os.path.join(os.path.dirname(__file__), "../worker.log")
     if not os.path.exists(log_path):
         return {"logs": "Log fajl još uvek nije generisan..."}
     try:
-        # Uzimamo poslednjih 100 linija
         with open(log_path, "r") as f:
             lines = f.readlines()
             logs = "".join(lines[-100:])

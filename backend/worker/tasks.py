@@ -3,21 +3,22 @@ from backend.worker.downloader import download_video
 from backend.core.config import settings
 import os
 import shutil
+import json
+import redis
+import re
+import time
+import threading
 from datetime import datetime, timedelta, timezone
 
-@celery_app.task(bind=True, name="process_video_task")
-def process_video_task(self, video_url: str, debug: bool = False):
-    print(f"--- [CELERY TASK] Započeta obrada. Debug: {debug} ---", flush=True)
-    """
-    Korenski Celery zadatak koji vodi Fazu 1-7 sa hibridnom Modal arhitekturom.
-    """
-    import redis
-    import time
-    import re
-    import threading
+def get_redis_client():
     match = re.search(r'@([^:/]+)', settings.REDIS_URL)
     redis_host = match.group(1) if match else "redis"
-    r_client = redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+
+@celery_app.task(bind=True, name="analyze_video_task")
+def analyze_video_task(self, video_url: str, debug: bool = False):
+    print(f"--- [CELERY TASK] Započeta FAZA 1 (Analiza). Debug: {debug} ---", flush=True)
+    r_client = get_redis_client()
     task_id = self.request.id
 
     # Uspostavljanje izolovanog radnog prostora za ovaj task
@@ -35,8 +36,6 @@ def process_video_task(self, video_url: str, debug: bool = False):
         'segments': [],
         'detail': "Priprema radnog prostora...",
         'logs': [],
-        'waiting_for_user': False,
-        'waiting_step': None,
         'costs': {
             'phases': {},
             'total_usd': 0.0
@@ -54,18 +53,12 @@ def process_video_task(self, video_url: str, debug: bool = False):
         total = sum(p["cost_usd"] for p in progress_metadata['costs']['phases'].values())
         progress_metadata['costs']['total_usd'] = round(total, 5)
 
-    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None, waiting=False, waiting_step=None):
+    def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None):
         if step_name: progress_metadata['current_step'] = step_name
         if percentage is not None: progress_metadata['percent'] = percentage
         if completed_step: progress_metadata['completed_steps'].append(completed_step)
         if segments: progress_metadata['segments'] = segments
         if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
-        progress_metadata['waiting_for_user'] = waiting
-        if waiting_step is not None:
-            progress_metadata['waiting_step'] = waiting_step
-        elif not waiting:
-            progress_metadata['waiting_step'] = None
-
         if detail:
             progress_metadata['detail'] = detail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -74,45 +67,6 @@ def process_video_task(self, video_url: str, debug: bool = False):
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
-
-    def wait_for_user(step_name, segments_to_update=None):
-        if not debug:
-            return "continue"
-        
-        update_progress(detail=f"DEBUG: Pauziram nakon koraka '{step_name}'. Čekam potvrdu korisnika...", waiting=True, waiting_step=step_name)
-        
-        # Brišemo stari signal ako postoji
-        r_client.delete(f"task:{task_id}:continue")
-        
-        # Čekamo signal (max 30 minuta)
-        start_wait = time.time()
-        while time.time() - start_wait < 1800:
-            val = r_client.get(f"task:{task_id}:continue")
-            if val:
-                r_client.delete(f"task:{task_id}:continue")
-                
-                # Provera da li postoje editovani segmenti u Redis-u
-                edited_bytes = r_client.get(f"task:{task_id}:edited_segments")
-                if edited_bytes and segments_to_update is not None:
-                    import json
-                    try:
-                        edited_data = json.loads(edited_bytes)
-                        print(f"[DEBUG] Primena editovanih segmenata iz Redisa: {len(edited_data)} stavki.", flush=True)
-                        for ed_seg in edited_data:
-                            idx = ed_seg.get("id")
-                            new_text = ed_seg.get("translated")
-                            if idx is not None and new_text is not None:
-                                if idx < len(segments_to_update):
-                                    segments_to_update[idx]["text"] = new_text
-                                    print(f"[DEBUG] Ažuriran segment [{idx}] na: {new_text}", flush=True)
-                    except Exception as e:
-                        print(f"Greška pri ažuriranju segmenata: {e}", flush=True)
-                
-                update_progress(detail=f"DEBUG: Signal primljen. Nastavljam dalje...", waiting=False, waiting_step=None)
-                return val.decode("utf-8") if isinstance(val, bytes) else str(val)
-            time.sleep(1)
-        
-        raise TimeoutError("Korisnik nije potvrdio nastavak u predviđenom roku.")
 
     vc_result = {}
     def run_vc_extraction(video_path):
@@ -135,21 +89,19 @@ def process_video_task(self, video_url: str, debug: bool = False):
             vc_result["duration"] = 0.0
 
     try:
-        # --- FAZA 1: Preuzimanje ---
-        update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje media fajlova...")
+        # --- KORAK 1: Preuzimanje ---
+        update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje video zapisa...")
         result = download_video(video_url)
-        if result["status"] == "error": return result
+        if result["status"] == "error": 
+            return result
         update_progress(completed_step="Preuzimanje završeno")
         
-        # Pokrećemo ekstrakciju vizuelnog konteksta u pozadini odmah nakon preuzimanja videa
+        # Pokrećemo ekstrakciju vizuelnog konteksta u pozadini
         vc_thread = threading.Thread(target=run_vc_extraction, args=(result["video_path"],))
         vc_thread.daemon = True
         vc_thread.start()
         
-        time.sleep(1)
-        wait_for_user("Preuzimanje")
-        
-        # --- FAZA 2: Separacija Zvuka ---
+        # --- KORAK 2: Separacija Zvuka ---
         update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na Modalu...")
         from backend.worker.audio_sep import separate_audio
         t_start_sep = time.time()
@@ -158,61 +110,50 @@ def process_video_task(self, video_url: str, debug: bool = False):
             progress_callback=lambda detail: update_progress(detail=detail)
         )
         duration_sep = time.time() - t_start_sep
-        if sep_result["status"] == "error": return sep_result
+        if sep_result["status"] == "error": 
+            return sep_result
         add_phase_cost("separation", "Izolacija vokala (Demucs)", "T4", duration_sep, 0.00018)
         update_progress(completed_step="Vokal izolovan")
-        time.sleep(1)
-        wait_for_user("Separacija vokala")
         
-        # --- FAZA 3: Transkripcija ---
-        update_progress("Prepoznavanje govora (Whisper Modal)...", 40, detail="Inicijalizacija Whisper zahteva...")
+        # Kopiramo vokal i no-vocal fajlove u privremeni direktorijum koji ostaje dostupan i nakon gašenja taska
+        vocals_filename = f"vocals_{task_id}.wav"
+        no_vocals_filename = f"no_vocals_{task_id}.wav"
+        stable_vocals_path = os.path.join(original_temp_workspace, vocals_filename)
+        stable_no_vocals_path = os.path.join(original_temp_workspace, no_vocals_filename)
         
-        # Korak 1: Kreiranje dinamičkog initial prompt-a na osnovu metapodataka videa
+        shutil.copy2(sep_result["vocals_path"], stable_vocals_path)
+        shutil.copy2(sep_result["no_vocals_path"], stable_no_vocals_path)
+        
+        # --- KORAK 3: Transkripcija ---
+        update_progress("Prepoznavanje govora (Whisper)...", 50, detail="Slanje vokalne trake na Modal Whisper...")
+        
         video_title = result.get("title", "")
-        video_desc = result.get("description", "")
         video_tags = result.get("tags", [])
-        
         prompt_keywords = []
-        if video_title:
-            prompt_keywords.append(video_title)
-        if video_tags:
-            prompt_keywords.extend(video_tags[:5])
-            
+        if video_title: prompt_keywords.append(video_title)
+        if video_tags: prompt_keywords.extend(video_tags[:5])
         keywords_str = ", ".join([str(kw) for kw in prompt_keywords[:8]])
+        
         initial_prompt = "This is a clear speech. Please use punctuation: dots, commas, and capital letters."
         if keywords_str:
             initial_prompt = f"This is a video about {keywords_str}. Please use correct punctuation: dots, commas, and capital letters. Spell names and technical terms correctly."
             
-        print(f"[ASR] Generisan dinamički prompt: {initial_prompt}", flush=True)
-    
         from backend.worker.transcriber import transcribe_audio
         t_start_trans = time.time()
         transcription_result = transcribe_audio(
-            sep_result["vocals_path"],
+            stable_vocals_path,
             initial_prompt=initial_prompt,
             progress_callback=lambda detail: update_progress(detail=detail)
         )
         duration_trans = time.time() - t_start_trans
-        if transcription_result["status"] == "error": return transcription_result
+        if transcription_result["status"] == "error": 
+            return transcription_result
         add_phase_cost("transcription", "Prepoznavanje govora (Whisper)", "T4", duration_trans, 0.00018)
+        update_progress(completed_step="Govor prepoznat")
         
-        segments_ui = []
-        for i, s in enumerate(transcription_result["segments"]):
-            segments_ui.append({
-                "id": i,
-                "original": s["text"],
-                "translated": "",
-                "status": "pending"
-            })
-        print(f"--- [DEBUG] Šaljem {len(segments_ui)} segmenata u update_progress", flush=True)
-        update_progress(completed_step="Govor prepoznat", segments=segments_ui, detail="Transkripcija uspešno završena.")
-        time.sleep(2) # Dajemo vremena frontendu da oseti promenu pre nego što radnik blokira
-        wait_for_user("Transkripcija", transcription_result["segments"])
+        # --- KORAK 4: Prevođenje & Lektura ---
+        update_progress("Prevođenje (Modal + Multimodal)...", 75, detail="Čekam pozadinsku ekstrakciju slika...")
         
-        # --- FAZA 4: Vizuelni Kontekst i Prevod ---
-        update_progress("Generisanje vizuelnog konteksta...", 50, detail="Čekam pozadinsku ekstrakciju ključnih frejmova...")
-        
-        # Čekamo da se završi pozadinska ekstrakcija frejmova
         if vc_thread.is_alive():
             vc_thread.join()
             
@@ -222,197 +163,297 @@ def process_video_task(self, video_url: str, debug: bool = False):
             update_progress(visual_context_url=visual_context_url)
         add_phase_cost("visual_context", "Generisanje vizuelnog konteksta (Lokalno)", "Lokalni VPS", duration_vc, 0.0)
         
-        update_progress("Prevođenje (Modal + Multimodal)...", 60, detail="Analiza vizuelnog konteksta i slanje segmenata na Qwen-VL...")
+        update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Prevođenje i lektura teksta preko Qwen modela...")
         from backend.worker.translator import translate_segments
+        
+        # Kopiramo originalni video u stabilnu lokaciju
+        video_filename = f"video_{task_id}.mp4"
+        stable_video_path = os.path.join(original_temp_workspace, video_filename)
+        shutil.copy2(result["video_path"], stable_video_path)
         
         translation_result = translate_segments(
             transcription_result["segments"],
-            video_path=result["video_path"],
+            video_path=stable_video_path,
             progress_callback=lambda detail: update_progress(detail=detail)
         )
-        if translation_result["status"] == "error": return translation_result
+        if translation_result["status"] == "error": 
+            return translation_result
         
-        # Dodajemo cene za prevođenje i lekturu
         metrics = translation_result.get("metrics", {})
-        duration_trans = metrics.get("translator_duration", 0.0)
+        duration_translate = metrics.get("translator_duration", 0.0)
         duration_lektor = metrics.get("lektor_duration", 0.0)
         
-        if duration_trans > 0:
-            add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_trans, 0.00033)
+        if duration_translate > 0:
+            add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_translate, 0.00033)
         if duration_lektor > 0:
             add_phase_cost("lektor", "Lektura teksta (Qwen 32B AWQ)", "A10G", duration_lektor, 0.00033)
-        
-        for i, s in enumerate(translation_result["translated_segments"]):
-            if i < len(segments_ui):
-                segments_ui[i]["translated"] = s["text"]
-                segments_ui[i]["status"] = "translated"
-                
-        update_progress(completed_step="Tekst preveden i lektorisan", percentage=70, segments=segments_ui)
-        time.sleep(2)
-        wait_for_user("Prevođenje", translation_result["translated_segments"])
-    
-        # --- FAZA 5: Sinteza Govora ---
-        from backend.worker.tts_engine import synthesize_audio
-        
-        while True:
-            update_progress("Sinteza glasa (Modal TTS)...", 75, detail="Inicijalizacija i generisanje srpskih vokala...")
             
-            # Učitavanje odabira glasa iz Redisa
-            selected_voice = "clone"
-            try:
-                voice_bytes = r_client.get(f"task:{task_id}:voice_settings")
-                if voice_bytes:
-                    import json
-                    voice_data = json.loads(voice_bytes)
-                    selected_voice = voice_data.get("voice", "clone")
-                    print(f"[DEBUG] Primena glasa iz Redisa: {selected_voice}", flush=True)
-            except Exception as e:
-                print(f"Greska pri ucitavanju podesavanja glasa: {e}", flush=True)
-                
-            # Primenjujemo najnoviji prevod/tekst iz Redisa ako postoji
-            edited_bytes = r_client.get(f"task:{task_id}:edited_segments")
-            if edited_bytes:
-                import json
-                try:
-                    edited_data = json.loads(edited_bytes)
-                    print(f"[DEBUG] Primena editovanih segmenata pre TTS-a: {len(edited_data)} stavki.", flush=True)
-                    for ed_seg in edited_data:
-                        idx = ed_seg.get("id")
-                        new_text = ed_seg.get("translated")
-                        if idx is not None and new_text is not None:
-                            if idx < len(translation_result["translated_segments"]):
-                                translation_result["translated_segments"][idx]["text"] = new_text
-                except Exception as e:
-                    print(f"Greska pri ucitavanju editovanih segmenata za TTS: {e}", flush=True)
+        update_progress(completed_step="Prevedeno i lekturisano", percentage=100)
+        
+        # Formatiranje segmenata za nacrt
+        draft_segments = []
+        for i, s in enumerate(translation_result["translated_segments"]):
+            draft_segments.append({
+                "id": i,
+                "start": s["start"],
+                "end": s["end"],
+                "original": s.get("original_text", ""),
+                "translated": s["text"],
+                "tts_path": None,
+                "tts_duration": None,
+                "status": "draft"
+            })
+            
+        # --- SAČUVAJ NACRT U REDIS ---
+        draft_data = {
+            "project_id": task_id,
+            "video_url": video_url,
+            "video_path": stable_video_path,
+            "vocals_path": stable_vocals_path,
+            "no_vocals_path": stable_no_vocals_path,
+            "visual_context_url": visual_context_url,
+            "title": video_title,
+            "segments": draft_segments,
+            "costs": progress_metadata["costs"],
+            "status": "draft",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        # Nacrt se čuva 7 dana
+        r_client.set(f"project:{task_id}:draft", json.dumps(draft_data), ex=604800)
+        print(f"[CELERY TASK] Nacrt uspešno sačuvan u Redis: project:{task_id}:draft", flush=True)
+        
+        return {
+            "status": "success",
+            "project_id": task_id,
+            "visual_context_url": visual_context_url,
+            "segments": draft_segments,
+            "costs": progress_metadata["costs"]
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+    finally:
+        # Vraćamo originalni TEMP_WORKSPACE i čistimo privremeni radni folder zadatka
+        settings.TEMP_WORKSPACE = original_temp_workspace
+        if os.path.exists(task_workspace):
+            print(f"[CELERY TASK] Čistim privremeni radni prostor: {task_workspace}", flush=True)
+            shutil.rmtree(task_workspace, ignore_errors=True)
+
+@celery_app.task(bind=True, name="render_video_task")
+def render_video_task(self, project_id: str, voice_type: str = "clone", background_vol: float = -5.0, dubbed_vol: float = 0.0):
+    print(f"--- [CELERY TASK] Započeta FAZA 2 (Render). Projekat: {project_id} ---", flush=True)
+    r_client = get_redis_client()
+    task_id = self.request.id
     
+    # Učitavamo nacrt iz Redisa
+    draft_bytes = r_client.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        return {"status": "error", "message": f"Nacrt projekta {project_id} nije pronađen."}
+        
+    project_data = json.loads(draft_bytes)
+    
+    # Inicijalizujemo workspace
+    original_temp_workspace = settings.TEMP_WORKSPACE
+    task_workspace = os.path.join(original_temp_workspace, task_id)
+    os.makedirs(task_workspace, exist_ok=True)
+    settings.TEMP_WORKSPACE = task_workspace
+    
+    progress_metadata = {
+        'id': task_id,
+        'current_step': "Učitavanje projekta...",
+        'percent': 0,
+        'completed_steps': [],
+        'detail': "Priprema fajlova za renderovanje...",
+        'logs': [],
+        'costs': project_data.get("costs", {"phases": {}, "total_usd": 0.0})
+    }
+    
+    def add_phase_cost(phase_id, name, gpu, duration, rate):
+        cost = duration * rate
+        progress_metadata['costs']['phases'][phase_id] = {
+            "name": name,
+            "gpu": gpu,
+            "duration_sec": round(duration, 2),
+            "cost_usd": round(cost, 5)
+        }
+        total = sum(p["cost_usd"] for p in progress_metadata['costs']['phases'].values())
+        progress_metadata['costs']['total_usd'] = round(total, 5)
+        
+    def update_progress(step_name=None, percentage=None, completed_step=None, detail=None):
+        if step_name: progress_metadata['current_step'] = step_name
+        if percentage is not None: progress_metadata['percent'] = percentage
+        if completed_step: progress_metadata['completed_steps'].append(completed_step)
+        if detail:
+            progress_metadata['detail'] = detail
+            ts = datetime.now().strftime("%H:%M:%S")
+            progress_metadata['logs'].append(f"[{ts}] {detail}")
+            if len(progress_metadata['logs']) > 20:
+                progress_metadata['logs'] = progress_metadata['logs'][-20:]
+        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
+
+    try:
+        # --- KORAK 1: Sinteza Govora (TTS) ---
+        update_progress("Sinteza govora...", 20, detail="Provera generisanih zvučnih fajlova...")
+        
+        segments = project_data["segments"]
+        missing_tts_segments = []
+        
+        # Proveravamo koji segmenti nemaju generisan audio
+        for s in segments:
+            if not s.get("tts_path") or not os.path.exists(s["tts_path"]):
+                missing_tts_segments.append(s)
+                
+        if missing_tts_segments:
+            update_progress("Sinteza govora...", 30, detail=f"Sinteza preostalih {len(missing_tts_segments)} segmenata na Modalu...")
+            from backend.worker.tts_engine import synthesize_audio
+            
+            # Formatiramo za synthesizer
+            tts_input_segments = [{
+                "id": s["id"],
+                "start": s["start"],
+                "end": s["end"],
+                "text": s["translated"],
+                "original_text": s["original"]
+            } for s in missing_tts_segments]
+            
             t_start_tts = time.time()
             tts_result = synthesize_audio(
-                sep_result["vocals_path"], 
-                translation_result["translated_segments"],
-                voice_type=selected_voice,
+                project_data["vocals_path"],
+                tts_input_segments,
+                voice_type=voice_type,
                 disable_openvoice=settings.DISABLE_OPENVOICE,
                 disable_enhance=settings.DISABLE_ENHANCE,
                 progress_callback=lambda detail: update_progress(detail=detail)
             )
             duration_tts = time.time() - t_start_tts
-            if tts_result["status"] == "error": return tts_result
-            
-            # Akumuliramo trošak u slučaju da korisnik regeneriše glas više puta
+            if tts_result["status"] == "error":
+                return tts_result
+                
+            # Akumuliramo trošak
             existing_tts = progress_metadata['costs']['phases'].get("tts", {})
             existing_duration = existing_tts.get("duration_sec", 0.0)
             total_duration_tts = existing_duration + duration_tts
-            add_phase_cost("tts", "Sinteza glasa (OpenVoice)", "L4", total_duration_tts, 0.00025)
+            add_phase_cost("tts", "Sinteza govora (OpenVoice)", "L4", total_duration_tts, 0.00025)
             
-            # Eksponiramo generisani audio URL za preslušavanje na frontendu
-            dubbed_filename = os.path.basename(tts_result["dubbed_audio_path"])
-            progress_metadata['dubbed_audio_url'] = f"/videos/{dubbed_filename}"
+            # Ažuriramo putanje u našim segmentima i kopiramo ih u stabilnu lokaciju
+            tts_map = {s["id"]: s for s in tts_result["tts_segments"]}
+            for s in segments:
+                if s["id"] in tts_map:
+                    res_seg = tts_map[s["id"]]
+                    stable_seg_filename = f"tts_seg_{project_id}_{s['id']}.wav"
+                    stable_seg_path = os.path.join(original_temp_workspace, stable_seg_filename)
+                    shutil.copy2(res_seg["path"], stable_seg_path)
+                    s["tts_path"] = stable_seg_path
+                    s["tts_duration"] = res_seg["duration"]
+                    
+            # Ažuriramo draft u Redisu
+            project_data["segments"] = segments
+            project_data["costs"] = progress_metadata["costs"]
+            r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
             
-            segments_ui = [{
-                "id": s.get("id", idx),
-                "original": s.get("original_text", ""),
-                "translated": s.get("text", ""),
-                "status": "translated"
-            } for idx, s in enumerate(translation_result["translated_segments"])]
-            update_progress(completed_step="Glas generisan", percentage=85, segments=segments_ui)
-            
-            # Čekamo odluku korisnika
-            action = wait_for_user("TTS Sinteza", translation_result["translated_segments"])
-            if action == "regenerate":
-                print("[DEBUG] Korisnik je zatražio ponovno generisanje glasa. Ponavljam sintezu...", flush=True)
-                continue
-            else:
-                break
+        update_progress(completed_step="Svi vokali sintetizovani")
         
-        # --- FAZA 6: Spajanje ---
-        update_progress("Finalni Mix...", 90)
+        # --- KORAK 2: FFmpeg merger i Dynamic Time Stretching ---
+        update_progress("Finalni miks (FFmpeg)...", 60, detail="Dynamic time stretching i miksovanje zvuka...")
         
-        # Ucitavanje podesavanja miksera iz Redisa ako postoje
-        background_vol = -5.0
-        dubbed_vol = 0.0
-        try:
-            mixer_bytes = r_client.get(f"task:{task_id}:mixer_settings")
-            if mixer_bytes:
-                import json
-                mixer_data = json.loads(mixer_bytes)
-                background_vol = float(mixer_data.get("background_volume", -5.0))
-                dubbed_vol = float(mixer_data.get("dubbed_volume", 0.0))
-                print(f"[DEBUG] Primena jacina iz Redisa: bg={background_vol}dB, dub={dubbed_vol}dB", flush=True)
-        except Exception as e:
-            print(f"Greska pri ucitavanju podesavanja miksera: {e}", flush=True)
-    
-        from backend.worker.merger import merge_audio_and_video, merge_audio_and_video_dynamic
+        # Formiramo tts_segments listu za merger
+        merger_segments = [{
+            "id": s["id"],
+            "path": s["tts_path"],
+            "duration": s["tts_duration"],
+            "start": s["start"],
+            "end": s["end"]
+        } for s in segments]
+        
+        from backend.worker.merger import merge_audio_and_video_dynamic
         t_start_merge = time.time()
-        if tts_result.get("tts_segments"):
-            merge_result = merge_audio_and_video_dynamic(
-                result["video_path"], 
-                sep_result["no_vocals_path"], 
-                tts_result["tts_segments"],
-                background_vol=background_vol,
-                dubbed_vol=dubbed_vol
-            )
-        else:
-            merge_result = merge_audio_and_video(
-                result["video_path"], 
-                sep_result["no_vocals_path"], 
-                tts_result["dubbed_audio_path"],
-                background_vol=background_vol,
-                dubbed_vol=dubbed_vol
-            )
-        duration_merge = time.time() - t_start_merge
-        if merge_result["status"] == "error": return merge_result
-        add_phase_cost("merger", "Audio-video miksovanje (Lokalno)", "Lokalni VPS", duration_merge, 0.0)
-        update_progress(completed_step="Video spojen")
         
-        # --- FAZA 7: Lip Sync ---
-        update_progress("Lip Sync provera...", 95)
+        merge_result = merge_audio_and_video_dynamic(
+            project_data["video_path"],
+            project_data["no_vocals_path"],
+            merger_segments,
+            background_vol=background_vol,
+            dubbed_vol=dubbed_vol
+        )
+        duration_merge = time.time() - t_start_merge
+        if merge_result["status"] == "error":
+            return merge_result
+            
+        add_phase_cost("merger", "Audio-video miksovanje (Lokalno)", "Lokalni VPS", duration_merge, 0.0)
+        update_progress(completed_step="Miks završen")
+        
+        # --- KORAK 3: Lip Sync ---
+        update_progress("Lip Sync sinhronizacija...", 80, detail="Analiza i pokretanje Wav2Lip-a...")
         from backend.worker.lipsync import has_sufficient_faces, apply_lip_sync
+        
         t_start_lip = time.time()
         needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
         
         if needs_lipsync:
-            lip_vocals_path = merge_result.get("dubbed_audio_path") or tts_result["dubbed_audio_path"]
+            update_progress("Lip Sync sinhronizacija...", 85, detail="Usklađivanje usana govornika (Wav2Lip)...")
+            lip_vocals_path = merge_result["dubbed_audio_path"]
             lip_result = apply_lip_sync(merge_result["final_video_path"], lip_vocals_path)
             final_output = lip_result["lipsync_video_path"] if lip_result["status"] != "error" else merge_result["final_video_path"]
         else:
             final_output = merge_result["final_video_path"]
+            
         duration_lip = time.time() - t_start_lip
-        
         if needs_lipsync:
             add_phase_cost("lipsync", "Lip Sync sinhronizacija (Wav2Lip)", "Lokalni VPS", duration_lip, 0.0)
         else:
             add_phase_cost("lipsync", "Lip Sync preskočen (nema lica)", "Lokalni VPS", duration_lip, 0.0)
-        
-        update_progress("Obrada završena", 100, "Obrada završena")
-        
-        # Pomeranje finalnih fajlova u korenski temp_workspace kako bi ih web server mogao servirati
-        if os.path.exists(final_output):
-            final_output_filename = os.path.basename(final_output)
-            destination_final_output = os.path.join(original_temp_workspace, final_output_filename)
-            shutil.move(final_output, destination_final_output)
-            final_output = destination_final_output
             
-        if "dubbed_audio_path" in tts_result and os.path.exists(tts_result["dubbed_audio_path"]):
-            dubbed_filename = os.path.basename(tts_result["dubbed_audio_path"])
-            dest_dubbed = os.path.join(original_temp_workspace, dubbed_filename)
-            shutil.move(tts_result["dubbed_audio_path"], dest_dubbed)
-            tts_result["dubbed_audio_path"] = dest_dubbed
-            progress_metadata['dubbed_audio_url'] = f"/videos/{dubbed_filename}"
-            # Ažuriramo stanje i na Celery-u
-            self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
-
+        update_progress(completed_step="Renderovanje završeno", percentage=100)
+        
+        # Pomeranje finalnih fajlova u korenski temp_workspace
+        final_video_filename = f"final_{project_id}.mp4"
+        destination_final_video = os.path.join(original_temp_workspace, final_video_filename)
+        shutil.move(final_output, destination_final_video)
+        
+        # Ažuriramo status projekta u Redisu na completed
+        project_data["status"] = "completed"
+        project_data["final_video_url"] = f"/videos/{final_video_filename}"
+        project_data["costs"] = progress_metadata["costs"]
+        r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+        
         return {
-            "status": "completed", 
-            "url": video_url,
-            "final_video_path": final_output,
-            "costs": progress_metadata.get("costs")
+            "status": "completed",
+            "project_id": project_id,
+            "video_url": f"/videos/{final_video_filename}",
+            "costs": progress_metadata["costs"]
         }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
     finally:
-        # Vraćamo originalni TEMP_WORKSPACE
+        # Vraćamo originalni workspace i čistimo render folder
         settings.TEMP_WORKSPACE = original_temp_workspace
-        # Brišemo izolovani radni prostor
         if os.path.exists(task_workspace):
-            print(f"[CELERY TASK] Čistim privremeni radni prostor za task {task_id}: {task_workspace}", flush=True)
             shutil.rmtree(task_workspace, ignore_errors=True)
+
+# Definišemo legacy celery task radi kompatibilnosti, ali on sada interno poziva Fazu 1 i Fazu 2 za redom
+@celery_app.task(bind=True, name="process_video_task")
+def process_video_task(self, video_url: str, debug: bool = False):
+    """
+    Legacy task koji automatski radi i analizu i render (1-pass) bez prekidanja,
+    kako ne bismo pokvarili stare testove i fallback mehanizme.
+    """
+    print("--- [LEGACY 1-PASS TASK] Pokrećem automatsku sinhronizaciju u jednom prolazu ---", flush=True)
+    task_id = self.request.id
+    
+    # 1. Pokrećemo analizu
+    analysis_res = analyze_video_task(video_url, debug)
+    if analysis_res.get("status") == "error":
+        return analysis_res
+        
+    # 2. Pokrećemo render sa podrazumevanim parametrima
+    render_res = render_video_task(task_id, voice_type="clone", background_vol=-5.0, dubbed_vol=0.0)
+    return render_res
 
 @celery_app.task(name="backend.worker.tasks.cleanup_old_files")
 def cleanup_old_files():
@@ -422,7 +463,6 @@ def cleanup_old_files():
     import boto3
     print(f"[CLEANUP] Pokrećem čišćenje starih fajlova: {datetime.now()}")
     
-    # 1. Čišćenje MinIO bucketa (uploads i processed)
     try:
         s3 = boto3.client(
             's3',
@@ -431,12 +471,11 @@ def cleanup_old_files():
             aws_secret_access_key=settings.MINIO_SECRET_KEY
         )
         
-        buckets = ['uploads', 'processed', 'input-audio'] # Dodajemo i input-audio za svaki slučaj
+        buckets = ['uploads', 'processed', 'input-audio']
         threshold = datetime.now(timezone.utc) - timedelta(hours=24)
         
         for bucket in buckets:
             print(f"[CLEANUP] Proveravam bucket: {bucket}")
-            # Provera da li bucket postoji pre listanja
             try:
                 objects = s3.list_objects_v2(Bucket=bucket)
                 if 'Contents' in objects:
@@ -450,14 +489,12 @@ def cleanup_old_files():
     except Exception as e:
         print(f"[CLEANUP] S3 klijent greška: {e}")
 
-    # 2. Čišćenje lokalnog /app/temp_workspace
     local_temp = "/app/temp_workspace"
     if os.path.exists(local_temp):
         threshold_ts = (datetime.now(timezone.utc) - timedelta(hours=24)).timestamp()
         for item in os.listdir(local_temp):
             item_path = os.path.join(local_temp, item)
             try:
-                # Brišemo podfoldere i fajlove starije od 24h
                 mtime = os.path.getmtime(item_path)
                 if mtime < threshold_ts:
                     if os.path.isdir(item_path):
