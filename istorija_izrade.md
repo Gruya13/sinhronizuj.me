@@ -1355,6 +1355,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Ažurirao sam loop za sintezu nedostajućih vokala unutar `render_video_task` tako da primenjuje `apply_audio_modifiers` pre konačnog spajanja sa videom i pozadinskom muzikom.
 - **Status:** Uspešno implementirano, Vite produkcioni build prošao bez greške.
 
+### 30.05.2026. 16:32 — Realtime audio podešavanja, stabilno dugme za regeneraciju, preloading bez seckanja i ispravka NameError-a
+- **Zahtev:** Korisnik je tražio da dugme za regeneraciju bude uvek vidljivo (i da piše "Regeneriši Probni Glas" umesto starog dugmeta za kreiranje), da slajderi u audio opcijama ne zahtevaju sporu regeneraciju glasa (tj. da ne prikazuju žuto upozorenje), da pomeranje slajdera u realnom vremenu odmah utiče na reprodukciju videa/audija, i da se ispravi greška "Failed to fetch" koja se javila prilikom ponovne generacije glasa za segment.
+- **Urađeno:**
+    - **Backend API (`backend/main.py`):**
+        * Uklonio sam suvišni i duplirani poziv spore Modal/Piper sinteze `synthesize_audio` sa samog početka rute `/segment/{segment_id}/tts` (koja se neopravdano pozivala i blokirala brza FFmpeg podešavanja).
+        * Rešio sam `NameError: name 'generated_seg' is not defined` u `is_fast_adjust` grani, obezbeđujući stabilno učitavanje iz sirovog snimljenog fajla (`stable_raw_path`) i računanje trajanja direktno na rezultujućem modifikovanom fajlu.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Stabilizacija dugmeta:** Učinio sam da ljubičasto dugme `"🎙️ Regeneriši Probni Glas"` bude uvek stabilno i vidljivo na dnu editora segmenta, sa fiksiranim tekstom.
+        * **Pametni slajderi i status:** Uklonio sam postavljanje statusa `"edited"` iz `onChange` događaja za audio slajdere (Volume, Tempo, Pitch). Time je sprečeno nepotrebno prikazivanje žutog upozorenja o potrebi za regeneracijom celog glasa.
+        * **Realtime reprodukcija (Delta Volume & Tempo):** Ažurirao sam petlju sinhronizacije (interval od 50ms) da u realnom vremenu računa razliku (deltu) između trenutnog položaja slajdera i zadnjeg generisanog stanja segmenta. Ta delta se momentalno primenjuje na `volume` i `playbackRate` zvučne trake i videa, čime korisnik u realnom vremenu čuje promenu jačine i brzine zvuka dok pomera slajdere tokom reprodukcije.
+        * **Preloading dubbed audija (Uklanjanje seckanja):** Uveo sam pozadinsko učitavanje spojenog dub-miksa pomoću skrivenog `Audio` elementa. Tek kada se novi fajl učita u pozadini (`canplaythrough`), menja se URL aktivnog plejera, čime je prelaz na osveženi zvučni miks potpuno neometan i bez ikakvog seckanja ili prekidanja u reprodukciji.
+- **Status:** Uspešno implementirano, Vite produkcioni build prošao u potpunosti bez grešaka, izmene push-ovane na granu `development`, povučene na VPS i docker kontejneri restartovani.
+
 
 
 
