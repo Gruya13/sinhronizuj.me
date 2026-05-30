@@ -45,6 +45,7 @@ class SegmentItem(BaseModel):
     tts_path: Optional[str] = None
     tts_duration: Optional[float] = None
     status: Optional[str] = "draft"
+    voice_type: Optional[str] = "clone"
 
 class SaveProjectRequest(BaseModel):
     segments: List[SegmentItem]
@@ -157,8 +158,9 @@ def save_project_draft(project_id: str, request: SaveProjectRequest):
         orig_id = orig_seg["id"]
         if orig_id in seg_map:
             req_seg = seg_map[orig_id]
-            # Ažuriramo samo prevedeni tekst
+            # Ažuriramo prevedeni tekst i glas za segment
             orig_seg["translated"] = req_seg.translated
+            orig_seg["voice_type"] = req_seg.voice_type or orig_seg.get("voice_type", "clone")
             orig_seg["status"] = "edited"
         updated_segments.append(orig_seg)
         
@@ -231,6 +233,7 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     
     # Ažuriramo metapodatke u nacrtu u Redis-u
     target_segment["translated"] = request.text
+    target_segment["voice_type"] = request.voice_type
     target_segment["tts_path"] = stable_probni_path
     target_segment["tts_duration"] = generated_seg["duration"]
     target_segment["status"] = "previewed"

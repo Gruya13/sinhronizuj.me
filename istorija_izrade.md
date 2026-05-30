@@ -1283,3 +1283,21 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Izmenio sam funkciju `handleTestSegmentTTS` tako da čita detaljan opis greške iz tela API odgovora (`errData.detail`) i prikazuje je u `alert` prozoru umesto fiksne i neinformativne poruke "TTS failed".
 - **Status:** Uspešno implementirano, nova verzija radnika deploy-ovana na Modal, promene integrisane u backend i frontend.
 
+### 30.05.2026. 15:50 — Implementacija segment-specifičnog odabira glasa
+- **Zahtev:** Korisnik je tražio da se omogući odabir glasa (kloniranje ili muški glas) posebno za svaki pojedinačni segment pri generisanju.
+- **Urađeno:**
+    - **Backend API (`backend/main.py`):**
+        * Ažurirao sam Pydantic model `SegmentItem` da podržava `voice_type` polje (podrazumevano `"clone"`).
+        * Izmenio sam rutu `/api/v1/project/{project_id}/save` da perzistira `voice_type` svakog segmenta u Redis nacrtu projekta.
+        * Ažurirao sam rutu `/api/v1/project/{project_id}/segment/{segment_id}/tts` da perzistira odabrani `voice_type` u Redis-u prilikom probnog generisanja i prosleđuje ga u `synthesize_audio`.
+    - **Celery Worker (`backend/worker/tasks.py`):**
+        * Ažurirao sam pripremu segmenata u `render_video_task` tako da čita i prosleđuje individualni `voice_type` svakog segmenta u `synthesize_audio`.
+    - **TTS Engine / Modal (`backend/worker/tts_engine.py` i `modal_workers/tts_openvoice.py`):**
+        * Modifikovao sam payload koji se šalje na Modal da uključi `voice_type` na nivou pojedinačnog segmenta.
+        * U radniku `tts_openvoice.py` sam omogućio čitanje segment-specifičnog `voice_type` i primenu OpenVoice V2 kloniranja samo za segmente označene sa `"clone"`, dok se za ostale (npr. `"male"`) preskače kloniranje i koristi direktan izlaz Piper modela.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * Dodao sam padajući meni (dropdown) za odabir glasa ("Kloniraj originalni glas" ili "Muški glas") direktno u panel za uređivanje izabranog segmenta.
+        * Ažurirao sam funkciju `handleTestSegmentTTS` i dugme za generisanje da čitaju i šalju glas konfigurisan za taj specifični segment.
+- **Status:** Uspešno implementirano, testirano lokalno i deploy-ovano na Hetzner VPS i Modal.
+
+

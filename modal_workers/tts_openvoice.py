@@ -110,7 +110,7 @@ class OpenVoiceWorker:
             
         print("Svi modeli su uspešno inicijalizovani.")
 
-    def _generate_segment(self, segment, ref_se_path, base_se_path, enhance_params=None, disable_openvoice=False, disable_enhance=False):
+    def _generate_segment(self, segment, ref_se_path, base_se_path, enhance_params=None, disable_openvoice=False, disable_enhance=False, default_voice_type="clone"):
         """
         Sintetizuje tekst u govor pomoću Piper-a (bazni model Marko) i menja mu boju glasa
         prema referentnim speeker embedding-ovima pomoću OpenVoice-a.
@@ -149,7 +149,8 @@ class OpenVoiceWorker:
                 wav_file.writeframes(audio_bytes)
                 
             # 2. Promena boje glasa pomoću OpenVoice V2
-            if not disable_openvoice:
+            seg_voice_type = segment.get("voice_type", default_voice_type)
+            if not disable_openvoice and seg_voice_type == "clone":
                 target_se = torch.load(ref_se_path)
                 base_se = torch.load(base_se_path)
                 
@@ -238,6 +239,7 @@ class OpenVoiceWorker:
             
             disable_openvoice = data.get("disable_openvoice", False)
             disable_enhance = data.get("disable_enhance", False)
+            voice_type = data.get("voice_type", "clone")
             
             enhance_params = {
                 "denoise": data.get("enhance_denoise", True),
@@ -373,7 +375,8 @@ class OpenVoiceWorker:
                             base_se_path=base_se_path,
                             enhance_params=enhance_params,
                             disable_openvoice=disable_openvoice,
-                            disable_enhance=disable_enhance
+                            disable_enhance=disable_enhance,
+                            default_voice_type=voice_type
                         )
                     except Exception as e:
                         return {"id": seg.get("id"), "error": str(e)}
@@ -395,7 +398,7 @@ class OpenVoiceWorker:
                 
                 print("[OpenVoice] Pokrećem pojedinačnu konverziju...")
                 single_segment = {"id": "0", "text": text}
-                res = self._generate_segment(single_segment, ref_se_path, base_se_path, enhance_params, disable_openvoice, disable_enhance)
+                res = self._generate_segment(single_segment, ref_se_path, base_se_path, enhance_params, disable_openvoice, disable_enhance, default_voice_type=voice_type)
                 
                 for f in [ref_se_path, base_se_path]:
                     if f and os.path.exists(f): os.remove(f)

@@ -372,14 +372,14 @@ function App() {
   };
 
   // Probna sinteza jednog segmenta
-  const handleTestSegmentTTS = async (segId, text) => {
+  const handleTestSegmentTTS = async (segId, text, voiceType) => {
     if (!project) return;
     setLoadingSegmentTTS(prev => ({ ...prev, [segId]: true }));
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/segment/${segId}/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice_type: selectedVoice })
+        body: JSON.stringify({ text, voice_type: voiceType || "clone" })
       });
       if (!res.ok) {
         let errorMsg = "TTS failed";
@@ -400,7 +400,7 @@ function App() {
       // Ažuriramo trajanje segmenta lokalno u projektu
       const updatedSegments = project.segments.map(s => {
         if (s.id === segId) {
-          return { ...s, translated: text, tts_duration: data.duration, status: "previewed" };
+          return { ...s, translated: text, voice_type: voiceType || "clone", tts_duration: data.duration, status: "previewed" };
         }
         return s;
       });
@@ -802,6 +802,27 @@ function App() {
                       })()}
                     </div>
 
+                    {/* Odabir glasa za ovaj segment */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Glas za ovaj segment:</span>
+                      <select
+                        value={activeSegment.voice_type || "clone"}
+                        onChange={(e) => {
+                          const updated = project.segments.map(s => {
+                            if (s.id === selectedSegmentId) {
+                              return { ...s, voice_type: e.target.value, status: "edited" };
+                            }
+                            return s;
+                          });
+                          setProject({ ...project, segments: updated });
+                        }}
+                        style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
+                      >
+                        <option value="clone">Kloniraj originalni glas (OpenVoice V2)</option>
+                        <option value="male">Muški glas (Piper - sr_Marko)</option>
+                      </select>
+                    </div>
+
                     {/* Akcije za segment */}
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
                       {/* Preslušavanje probnog TTS-a */}
@@ -816,7 +837,7 @@ function App() {
                       )}
                       
                       <button 
-                        onClick={() => handleTestSegmentTTS(selectedSegmentId, activeSegment.translated || "")}
+                        onClick={() => handleTestSegmentTTS(selectedSegmentId, activeSegment.translated || "", activeSegment.voice_type)}
                         disabled={loadingSegmentTTS[selectedSegmentId]}
                         className="glow-button"
                         style={{ background: '#3b82f6', boxShadow: 'none', padding: '10px 16px', fontSize: '0.85rem' }}
