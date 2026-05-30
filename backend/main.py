@@ -58,6 +58,10 @@ class RenderRequest(BaseModel):
     background_volume: float = -5.0
     dubbed_volume: float = 0.0
 
+class MixerSettingsRequest(BaseModel):
+    background_volume: float
+    dubbed_volume: float
+
 @app.get("/")
 def read_root():
     return {"message": "Sinhronizuj.me API je aktivan i ažuriran na v2.0 (Dvofazni)!"}
@@ -287,9 +291,6 @@ def edit_segments(task_id: str, request: SaveProjectRequest):
 
 @app.post("/api/v1/mixer-settings/{task_id}")
 def save_mixer_settings(task_id: str, request: MixerSettingsRequest):
-    class MixerSettingsRequest(BaseModel):
-        background_volume: float
-        dubbed_volume: float
     r = get_redis_client()
     r.set(f"task:{task_id}:mixer_settings", json.dumps({
         "background_volume": request.background_volume,
