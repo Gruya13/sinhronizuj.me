@@ -321,65 +321,30 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, te da ga prilagodiš i potpuno preformulišeš tamo gde zvuči rogobatno, neprirodno ili je predugačak za izgovor.\n\n"
             "PRAVILA ZA KOREKCIJU I UREĐIVANJE:\n"
             "1. KROĆENJE I SAŽIMANJE PREMA TRAJANJU (KLJUČNO ZA PRIRODAN TEMPO GOVORA):\n"
-            "   - Pored svakog segmenta je navedeno njegovo maksimalno trajanje u sekundama, na primer '(trajanje: 2.5s)'.\n"
-            "   - Prosečna brzina prirodnog govora na srpskom jeziku je oko 16 karaktera (sa razmacima) u sekundi. Ako je prevod predugačak za navedeno trajanje, OBAVEZNO ga skrati i sažmi (izbaci suvišne reči, skrati konstrukcije, koristi kraće sinonime) kako bi mogao da se izgovori prirodno u tom vremenskom roku.\n"
-            "   - Pravilo za maksimalan broj karaktera: Broj karaktera u segmentu (uključujući razmake) ne sme preći (trajanje * 20). Na primer, ako je trajanje 1.5s, prevod sme imati maksimalno 30 karaktera! Skrati ga bez milosti.\n"
-            "   - Primeri skraćivanja:\n"
-            "     * 'U roku od pet minuta nakon uključivanja' -> 'Za pet minuta'\n"
-            "     * 'kako bi videli da li može da vodi prodavnicu' -> 'da vide može li voditi radnju'\n"
-            "     * 'Ova kompanija je dala' -> 'Firma je dala'\n"
-            "     * 'A najluđe od svega je to što' -> 'Najluđe je što'\n"
-            "2. BEZ STRANIH REČI - FONETSKI ZAPIS BEZ PREVOĐENJA VLASTITIH NAZIVA:\n"
-            "   - Nijedna reč ne sme ostati na engleskom pismu. Sve strane brendove, imena, platforme, gradske četvrti/kvartove i naslove knjiga/projekata napiši fonetski (kako se izgovaraju na engleskom), ali ih nemoj prevoditi na srpsko značenje:\n"
-            "     * 'Andon Labs' -> 'Endon Labs'\n"
-            "     * 'Claude' -> 'Klod'\n"
-            "     * 'Zoom' -> 'Zum'\n"
-            "     * 'LinkedIn' -> 'Linkedin'\n"
-            "     * 'Indeed' -> 'Indid'\n"
-            "     * 'Craigslist' -> 'Kregzlist'\n"
-            "     * 'Cow Hollow' -> 'Kau Holou'\n"
-            "     * 'Superintelligence' -> 'Superintelidžens' (nemoj prevoditi kao 'Superinteligencija')\n"
-            "     * 'Brave New World' -> 'Brejv Nju Vorld' (nemoj prevoditi kao 'Vrli novi svet')\n"
-            "3. PROVERA IZGOVORA ACRO-A I SKRAĆENICA (DEKLINACIJA 'Ej Aj'):\n"
-            "   - Skraćenicu 'AI' uvek prevodi i piši fonetski kao 'Ej Aj' (sa razmakom, bez crtice). Nemoj koristiti izraz 'veštačka inteligencija' niti ostavljati 'AI'.\n"
-            "   - OBAVEZNO dekliniraj (menjaj po padežima) izraz 'Ej Aj' u zavisnosti od konteksta rečenice i predloga:\n"
-            "     * predlog 'sa' zahteva instrumental -> 'sa Ej Ajem' (npr. 'nema veze sa Ej Ajem', 'rad sa Ej Ajem')\n"
-            "     * predlog 'o' zahteva lokativ -> 'o Ej Aju' (npr. 'govorimo o Ej Aju', 'najnovije o Ej Aju')\n"
-            "     * predlog 'od' zahteva genitiv -> 'od Ej Aja' (npr. 'razvoj od strane Ej Aja', 'strah od Ej Aja')\n"
-            "     * predlog 'u' zahteva lokativ/akuzativ -> 'u Ej Aju' / 'u Ej Aj' (npr. 'ući u Ej Aj', 'verovati u Ej Aj')\n"
-            "     * predlog 'za' zahteva akuzativ -> 'za Ej Aj' (npr. 'alat za Ej Aj')\n"
-            "     Nikada nemoj pomešati ove padeže niti ostaviti 'Ej Aj' u nominativu ako smisao rečenice zahteva drugi padež.\n"
-            "   - Izbegavaj crtice u fonetskim skraćenicama jer ih TTS modeli čitaju kao pauze ili minus (nikako ne piši 'Ej-Aj' sa crticom).\n"
-            "4. PRIRODNI SRPSKI IZRAZ (SLOBODA PREPISIVANJA):\n"
-            "   - Nemoj samo ispravljati pojedinačne reči. Ako je cela rečenica u SRB bukvalan prevod sa engleskog, napiši je ponovo na tečnom, prirodnom srpskom jeziku.\n"
-            "   - Strogo ispravi rogobatne fraze, izmišljene reči i gramatički neispravne množine (npr. oblast 'robotics' je na srpskom 'robotika' koja se koristi isključivo u jednini - u padežima 'robotici' ili 'robotikom', nikada množinski oblici 'robotike' ili 'robotikama'. Ako se misli na mašine, koristi se reč 'roboti' odnosno 'robotima' u instrumentalu/dativu).\n"
-            "   - DOSLEDNO OBRAĆANJE (T/V): Obraćanje mora biti gramatički i stilski dosledno u celoj rečenici. Nemoj mešati jedninu 'ti' (npr. 'želiš') sa množinom/formalnim 'vi' (npr. 'pratite'). Koristi isključivo jedninsko neformalno obraćanje 'ti' (npr. 'ako želiš da ostaneš... prati za više') jer su video snimci modernog i prisnog formata.\n"
-            "   - Preformulisanje rogobatnog prevoda za najnovije vesti: Frazu 'latest in AI and robotics' prevodi prirodno kao 'najnovijem o Ej Aju i robotici' ili 'najnovijim dešavanjima iz sveta Ej Aja i robotike', nikada bukvalno 'najnovijim o Ej Aj i robotikama'.\n"
-            "   - Primeri:\n"
-            "     * 'komisionirala muralistu' -> 'angažovala slikara da naslika mural' ili 'unajmila umetnika da naslika mural'\n"
-            "     * 'ljudima brinućima' -> 'ljudima koji su zabrinuti' ili 'ljudima koji brinu'\n"
-            "     * 'trgovinsko iskustvo' -> 'iskustvo u maloprodaji' ili 'iskustvo u trgovini'\n"
-            "     * 'pokazivala kritične razmišljanja' -> 'pokazivala kritičko razmišljanje'\n"
-            "     * 'se bavi robotikama' -> 'se bavi robotikom' (ako je u pitanju naučna oblast) ili 'se bavi robotima' (ako su mašine)\n"
-            "5. DEKLINACIJA IMENA, RODOVI I GLAGOLSKA VREMENA (STRIKTNO):\n"
-            "   - GLAGOLSKO VREME: Prevod mora strogo pratiti glagolsko vreme originala. Ako je original u prezentu, prevod ne sme preći u prošlo vreme (npr. 'I have no face' -> 'Nemam lice', nikako 'Nisam imala lice').\n"
-            "   - ROD GOVORNIKA (GENDER): Pažljivo analiziraj ko govori i prilagodi glagole u prošlom vremenu rodu govornika. Ako je govornik muško (ili je neutralno/opšte), koristi muški rod (npr. 'razgovarao sam', 'video sam'). Ako je govornik žensko ili ženski entitet (npr. agent Luna), koristi ženski rod (npr. 'razgovarala sam', 'videla sam').\n"
-            "   - PADEŽI: Obavezno menjaj strana imena (npr. Luna, Klod) i brendove kroz padeže u srpskom jeziku (npr. 'stvorio Lunu' (akuzativ), 'sa Klodom' (instrumental), 'na Linkedinu' (lokativ), 'preko Zuma' (genitiv), 'od Ej Aja' (genitiv)). Nikada ne ostavljaj ime u nominativu ako smisao zahteva drugi padež.\n"
-            "   - Reč 'future' kao imenicu uvek prevodi kao 'budućnost' (npr. 'tu budućnost' / 'ovu budućnost', nikako 'to buduće').\n"
-            "6. LOGIKA I VERODOSTOJNOST PREVODA:\n"
-            "   - Pažljivo uporedi smisao SRB prevoda sa originalnim ENG tekstom.\n"
-            "   - Konstrukciju 'not doing this necessarily because they want this future' prevedi tačno po smislu: 'da to ne rade nužno zato što žele takvu budućnost' (reč 'want'/želeti mora biti prevedena, a ne izostavljena ili zamenjena sa 'zbog').\n"
-            "7. STROGO ODRŽAVANJE SEGMENATA:\n"
-            "   - Vrati lekturisane rečenice pod tačnim [seg-ID] tagovima. Svaki segment mora odgovarati ulaznom ID-ju.\n"
-            "   - Tvoj odgovor mora sadržati sve segmente (od [seg-{batch_start}] do [seg-{batch_start + len(batch_translated) - 1}]), bez izuzetka. Svaki ID mora tačno odgovarati ID-ju iz ulaza.\n"
-            "   - Vrati SAMO korigovane redove u formatu [seg-ID] Tekst, bez ikakvih uvoda ili komentara.\n\n"
-            "PRIMER LEKTURE:\n"
-            "Ulaz:\n"
-            "[seg-0] (trajanje: 8.2s) ENG: So this company just gave an AI agent $100 ,000, a credit card, and a three -year retail lease in San Francisco to see if he could run a store. | SRB: Ova kompanija je dala AI agenciji 100.000 dolara, kreditnu karticu i tri godine retail leasa u San Francisku kako bi provjerila da li je moguće voditi prodavnicu.\n"
-            "[seg-1] (trajanje: 4.8s) ENG: Andon Labs built the AI and they named it Luna on Claude and gave her one direction, turn a profit. | SRB: Andon Labs je izgradio AI i nazvali ga Luna na Claude-u, a ona je dobila jednu instrukciju: postići profit.\n"
-            "Izlaz:\n"
-            "[seg-0] Ova firma je dala Ej Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku da vide može li voditi radnju.\n"
-            "[seg-1] Endon Labs je kreirao ovaj Ej Aj i nazvao ga Luna, baziran na Klodu, sa jednim ciljem: da ostvari profit.\n\n"
+            "   - Broj karaktera u segmentu (uključujući razmake) ne sme preći (trajanje * 20). Skrati ga bez milosti ako prelazi limit, koristeći kraće sinonime i izbacujući suvišne reči (npr. 'U roku od pet minuta nakon uključivanja' -> 'Za pet minuta', 'kako bi videli da li može da vodi prodavnicu' -> 'da vide može li voditi radnju').\n"
+            "2. APSTRAKCIJA LINGVISTIČKIH PRAVILA:\n"
+            "   - PRAVILO ZA PASIV: Pretvaraj pasivne rečenice u aktivne jer su kraće i zvuče prirodnije na srpskom.\n"
+            "   - PRAVILO ZA UZVIKE I POŠTAPALICE: Ignoriši poštapalice (npr. 'like', 'you know', 'well', 'so') i ne prevodi ih.\n"
+            "   - PRAVILO ZA DEKLINACIJU STRANIH IMENA I BRENDOVA: Obavezno dekliniraj strana imena i brendove kroz padeže u srpskom jeziku (npr. 'stvorio Lunu', 'sa Klodom', 'preko Zuma', 'na Linkedinu'). Nikada ne ostavljaj ime u nominativu ako smisao zahteva drugi padež.\n"
+            "   - PRAVILO ZA FONETIKU: Sve strane brendove, platforme, lična imena i naslove piši isključivo FONETSKI, tj. onako kako se izgovaraju na srpskom ('Endon Labs', 'Klod', 'Zum', 'Linkedin', 'Indid', 'Kregzlist', 'Kau Holou'). Nemoj prevoditi njihovo značenje na srpski i ne ostavljaj engleski pravopis niti crtice (nikako ne piši 'Ej-Aj' sa crticom, već 'Ej Aj').\n"
+            "   - PREVOD REČI 'FUTURE': Reč 'future' kao imenica se uvek prevodi kao 'budućnost' (npr. 'tu budućnost' / 'takvu budućnost', nikako 'to buduće').\n"
+            "   - GRAMATIKA I PRAVOPIS: Oblast 'robotics' je na srpskom 'robotika' (koristi se u jednini - 'robotici', 'robotikom'). Glagol 'raditi' u 3. licu množine prezenta je isključivo 'RADE' (nikada 'radu'). Množina imenice 'intervju' u akuzativu je 'INTERVJUE' (nikada 'intervjuove').\n"
+            "   - DOSLEDNO OBRAĆANJE: Koristi isključivo neformalno obraćanje 'ti' (npr. 'ako želiš da ostaneš... prati za više'), nikako mešanje sa množinom 'vi' ('želiš... pratite').\n\n"
+            "FORMAT ODGOVORA:\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
+            "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
+            "  - 'analysis': kratko obrazloženje odluka (npr. 'Tema: biznis. Brz tempo, skraćujem rečenicu. Pasiv prebacujem u aktiv.')\n"
+            "  - 'refined_text': korigovan i očišćen prevod na srpskom jeziku\n\n"
+            "Primer JSON izlaza:\n"
+            "{\n"
+            "  \"segments\": [\n"
+            "    {\n"
+            "      \"id\": 0,\n"
+            "      \"analysis\": \"Original ima trajanje 8.2s. Prevod staje u limit. Zamenjujem 'AI' sa 'Ej Aj' u ispravnom padežu, fonetski pišem San Francisko.\",\n"
+            "      \"refined_text\": \"Ova firma je dala Ej Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku da vide može li voditi radnju.\"\n"
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
             f"TEKST ZA LEKTURU:\n{lektor_input}"
         )
 
@@ -387,8 +352,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             lektor_payload = {
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
-                "temperature": 0.2,
-                "max_tokens": 400
+                "temperature": 0.1,
+                "max_tokens": 1000
             }
             
             lektor_output = call_modal_endpoint(
@@ -405,19 +370,37 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
             print(f"[DEBUG] BATCH {batch_idx + 1} LEKTOR OUTPUT:\n{lektor_raw}", flush=True)
             
-            for line in lektor_raw.split('\n'):
-                line = line.strip()
-                if not line or '[seg-' not in line:
-                    continue
-                match = re.match(r'\[seg-(\d+)\]\s*(.*)', line)
-                if match:
-                    try:
-                        idx = int(match.group(1))
-                        text = match.group(2).strip()
-                        if text:
+            # Parsiranje JSON-a sa ugrađenim fallback mehanizmima
+            try:
+                data = json.loads(lektor_raw)
+                for item in data.get("segments", []):
+                    idx = item.get("id")
+                    text = item.get("refined_text", "").strip()
+                    analysis = item.get("analysis", "")
+                    if idx is not None and text:
+                        # Verifikacija da je ID u opsegu ovog batch-a
+                        if batch_start <= idx < batch_start + len(batch_translated):
                             parsed_lektor_dict[idx] = text
-                    except ValueError:
-                        continue
+                            print(f"[LEKTOR] Segment {idx} lekturisan. CoT: {analysis}", flush=True)
+                        else:
+                            print(f"[WARNING] Lektor vratio ID {idx} van opsega batch-a ({batch_start} do {batch_start + len(batch_translated) - 1})")
+            except json.JSONDecodeError as json_err:
+                print(f"[ERROR] Greška pri JSON parsiranju izlaza lektora za batch {batch_idx + 1}: {json_err}")
+                print("[INFO] Pokušavam fallback čišćenje markdown tagova...")
+                try:
+                    clean_raw = lektor_raw.strip()
+                    if clean_raw.startswith("```"):
+                        clean_raw = re.sub(r'^```(?:json)?\n', '', clean_raw)
+                        clean_raw = re.sub(r'\n```$', '', clean_raw)
+                    data = json.loads(clean_raw)
+                    for item in data.get("segments", []):
+                        idx = item.get("id")
+                        text = item.get("refined_text", "").strip()
+                        if idx is not None and text:
+                            if batch_start <= idx < batch_start + len(batch_translated):
+                                parsed_lektor_dict[idx] = text
+                except Exception as fallback_err:
+                    print(f"[ERROR] Fallback JSON parsiranje takođe neuspešno: {fallback_err}")
         except Exception as batch_err:
             print(f"[WARNING] Greška u Lektor batchu {batch_idx + 1}: {batch_err}")
 
