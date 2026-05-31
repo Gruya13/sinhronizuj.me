@@ -1393,4 +1393,4 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Backend API (`backend/main.py`):**
         * Ažurirao sam funkciju `save_project_draft` (/save) na backendu da ispravno preuzima i perzistira `bg_volume` vrednost svakog segmenta u Redis nacrtu projekta.
         * **Novi API Endpoint (`/shorten`):** Kreirao sam rutu `POST /api/v1/project/{project_id}/segment/{segment_id}/shorten` i prateći Pydantic model `ShortenSegmentRequest`. Ruta pronalazi odgovarajući segment u Redis nacrtu, izračunava preporučeni limit karaktera (`duration * 20`), formuliše namenski prompt za skraćivanje teksta u srpskoj sinkronizaciji i šalje zahtev ka OpenAI/Qwen Lektor endpointu. Dobijeni tekst se čisti i šalje nazad klijentu.
-- **Status:** Uspešno implementirano, potvrđen ispravan lokalni Vite build i uspešno kompajliranje svih backend datoteka.
+- **Status:** Uspešno implementirano, potvrđen ispravan lokalni Vite build i uspešno kompajliranje svih backend datoteka. Izmene su push-ovane na granu development i uspešno deploy-ovane na VPS-u (rebuild i restart docker compose kontejnera).
