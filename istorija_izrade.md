@@ -1394,3 +1394,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Ažurirao sam funkciju `save_project_draft` (/save) na backendu da ispravno preuzima i perzistira `bg_volume` vrednost svakog segmenta u Redis nacrtu projekta.
         * **Novi API Endpoint (`/shorten`):** Kreirao sam rutu `POST /api/v1/project/{project_id}/segment/{segment_id}/shorten` i prateći Pydantic model `ShortenSegmentRequest`. Ruta pronalazi odgovarajući segment u Redis nacrtu, izračunava preporučeni limit karaktera (`duration * 20`), formuliše namenski prompt za skraćivanje teksta u srpskoj sinkronizaciji i šalje zahtev ka OpenAI/Qwen Lektor endpointu. Dobijeni tekst se čisti i šalje nazad klijentu.
 - **Status:** Uspešno implementirano, potvrđen ispravan lokalni Vite build i uspešno kompajliranje svih backend datoteka. Izmene su push-ovane na granu development i uspešno deploy-ovane na VPS-u (rebuild i restart docker compose kontejnera).
+
+### 31.05.2026. 11:03 — Izrada novog toka podataka kroz pipeline za dvofaznu arhitekturu (v2)
+- **Zahtev:** Korisnik je tražio da se napravi novi fajl za tok podataka umesto prepisivanja starog, i da se navedu razlike.
+- **Urađeno:**
+    - **Vraćanje originalnih fajlova:** Vratio sam stare fajlove `tok_podataka_pipeline.md` i `tok_podataka_pipeline.txt` na njihovo originalno stanje.
+    - **Kreiranje novih v2 fajlova:** Napravio sam nove fajlove `tok_podataka_pipeline_v2.md` i `tok_podataka_pipeline_v2.txt` koji verno opisuju trenutnu dvofaznu arhitekturu sa Redis draftovima, Studio Editorom, AI Lektorom (Magic Shorten), i dynamic/realtime preloading mikserom.
+- **Status:** Stari fajlovi očuvani, a novi v2 fajlovi kreirani i uspešno push-ovani na granu development.
+

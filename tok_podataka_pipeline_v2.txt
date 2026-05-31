@@ -1,0 +1,110 @@
+=== DETALJAN TOK PODATAKA KROZ PIPELINE (sinhronizuj.me) - VERZIJA 2 ===
+
+Ovaj dokument detaljno opisuje kako se podaci kreću, transformišu i procesiraju kroz ceo sistem za inteligentnu sinhronizaciju video zapisa sa engleskog na srpski jezik, oslikavajući trenutno dvofazno stanje projekta sa Studio Editorom i AI Lektorom.
+
+================================================================================
+1. PREGLED STRUKTURE I TOKA PODATAKA
+================================================================================
+
+UI (React) ---> FastAPI API ---> Celery (Redis Draft) ---> Studio Editor ---> Celery (Render) ---> Finalni Video
+
++--------------------+     1. Početak projekta          +---------------------+
+|   React Frontend   | ---------------------------> |     FastAPI API     |
++--------------------+                              +---------------------+
+          ^                                                    |
+          |                                                    | 2. Pokreće Celery Fazu 1
+          | 7. Učitava draft iz Redis-a                        v
++--------------------+                              +---------------------+
+|    Redis (Draft)   | <--------------------------- |  analyze_video_task |
++--------------------+      6. Snima draft          +---------------------+
+          |                                                    |
+          |                                                    | 3. Analiza na Modalu
+          |                                                    v
+          |                                         +---------------------+
+          |                                         | Demucs / Whisper    |
+          |                                         | Qwen2-VL / Lektor   |
+          |                                         +---------------------+
+          v
++--------------------+     8. Brza proba glasa /tts     +---------------------+
+|    Studio Editor   | ---------------------------> |     FastAPI API     |
++--------------------+                              +---------------------+
+          |                                                    |
+          |                                                    | 9. Brza sinteza + Splicing
+          |                                                    v
+          |                                         +---------------------+
+          |                                         | Modal TTS (Piper/OV)|
+          |                                         +---------------------+
+          |
+          | 10. Pokreće Fazu 2 (Render)
+          v
++--------------------+     11. Poziv /render            +---------------------+
+|    Render Trigger  | ---------------------------> |     FastAPI API     |
++--------------------+                              +---------------------+
+                                                               |
+                                                               | 12. Pokreće Celery Fazu 2
+                                                               v
+                                                    +---------------------+
+                                                    |  render_video_task  |
+                                                    +---------------------+
+                                                               |
+                                                               | 13. Sklapanje videa
+                                                               v
+                                                    +---------------------+
+                                                    |  merger.py + FFmpeg |
+                                                    |  Wav2Lip LipSync    |
+                                                    +---------------------+
+
+================================================================================
+2. DETALJAN OPIS SVAKOG KORAKA U PIPELINE-U
+================================================================================
+
+--------------------------------------------------------------------------------
+FAZA 1: ASINHRONA ANALIZA VIDEA (analyze_video_task)
+--------------------------------------------------------------------------------
+* Ulazni podaci:
+  - Video fajl (S3 upload) ili javni URL videa.
+* Proces:
+  1. Klijent pokreće sinhronizaciju pozivanjem rute `/api/v1/sync`.
+  2. Pokreće se Celery zadatak `analyze_video_task`.
+  3. Video se šalje na Modal Demucs model za separaciju vokala (`vocals.wav`) i pozadinske muzike (`no_vocals.wav`).
+  4. Vokalna traka se šalje na Modal Whisper za transkripciju i reč-po-reč tajminge.
+  5. FFmpeg izvlači 10 slika (frejmova) koji se šalju na Qwen2-VL za multimodalni prevod sa prepoznavanjem roda i vizuelnog konteksta.
+  6. Qwen 2.5 Lektor na Modalu vrši lekturu i sažimanje rečenica na srpski jezik.
+  7. Regex parser na Hetzner serveru ispravlja gramatičke greške.
+  8. Podaci o segmentima se čuvaju u Redis draft pod ključem `project:{project_id}:draft`.
+
+--------------------------------------------------------------------------------
+MEĐU-KORAK: INTERAKTIVNI STUDIO EDITOR (Rad u realnom vremenu)
+--------------------------------------------------------------------------------
+Korisnik učitava nacrt (draft) u Studio Editor i može vršiti sledeće interakcije:
+1. Ručna izmena prevoda u realnom vremenu.
+2. AI Lektor Skraćivanje (Čarobni štapić):
+   - Klikom na čarobni štapić (`Wand2`) poziva se ruta `/shorten` na backendu.
+   - Qwen Lektor na Modalu dobija prompt sa preporučenim limitom karaktera (`duration * 20`) i skraćuje rečenicu na srpskom jeziku zadržavajući smisao.
+3. Fino podešavanje zvuka po segmentima:
+   - Volume, Tempo, Pitch i segmentni bg_volume (Ducking).
+   - Moguća je masovna sinhronizacija na sve segmente jednim klikom ("Primeni na sve").
+4. Brza proba glasa (Hot-Patching):
+   - Klikom na "Regeneriši Probni Glas" poziva se `/tts` endpoint.
+   - Podrška za Piper muški glas (`male`) i OpenVoice V2 klonirani glas (`clone`) sa VAD Fallback-om i All-Segments Reference Audio.
+   - Dobijeni WAV se modifikuje pomoću FFmpeg rubberband filtera za tempo i pitch.
+   - Splicing: Backend reže stari glas iz celokupnog miksa i ubacuje novi preko `pydub`-a. Klijentu se šalje URL sa cache-buster-om (`?cb=...`).
+5. Realtime klijentski audio mikser:
+   - Dva audio plejera (srpski glas i pozadinska muzika) se u 50ms petlji sinhronizuju sa videom i u hodu reaguju na promenu položaja slajdera bez seckanja reprodukcije.
+
+--------------------------------------------------------------------------------
+FAZA 2: RENDEROVANJE VIDEA (render_video_task)
+--------------------------------------------------------------------------------
+* Ulazni podaci:
+  - Snimljen Redis draft sa izmenama korisnika.
+* Proces:
+  1. Korisnik klikće na "Renderuj" što pokreće `/render` FastAPI endpoint.
+  2. Pokreće se Celery zadatak `render_video_task`.
+  3. Batch procesiranjem na Modalu generišu se preostali TTS segmenti koristeći Piper ili OpenVoice V2.
+  4. Na svaki generisani segment se primenjuju individualna zvučna podešavanja (Volume, Speed, Pitch) pomoću FFmpeg `rubberband` i `volume` filtere.
+  5. Modul `merger.py` vrši dinamičko spajanje:
+     - Ako je srpski TTS duži od originalnog slota, blago usporava video i muziku (do 5%), a ako je potrebno ubrzava vokal.
+     - Spaja vokale u `merged_vocals.wav`.
+     - Primenjuje globalni i segment-specifični bg_volume (Ducking) za stišavanje pozadine.
+  6. Opciono se pokreće Wav2Lip za sinhronizaciju pokreta usana sa novim srpskim glasom.
+  7. FFmpeg miksuje komponente u finalni MP4 (H264/AAC) i čuva na S3 bucketu. Celery postavlja status na `SUCCESS`.
