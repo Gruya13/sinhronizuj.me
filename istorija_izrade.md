@@ -1408,4 +1408,8 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Ažuriran README.md:** Detaljno sam revidirao `README.md`. Zamenio sam stari opis monolitskog pipeline-a sa novim dvofaznim asinhronim procesom (Faza 1: Analiza, Studio Faza, Faza 2: Renderovanje). Dodao sam nove ključne karakteristike (Studio Editor v2, AI Lektor Magic Shorten, fina zvučna podešavanja i realtime klijentski mikser, OpenVoice V2 kloniranje sa VAD Fallback-om). Označio sam u planu daljeg razvoja izgradnju interaktivnog Studija v2 kao završen zadatak i dodao referencu na nove fajlove toka podataka u strukturu projekta.
 - **Status:** README.md uspešno ažuriran, usklađen sa novom arhitekturom i push-ovan na granu development.
 
-
+### 31.05.2026. 11:22 — Čišćenje repozitorijuma od nepotrebnih testova i privremenih skripti
+- **Zahtev:** Korisnik je tražio da pregledam i očistim projekat od nepotrebnih testova i dokumentacije.
+- **Urađeno:**
+    - **Uklonjeni testovi i privremene skripte:** Obrisao sam i uklonio iz Git praćenja cele foldere `scratch/` i `test/` koji su sadržali privremene i lokalne test skripte. Takođe, očistio sam lokalne privremene i log datoteke (`fetch_logs.py`, `fetch_logs_local.py`, `log.txt`, `test_out.txt`, `translation_debug.txt`).
+- **Status:** Repozitorijum je očišćen i spreman za produkciju. Izmene su push-ovane na granu development.
