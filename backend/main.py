@@ -49,6 +49,7 @@ class SegmentItem(BaseModel):
     volume: Optional[float] = 0.0
     speed: Optional[float] = 1.0
     pitch: Optional[float] = 0.0
+    bg_volume: Optional[float] = 0.0
 
 class SaveProjectRequest(BaseModel):
     segments: List[SegmentItem]
@@ -59,6 +60,10 @@ class SegmentTTSRequest(BaseModel):
     volume: float = 0.0
     speed: float = 1.0
     pitch: float = 0.0
+    bg_volume: float = 0.0
+
+class ShortenSegmentRequest(BaseModel):
+    text: str
 
 class GenerateAllTTSRequest(BaseModel):
     voice_type: str = "clone"
@@ -173,12 +178,89 @@ def save_project_draft(project_id: str, request: SaveProjectRequest):
             orig_seg["volume"] = req_seg.volume if req_seg.volume is not None else orig_seg.get("volume", 0.0)
             orig_seg["speed"] = req_seg.speed if req_seg.speed is not None else orig_seg.get("speed", 1.0)
             orig_seg["pitch"] = req_seg.pitch if req_seg.pitch is not None else orig_seg.get("pitch", 0.0)
+            orig_seg["bg_volume"] = req_seg.bg_volume if req_seg.bg_volume is not None else orig_seg.get("bg_volume", 0.0)
             orig_seg["status"] = "edited"
         updated_segments.append(orig_seg)
         
     project_data["segments"] = updated_segments
     r.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
     return {"status": "success", "message": "Promene na prevodu su sačuvane."}
+
+@app.post("/api/v1/project/{project_id}/segment/{segment_id}/shorten")
+def shorten_segment_translation(project_id: str, segment_id: int, request: ShortenSegmentRequest):
+    """
+    Poziva AI Lektora (Qwen) da lekturiše i skrati prevod segmenta
+    tako da stane u predviđeni vremenski prozor.
+    """
+    r = get_redis_client()
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if not draft_bytes:
+        raise HTTPException(status_code=404, detail="Projekat nije pronađen.")
+    
+    project_data = json.loads(draft_bytes)
+    segments = project_data["segments"]
+    
+    target_segment = None
+    for s in segments:
+        if s["id"] == segment_id:
+            target_segment = s
+            break
+            
+    if not target_segment:
+        raise HTTPException(status_code=404, detail="Segment nije pronađen.")
+        
+    original_text = target_segment.get("original", "")
+    duration = target_segment.get("end", 0.0) - target_segment.get("start", 0.0)
+    limit = max(int(duration * 20), 10)
+    
+    if not settings.MODAL_LEKTOR_URL:
+        raise HTTPException(status_code=500, detail="Modal Lektor nije konfigurisan na serveru.")
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    
+    lektor_prompt = (
+        "Ti si stručni lektor i prevodilac za srpski jezik. Dobio si zadatak da skratiš i lekturišeš prevod na srpskom jeziku kako bi stao u predviđeni vremenski okvir sinhronizacije.\n\n"
+        f"Originalni engleski tekst: {original_text}\n"
+        f"Maksimalno dozvoljeno trajanje: {duration:.2f}s\n"
+        f"Preporučeni limit karaktera: {limit} (Vaš prevod MORA biti kraći od ovog limita!)\n"
+        f"Trenutni prevod koji treba da skratiš: {request.text}\n\n"
+        "PRAVILA:\n"
+        "1. Prevod mora biti kraći i jezgrovitiji, idealno ispod limita karaktera.\n"
+        "2. Sačuvaj smisao originalne engleske rečenice.\n"
+        "3. Piši isključivo na srpskom jeziku (latinica), koristeći prirodne fraze bez engleskih reči (npr. piši brendove fonetski).\n"
+        "4. Vrati SAMO i isključivo novi skraćeni tekst, bez ikakvih uvoda, komentara, navodnika ili objašnjenja."
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [{"role": "user", "content": lektor_prompt}],
+        "temperature": 0.2,
+        "max_tokens": 150
+    }
+    
+    try:
+        from backend.worker.utils import call_modal_endpoint
+        response_data = call_modal_endpoint(url=url, payload=payload)
+        
+        choices = response_data.get("choices", [])
+        if not choices:
+            raise Exception("Lektor nije vratio validan odgovor.")
+            
+        shortened_text = choices[0]["message"]["content"].strip()
+        if shortened_text.startswith('"') and shortened_text.endswith('"'):
+            shortened_text = shortened_text[1:-1].strip()
+        if shortened_text.startswith("'") and shortened_text.endswith("'"):
+            shortened_text = shortened_text[1:-1].strip()
+            
+        return {
+            "status": "success",
+            "original_text": request.text,
+            "shortened_text": shortened_text,
+            "limit": limit
+        }
+    except Exception as e:
+        print(f"[MAGIC SHORTEN ERROR] Greška: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Greška pri lekturi preko veštacke inteligencije: {str(e)}")
 
 @app.post("/api/v1/project/{project_id}/segment/{segment_id}/tts")
 def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRequest):
@@ -303,6 +385,7 @@ def generate_segment_tts(project_id: str, segment_id: int, request: SegmentTTSRe
     target_segment["volume"] = request.volume
     target_segment["speed"] = request.speed
     target_segment["pitch"] = request.pitch
+    target_segment["bg_volume"] = request.bg_volume
     target_segment["status"] = "previewed"
     
     # Ako već postoji izgenerisan pun miks za ceo video, ažuriramo i njega dinamički!

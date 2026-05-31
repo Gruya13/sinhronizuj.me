@@ -384,7 +384,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             "path": s["tts_path"],
             "duration": s["tts_duration"],
             "start": s["start"],
-            "end": s["end"]
+            "end": s["end"],
+            "bg_volume": s.get("bg_volume", 0.0)
         } for s in segments]
         
         from backend.worker.merger import merge_audio_and_video_dynamic

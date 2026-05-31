@@ -168,7 +168,8 @@ def merge_audio_and_video_dynamic(
                 "stretch_factor": video_stretch,
                 "audio_speedup": audio_speedup,
                 "tts_path": seg["path"],
-                "duration": tts_duration
+                "duration": tts_duration,
+                "bg_volume": seg.get("bg_volume", 0.0)
             })
             
             last_time = end
@@ -231,7 +232,8 @@ def merge_audio_and_video_dynamic(
                 tts_input_idx = len(cmd_inputs) // 2
                 cmd_inputs.extend(["-i", tts_path])
                 
-                bg_vol_str = f"{background_vol}dB" if background_vol != 0.0 else "0dB"
+                combined_bg_vol = background_vol + block.get("bg_volume", 0.0)
+                bg_vol_str = f"{combined_bg_vol}dB" if combined_bg_vol != 0.0 else "0dB"
                 dub_vol_str = f"{dubbed_vol}dB" if dubbed_vol != 0.0 else "0dB"
                 
                 a_bg_res = f"abgres{idx}"
@@ -264,7 +266,8 @@ def merge_audio_and_video_dynamic(
                 concat_voc_labels.append(a_voc_out)
             else:
                 a_bg_res = f"abgres{idx}"
-                audio_mix_filters.append(f"[{a_bg_out}]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_bg_res}]")
+                bg_vol_str = f"{background_vol}dB" if background_vol != 0.0 else "0dB"
+                audio_mix_filters.append(f"[{a_bg_out}]volume={bg_vol_str},aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[{a_bg_res}]")
                 concat_mix_labels.append(a_bg_res)
                 
                 a_voc_out = f"avoc{idx}"

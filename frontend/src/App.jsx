@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Play, Pause, Loader2, CheckCircle2, AlertCircle, Clock, 
   Database, Cpu, Terminal, Eye, Zap, ArrowRight, ShieldCheck, 
-  Paperclip, CloudUpload, RefreshCw, Trash2, Volume2, Save, Video, Film, Music, Mic
+  Paperclip, CloudUpload, RefreshCw, Trash2, Volume2, Save, Video, Film, Music, Mic, Wand2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
@@ -36,6 +36,7 @@ function App() {
   const [selectedVoice, setSelectedVoice] = useState("clone");
   const [probniAudios, setProbniAudios] = useState({});
   const [loadingSegmentTTS, setLoadingSegmentTTS] = useState({});
+  const [shorteningActive, setShorteningActive] = useState({});
   const [savingProject, setSavingProject] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [renderTaskId, setRenderTaskId] = useState(null);
@@ -45,6 +46,13 @@ function App() {
   const [dubbedBuster, setDubbedBuster] = useState(Date.now());
   const [segmentEditorTab, setSegmentEditorTab] = useState("text"); // text or audio
   const [activeDubbedAudioUrl, setActiveDubbedAudioUrl] = useState(null);
+  const [applyAudioToAll, setApplyAudioToAll] = useState(false);
+  const [visualContextError, setVisualContextError] = useState(false);
+  const [hoveredSegmentId, setHoveredSegmentId] = useState(null);
+
+  useEffect(() => {
+    setVisualContextError(false);
+  }, [project?.project_id]);
 
   const videoRef = useRef(null);
   const timelineRef = useRef(null);
@@ -178,8 +186,13 @@ function App() {
       if (data.segments) {
         data.segments = data.segments.map(s => ({
           ...s,
+          volume: s.volume !== undefined ? s.volume : 0.0,
+          speed: s.speed !== undefined ? s.speed : 1.0,
+          pitch: s.pitch !== undefined ? s.pitch : 0.0,
+          bg_volume: s.bg_volume !== undefined ? s.bg_volume : 0.0,
           last_generated_volume: s.volume !== undefined ? s.volume : 0.0,
-          last_generated_speed: s.speed !== undefined ? s.speed : 1.0
+          last_generated_speed: s.speed !== undefined ? s.speed : 1.0,
+          last_generated_bg_volume: s.bg_volume !== undefined ? s.bg_volume : 0.0
         }));
       }
       setProject(data);
@@ -369,6 +382,54 @@ function App() {
     }
   };
 
+  // Magično skraćivanje prevoda za segment (AI Lektor)
+  const handleMagicShorten = async (segId) => {
+    if (!project) return;
+    const seg = project.segments.find(s => s.id === segId);
+    if (!seg) return;
+    
+    setShorteningActive(prev => ({ ...prev, [segId]: true }));
+    try {
+      // Prvo sačuvamo trenutno stanje da backend ima najnoviji tekst
+      await handleSaveDraft();
+      
+      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/segment/${segId}/shorten`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: seg.translated || "" })
+      });
+      
+      if (!res.ok) {
+        let errorMsg = "Neuspešno skraćivanje prevoda.";
+        try {
+          const errData = await res.json();
+          if (errData && errData.detail) errorMsg = errData.detail;
+        } catch (_) {}
+        throw new Error(errorMsg);
+      }
+      
+      const data = await res.json();
+      
+      // Ažuriramo tekst prevoda lokalno u projektu i postavljamo ga u status "edited" kako bi se regenerisao glas
+      const updatedSegments = project.segments.map(s => {
+        if (s.id === segId) {
+          return { 
+            ...s, 
+            translated: data.shortened_text, 
+            status: "edited" 
+          };
+        }
+        return s;
+      });
+      setProject({ ...project, segments: updatedSegments });
+      
+    } catch (err) {
+      alert(`Greška pri skraćivanju: ${err.message}`);
+    } finally {
+      setShorteningActive(prev => ({ ...prev, [segId]: false }));
+    }
+  };
+
   // Čuvanje nacrta izmena na backendu
   const handleSaveDraft = async () => {
     if (!project) return;
@@ -389,7 +450,7 @@ function App() {
   };
 
   // Probna sinteza jednog segmenta
-  const handleTestSegmentTTS = async (segId, text, voiceType, volume = 0.0, speed = 1.0, pitch = 0.0, autoplay = true) => {
+  const handleTestSegmentTTS = async (segId, text, voiceType, volume = 0.0, speed = 1.0, pitch = 0.0, bgVolume = 0.0, autoplay = true) => {
     if (!project) return;
     setLoadingSegmentTTS(prev => ({ ...prev, [segId]: true }));
     try {
@@ -401,7 +462,8 @@ function App() {
           voice_type: voiceType || "clone",
           volume: volume !== undefined ? volume : 0.0,
           speed: speed !== undefined ? speed : 1.0,
-          pitch: pitch !== undefined ? pitch : 0.0
+          pitch: pitch !== undefined ? pitch : 0.0,
+          bg_volume: bgVolume !== undefined ? bgVolume : 0.0
         })
       });
       if (!res.ok) {
@@ -431,8 +493,10 @@ function App() {
             volume, 
             speed, 
             pitch, 
+            bg_volume: bgVolume,
             last_generated_volume: volume,
             last_generated_speed: speed,
+            last_generated_bg_volume: bgVolume,
             status: "previewed" 
           };
         }
@@ -617,7 +681,9 @@ function App() {
 
             // Realtime podešavanje jačine i brzine pozadinske muzike (bgAudioRef)
             if (bgAudioRef.current) {
-              const bgVolLinear = Math.min(Math.max(Math.pow(10, bgVolume / 20), 0), 1);
+              const segBgVolDb = currentSeg && currentSeg.bg_volume !== undefined ? currentSeg.bg_volume : 0.0;
+              const combinedBgVolDb = bgVolume + segBgVolDb;
+              const bgVolLinear = Math.min(Math.max(Math.pow(10, combinedBgVolDb / 20), 0), 1);
               if (bgAudioRef.current.volume !== bgVolLinear) {
                 bgAudioRef.current.volume = bgVolLinear;
               }
@@ -756,10 +822,14 @@ function App() {
   // Sinhronizacija jačine zvuka pozadinske muzike i efekata u realnom vremenu
   useEffect(() => {
     if (bgAudioRef.current) {
-      const linearVol = Math.min(Math.max(Math.pow(10, bgVolume / 20), 0), 1);
+      const t = videoRef.current ? videoRef.current.currentTime : 0;
+      const currentSeg = project?.segments.find(s => t >= s.start && t <= s.end);
+      const segBgVolDb = currentSeg && currentSeg.bg_volume !== undefined ? currentSeg.bg_volume : 0.0;
+      const combinedBgVolDb = bgVolume + segBgVolDb;
+      const linearVol = Math.min(Math.max(Math.pow(10, combinedBgVolDb / 20), 0), 1);
       bgAudioRef.current.volume = linearVol;
     }
-  }, [bgVolume, noVocalsAudioUrl]);
+  }, [bgVolume, noVocalsAudioUrl, project]);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -792,14 +862,18 @@ function App() {
     const handleKeyDown = (e) => {
       if (e.code === 'Space') {
         const active = document.activeElement;
-        if (active && (
-          active.tagName === 'INPUT' || 
+        const isTextInput = active && (
+          (active.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'image', 'reset'].includes(active.type)) || 
           active.tagName === 'TEXTAREA' || 
           active.isContentEditable
-        )) {
+        );
+        if (isTextInput) {
           return;
         }
         e.preventDefault();
+        if (active && typeof active.blur === 'function') {
+          active.blur();
+        }
         togglePlay();
       }
     };
@@ -1118,6 +1192,7 @@ function App() {
                     activeSegment.volume,
                     activeSegment.speed,
                     activeSegment.pitch,
+                    activeSegment.bg_volume,
                     false // AUTOPLAY = FALSE za automatsko podešavanje!
                   );
                 };
@@ -1203,10 +1278,37 @@ function App() {
                             const currentLen = (activeSegment.translated || "").length;
                             const isOver = currentLen > limit;
                             return (
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '4px' }}>
-                                <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
-                                  {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
-                                </span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', marginTop: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ color: isOver ? '#ef4444' : '#64748b' }}>
+                                    {isOver ? `⚠️ Prekoračen preporučeni limit za ${currentLen - limit} karaktera!` : `Preporučeno do ${limit} karaktera.`}
+                                  </span>
+                                  <button
+                                    onClick={() => handleMagicShorten(activeSegment.id)}
+                                    disabled={shorteningActive[activeSegment.id]}
+                                    title="Automatski skrati i prilagodi dužinu prevoda pomoću AI Lektora"
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      color: '#a78bfa',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      padding: '2px',
+                                      transition: 'all 0.2s ease',
+                                      outline: 'none',
+                                      opacity: shorteningActive[activeSegment.id] ? 0.5 : 1
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                  >
+                                    {shorteningActive[activeSegment.id] ? (
+                                      <Loader2 size={13} className="spinner-icon pulse-icon" style={{ color: '#a78bfa' }} />
+                                    ) : (
+                                      <Wand2 size={13} style={{ filter: 'drop-shadow(0 0 4px rgba(167, 139, 250, 0.4))' }} />
+                                    )}
+                                  </button>
+                                </div>
                                 <span style={{ color: isOver ? '#ef4444' : '#cbd5e1', fontWeight: '600' }}>
                                   {currentLen} / {limit}
                                 </span>
@@ -1238,7 +1340,39 @@ function App() {
                       </>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                        {/* Jačina zvuka (dB) */}
+                        {/* Primeni na sve segmente toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.15)', borderRadius: '10px', marginBottom: '4px' }}>
+                          <input
+                            type="checkbox"
+                            id="apply-audio-to-all"
+                            checked={applyAudioToAll}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setApplyAudioToAll(checked);
+                              if (checked && activeSegment) {
+                                // Odmah iskopiraj trenutna podešavanja na sve segmente
+                                const updated = project.segments.map(s => ({
+                                  ...s,
+                                  volume: activeSegment.volume !== undefined ? activeSegment.volume : 0.0,
+                                  speed: activeSegment.speed !== undefined ? activeSegment.speed : 1.0,
+                                  pitch: activeSegment.pitch !== undefined ? activeSegment.pitch : 0.0,
+                                  bg_volume: activeSegment.bg_volume !== undefined ? activeSegment.bg_volume : 0.0
+                                }));
+                                setProject({ ...project, segments: updated });
+                                // Pokreni auto adjust nakon kratkog timeout-a
+                                setTimeout(() => {
+                                  handleAutoAdjust();
+                                }, 50);
+                              }
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#8b5cf6' }}
+                          />
+                          <label htmlFor="apply-audio-to-all" style={{ fontSize: '0.8rem', color: '#cbd5e1', cursor: 'pointer', userSelect: 'none', fontWeight: '500' }}>
+                            🔗 Primeni audio podešavanja na sve segmente
+                          </label>
+                        </div>
+
+                        {/* Jačina zvuka (Volume) */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
                             <span>Jačina zvuka (Volume):</span>
@@ -1253,7 +1387,7 @@ function App() {
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
                               const updated = project.segments.map(s => {
-                                if (s.id === selectedSegmentId) {
+                                if (applyAudioToAll || s.id === selectedSegmentId) {
                                   return { ...s, volume: val };
                                 }
                                 return s;
@@ -1286,7 +1420,7 @@ function App() {
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
                               const updated = project.segments.map(s => {
-                                if (s.id === selectedSegmentId) {
+                                if (applyAudioToAll || s.id === selectedSegmentId) {
                                   return { ...s, speed: val };
                                 }
                                 return s;
@@ -1319,7 +1453,7 @@ function App() {
                             onChange={(e) => {
                               const val = parseInt(e.target.value);
                               const updated = project.segments.map(s => {
-                                if (s.id === selectedSegmentId) {
+                                if (applyAudioToAll || s.id === selectedSegmentId) {
                                   return { ...s, pitch: val };
                                 }
                                 return s;
@@ -1336,8 +1470,41 @@ function App() {
                             <span>Visok piskav</span>
                           </div>
                         </div>
+
+                        {/* Jačina pozadinske muzike (Ducking) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                            <span>Jačina pozadinske muzike (Ducking):</span>
+                            <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.bg_volume > 0 ? `+${activeSegment.bg_volume}` : activeSegment.bg_volume || 0} dB</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-20"
+                            max="10"
+                            step="1"
+                            value={activeSegment.bg_volume !== undefined ? activeSegment.bg_volume : 0}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const updated = project.segments.map(s => {
+                                if (applyAudioToAll || s.id === selectedSegmentId) {
+                                  return { ...s, bg_volume: val };
+                                }
+                                return s;
+                              });
+                              setProject({ ...project, segments: updated });
+                            }}
+                            onMouseUp={handleAutoAdjust}
+                            onTouchEnd={handleAutoAdjust}
+                            style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
+                            <span>-20 dB (Prigušeno)</span>
+                            <span>0 dB (Default)</span>
+                            <span>+10 dB (Glasno)</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
+                    ) }
 
                     {/* Upozorenje ako je prevod ili glas modifikovan a nije regenerisan */}
                     {activeSegment.status === "edited" && (
@@ -1366,7 +1533,9 @@ function App() {
                           activeSegment.voice_type,
                           activeSegment.volume,
                           activeSegment.speed,
-                          activeSegment.pitch
+                          activeSegment.pitch,
+                          activeSegment.bg_volume,
+                          true // Autoplay = true
                         )}
                         disabled={loadingSegmentTTS[selectedSegmentId]}
                         className="glow-button"
@@ -1428,9 +1597,10 @@ function App() {
                   <div style={{ position: 'absolute', left: '10px', fontSize: '0.7rem', color: '#475569', zIndex: 5, pointerEvents: 'none', textTransform: 'uppercase', fontWeight: 'bold' }}>
                     <Video size={10} style={{ display: 'inline', marginRight: '4px' }} /> Video Sličice
                   </div>
-                  {project.visual_context_url && (
+                  {project.visual_context_url && !visualContextError && (
                     <img 
                       src={project.visual_context_url} 
+                      onError={() => setVisualContextError(true)}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.25, pointerEvents: 'none' }} 
                       alt="Visual keyframes timeline"
                     />
@@ -1559,10 +1729,13 @@ function App() {
                     const ttsWidth = (ttsDur / dur) * 100;
                     const isLonger = seg.tts_duration && (seg.tts_duration > (seg.end - seg.start));
                     const isActive = selectedSegmentId === seg.id;
+                    const isHovered = hoveredSegmentId === seg.id;
                     
                     return (
                       <div 
                         key={seg.id}
+                        onMouseEnter={() => setHoveredSegmentId(seg.id)}
+                        onMouseLeave={() => setHoveredSegmentId(null)}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedSegmentId(seg.id);
@@ -1583,24 +1756,72 @@ function App() {
                           borderRadius: '4px',
                           display: 'flex',
                           alignItems: 'center',
-                          overflow: 'hidden',
+                          overflow: 'visible',
                           border: isActive ? '2px solid #22c55e' : '1px solid rgba(34, 197, 94, 0.15)',
                           background: isActive ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.05)',
                           transition: 'all 0.15s ease'
                         }}
                       >
+                        {/* Premium Tooltip prozorčić na hover ako segment ima upozorenje */}
+                        {isLonger && isHovered && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%) translateY(-10px)',
+                            background: 'rgba(15, 23, 42, 0.95)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 10px rgba(239, 68, 68, 0.2)',
+                            borderRadius: '10px',
+                            padding: '10px 14px',
+                            zIndex: 9999,
+                            width: '240px',
+                            color: '#fff',
+                            pointerEvents: 'none',
+                            transition: 'all 0.2s ease',
+                            display: 'block'
+                          }}>
+                            {/* Strelica nadole */}
+                            <div style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              width: '0',
+                              height: '0',
+                              borderLeft: '6px solid transparent',
+                              borderRight: '6px solid transparent',
+                              borderTop: '6px solid rgba(15, 23, 42, 0.95)'
+                            }} />
+                            
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                              <span style={{ fontSize: '1.1rem', marginTop: '-2px' }}>⚠️</span>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', whiteSpace: 'normal' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>Predugačak srpski izgovor!</span>
+                                <span style={{ fontSize: '0.7rem', color: '#cbd5e1', lineHeight: '1.3' }}>
+                                  Srpski glas traje <strong>{seg.tts_duration.toFixed(2)}s</strong> što je za <strong>{(seg.tts_duration - (seg.end - seg.start)).toFixed(2)}s</strong> duže od originalnog prozora ({((seg.end - seg.start)).toFixed(2)}s).
+                                </span>
+                                <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '4px' }}>
+                                  💡 Skratite prevod ili ubrzajte segment u Podešavanjima Zvuka.
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Ako je duži, obeležavamo crvenom pozadinom višak trajanja */}
                         {isLonger && (
-                          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((seg.tts_duration - (seg.end - seg.start)) / seg.tts_duration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444' }} title="Predugačko! Biće primenjeno usporavanje videa." />
+                          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((seg.tts_duration - (seg.end - seg.start)) / seg.tts_duration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444', borderRadius: '0 4px 4px 0' }} />
                         )}
  
                         {/* Waveform */}
-                        <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : 0.25 }}>
+                        <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : 0.25, overflow: 'hidden' }}>
                           {generateWaveformBars(ttsDur, seg.id + 10).map((h, i) => (
                             <div key={i} style={{ width: '2px', height: `${h}%`, background: isLonger ? '#f87171' : '#4ade80', borderRadius: '1px' }} />
                           ))}
                         </div>
-
+ 
                         <span style={{ fontSize: '0.65rem', color: isLonger ? '#f87171' : '#86efac', fontWeight: 'bold', marginLeft: '6px', zIndex: 10 }}>
                           #{seg.id} {isLonger ? `(⚠️ +${(seg.tts_duration - (seg.end - seg.start)).toFixed(1)}s)` : ''}
                         </span>
