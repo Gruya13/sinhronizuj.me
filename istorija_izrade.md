@@ -1402,3 +1402,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Kreiranje novih v2 fajlova:** Napravio sam nove fajlove `tok_podataka_pipeline_v2.md` i `tok_podataka_pipeline_v2.txt` koji verno opisuju trenutnu dvofaznu arhitekturu sa Redis draftovima, Studio Editorom, AI Lektorom (Magic Shorten), i dynamic/realtime preloading mikserom.
 - **Status:** Stari fajlovi očuvani, a novi v2 fajlovi kreirani i uspešno push-ovani na granu development.
 
+### 31.05.2026. 11:10 — Ažuriranje README.md datoteke shodno trenutnom stanju sistema
+- **Zahtev:** Korisnik je tražio da pregledam README.md na githubu, uporedim ga sa trenutnim stanjem projekta i ažuriram ako je potrebno.
+- **Urađeno:**
+    - **Ažuriran README.md:** Detaljno sam revidirao `README.md`. Zamenio sam stari opis monolitskog pipeline-a sa novim dvofaznim asinhronim procesom (Faza 1: Analiza, Studio Faza, Faza 2: Renderovanje). Dodao sam nove ključne karakteristike (Studio Editor v2, AI Lektor Magic Shorten, fina zvučna podešavanja i realtime klijentski mikser, OpenVoice V2 kloniranje sa VAD Fallback-om). Označio sam u planu daljeg razvoja izgradnju interaktivnog Studija v2 kao završen zadatak i dodao referencu na nove fajlove toka podataka u strukturu projekta.
+- **Status:** README.md uspešno ažuriran, usklađen sa novom arhitekturom i push-ovan na granu development.
+
+
