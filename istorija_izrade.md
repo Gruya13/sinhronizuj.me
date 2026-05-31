@@ -1368,6 +1368,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * **Preloading dubbed audija (Uklanjanje seckanja):** Uveo sam pozadinsko učitavanje spojenog dub-miksa pomoću skrivenog `Audio` elementa. Tek kada se novi fajl učita u pozadini (`canplaythrough`), menja se URL aktivnog plejera, čime je prelaz na osveženi zvučni miks potpuno neometan i bez ikakvog seckanja ili prekidanja u reprodukciji.
 - **Status:** Uspešno implementirano, Vite produkcioni build prošao u potpunosti bez grešaka, izmene push-ovane na granu `development`, povučene na VPS i docker kontejneri restartovani.
 
+### 31.05.2026. 02:47 — Nezavisna realtime kontrola pozadinske muzike i otklanjanje autoplay baga preklapanja
+- **Zahtev:** Korisnik je prijavio da menjanje slajdera u audio kontrolama segmenta neopravdano pokreće reprodukciju glasa čak i kada je video zaustavljen (i preklapa se sa aktivnom reprodukcijom ako video svira). Takođe, prijavio je da se pri izboru "AI Sinhronizovano (SR)" ne čuje pozadinska muzika i zvučni efekti, te je zatražio nezavisnu i finu kontrolu jačine pozadinskog zvuka u realnom vremenu.
+- **Urađeno:**
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Nezavisni pozadinski audio plejer (bgAudioRef):** Dodao sam drugi audio element u studiju koji reprodukuje izolovanu pozadinsku muziku/zvučne efekte (`no_vocals_{task_id}.wav` preuzeto sa servera).
+        * **Realtime nezavisno miksovanje:** Povezao sam slajdere "Muzika i efekti" i "Srpski AI glas" tako da u realnom vremenu i bez seckanja kontrolišu jačinu i brzinu zvuka na dva nezavisna zvučna toka. Sinhronizacijska petlja u letu usklađuje vremensku poziciju i playbackRate oba plejera sa videom.
+        * **Rešenje autoplay baga:** Modifikovao sam funkciju `handleTestSegmentTTS` i dodao `autoplay` parametar koji se postavlja na `false` kada se podešavanja tona rade automatski preko slajdera. Glas se sada pokreće samo ako korisnik eksplicitno klikne na "Regeneriši Probni Glas" i pod uslovom da je video pauziran, čime je preklapanje tona u potpunosti eliminisano.
+- **Status:** Uspešno implementirano, Vite produkcioni build prošao bez grešaka, izmene push-ovane na granu `development`, povučene na VPS i kontejneri restartovani.
+
 
 
 
