@@ -1364,8 +1364,25 @@ function App() {
                   </p>
                 )}
 
-                <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', textAlign: 'center' }}>
+                <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Proteklo vreme: {formatTime(elapsed)}</span>
+                  <button 
+                    onClick={resetStudio} 
+                    className="back-btn" 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.85rem', 
+                      background: 'rgba(239, 68, 68, 0.1)', 
+                      border: '1px solid rgba(239, 68, 68, 0.2)', 
+                      color: '#f87171', 
+                      cursor: 'pointer', 
+                      transition: 'all 0.2s',
+                      marginTop: '5px'
+                    }}
+                  >
+                    Prekini i nazad na projekte
+                  </button>
                 </div>
               </div>
             </div>
