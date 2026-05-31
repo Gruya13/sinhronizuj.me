@@ -52,6 +52,7 @@ function App() {
   const consecutiveErrorsRef = useRef(0);
   const playheadIntervalRef = useRef(null);
   const dubbedAudioRef = useRef(null);
+  const bgAudioRef = useRef(null);
 
   // Monitor resursa
   useEffect(() => {
@@ -388,7 +389,7 @@ function App() {
   };
 
   // Probna sinteza jednog segmenta
-  const handleTestSegmentTTS = async (segId, text, voiceType, volume = 0.0, speed = 1.0, pitch = 0.0) => {
+  const handleTestSegmentTTS = async (segId, text, voiceType, volume = 0.0, speed = 1.0, pitch = 0.0, autoplay = true) => {
     if (!project) return;
     setLoadingSegmentTTS(prev => ({ ...prev, [segId]: true }));
     try {
@@ -440,9 +441,11 @@ function App() {
       setProject({ ...project, segments: updatedSegments });
       setDubbedBuster(Date.now());
 
-      // Odmah pusti zvuk da korisnik čuje
-      const audio = new Audio(fullAudioUrl);
-      audio.play();
+      // Odmah pusti zvuk ako je autoplay uključen i video NE svira
+      if (autoplay && !isPlaying) {
+        const audio = new Audio(fullAudioUrl);
+        audio.play().catch(err => console.error("Greška pri reprodukciji probnog segmenta:", err));
+      }
     } catch (err) {
       alert("TTS greška: " + err.message);
     } finally {
@@ -557,6 +560,11 @@ function App() {
     videoRef.current.currentTime = targetTime;
     setCurrentTime(targetTime);
     
+    if (activeAudioSource === "dubbed") {
+      if (dubbedAudioRef.current) dubbedAudioRef.current.currentTime = targetTime;
+      if (bgAudioRef.current) bgAudioRef.current.currentTime = targetTime;
+    }
+    
     // Auto-select segment na osnovu vremena
     const matchingSeg = project.segments.find(s => targetTime >= s.start && targetTime <= s.end);
     if (matchingSeg) {
@@ -606,6 +614,18 @@ function App() {
             if (dubbedAudioRef.current.playbackRate !== finalSpeed) {
               dubbedAudioRef.current.playbackRate = finalSpeed;
             }
+
+            // Realtime podešavanje jačine i brzine pozadinske muzike (bgAudioRef)
+            if (bgAudioRef.current) {
+              const bgVolLinear = Math.min(Math.max(Math.pow(10, bgVolume / 20), 0), 1);
+              if (bgAudioRef.current.volume !== bgVolLinear) {
+                bgAudioRef.current.volume = bgVolLinear;
+              }
+              if (bgAudioRef.current.playbackRate !== finalSpeed) {
+                bgAudioRef.current.playbackRate = finalSpeed;
+              }
+            }
+
             if (videoRef.current.playbackRate !== finalSpeed) {
               videoRef.current.playbackRate = finalSpeed;
             }
@@ -614,6 +634,14 @@ function App() {
             const diff = Math.abs(videoRef.current.currentTime - dubbedAudioRef.current.currentTime);
             if (diff > 0.15) {
               dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
+            }
+
+            // Resinhronizacija pozadinske muzike
+            if (bgAudioRef.current) {
+              const diffBg = Math.abs(videoRef.current.currentTime - bgAudioRef.current.currentTime);
+              if (diffBg > 0.15) {
+                bgAudioRef.current.currentTime = videoRef.current.currentTime;
+              }
             }
           } else {
             // Ako nismo na dubbed izvoru, vratimo playbackRate videa na 1.0
@@ -636,13 +664,18 @@ function App() {
       if (dubbedAudioRef.current && dubbedAudioRef.current.playbackRate !== 1.0) {
         dubbedAudioRef.current.playbackRate = 1.0;
       }
+      if (bgAudioRef.current && bgAudioRef.current.playbackRate !== 1.0) {
+        bgAudioRef.current.playbackRate = 1.0;
+      }
     }
     return () => clearInterval(playheadIntervalRef.current);
-  }, [isPlaying, project, selectedSegmentId, activeAudioSource, dubVolume]);
+  }, [isPlaying, project, selectedSegmentId, activeAudioSource, dubVolume, bgVolume]);
 
   // Izvedena vrednost za putanju dubbed zvuka sa cache buster-om
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
   const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}?cb=${dubbedBuster}` : null;
+  const noVocalsFilename = project?.no_vocals_path ? project.no_vocals_path.split('/').pop() : null;
+  const noVocalsAudioUrl = noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null;
 
   // Preloading za dubbed audio da se izbegne seckanje pri regeneraciji segmenta
   useEffect(() => {
@@ -684,6 +717,7 @@ function App() {
   useEffect(() => {
     const video = videoRef.current;
     const audio = dubbedAudioRef.current;
+    const bgAudio = bgAudioRef.current;
     if (!video) return;
 
     if (activeAudioSource === "dubbed" && activeDubbedAudioUrl) {
@@ -691,18 +725,25 @@ function App() {
       if (audio) {
         if (isPlaying) {
           audio.currentTime = video.currentTime;
-          audio.play().catch(err => console.error("Greška pri reprodukciji probnog miksa:", err));
+          audio.play().catch(err => console.error("Greška pri reprodukciji srpskog tona:", err));
         } else {
           audio.pause();
         }
       }
+      if (bgAudio && noVocalsAudioUrl) {
+        if (isPlaying) {
+          bgAudio.currentTime = video.currentTime;
+          bgAudio.play().catch(err => console.error("Greška pri reprodukciji pozadinske muzike:", err));
+        } else {
+          bgAudio.pause();
+        }
+      }
     } else {
       video.muted = false;
-      if (audio) {
-        audio.pause();
-      }
+      if (audio) audio.pause();
+      if (bgAudio) bgAudio.pause();
     }
-  }, [activeAudioSource, isPlaying, activeDubbedAudioUrl]);
+  }, [activeAudioSource, isPlaying, activeDubbedAudioUrl, noVocalsAudioUrl]);
 
   // Sinhronizacija jačine zvuka sinhronizovane trake (AI Glas) u realnom vremenu
   useEffect(() => {
@@ -712,6 +753,14 @@ function App() {
     }
   }, [dubVolume, activeDubbedAudioUrl]);
 
+  // Sinhronizacija jačine zvuka pozadinske muzike i efekata u realnom vremenu
+  useEffect(() => {
+    if (bgAudioRef.current) {
+      const linearVol = Math.min(Math.max(Math.pow(10, bgVolume / 20), 0), 1);
+      bgAudioRef.current.volume = linearVol;
+    }
+  }, [bgVolume, noVocalsAudioUrl]);
+
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
@@ -719,11 +768,20 @@ function App() {
       if (dubbedAudioRef.current) {
         dubbedAudioRef.current.pause();
       }
+      if (bgAudioRef.current) {
+        bgAudioRef.current.pause();
+      }
     } else {
       videoRef.current.play();
-      if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
-        dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
-        dubbedAudioRef.current.play().catch(err => console.error("Greška pri reprodukciji probnog miksa:", err));
+      if (activeAudioSource === "dubbed") {
+        if (dubbedAudioRef.current) {
+          dubbedAudioRef.current.currentTime = videoRef.current.currentTime;
+          dubbedAudioRef.current.play().catch(err => console.error("Greška pri reprodukciji srpskog tona:", err));
+        }
+        if (bgAudioRef.current) {
+          bgAudioRef.current.currentTime = videoRef.current.currentTime;
+          bgAudioRef.current.play().catch(err => console.error("Greška pri reprodukciji pozadinske muzike:", err));
+        }
       }
     }
     setIsPlaying(!isPlaying);
@@ -968,10 +1026,17 @@ function App() {
                       }
                     }}
                   />
-                  {dubbedAudioUrl && (
+                  {activeDubbedAudioUrl && (
                     <audio 
                       ref={dubbedAudioRef} 
-                      src={dubbedAudioUrl} 
+                      src={activeDubbedAudioUrl} 
+                      style={{ display: 'none' }} 
+                    />
+                  )}
+                  {noVocalsAudioUrl && (
+                    <audio 
+                      ref={bgAudioRef} 
+                      src={noVocalsAudioUrl} 
                       style={{ display: 'none' }} 
                     />
                   )}
@@ -1052,7 +1117,8 @@ function App() {
                     activeSegment.voice_type,
                     activeSegment.volume,
                     activeSegment.speed,
-                    activeSegment.pitch
+                    activeSegment.pitch,
+                    false // AUTOPLAY = FALSE za automatsko podešavanje!
                   );
                 };
 
@@ -1411,8 +1477,9 @@ function App() {
                           setSelectedSegmentId(seg.id);
                           if (videoRef.current) {
                             videoRef.current.currentTime = seg.start;
-                            if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
-                              dubbedAudioRef.current.currentTime = seg.start;
+                            if (activeAudioSource === "dubbed") {
+                              if (dubbedAudioRef.current) dubbedAudioRef.current.currentTime = seg.start;
+                              if (bgAudioRef.current) bgAudioRef.current.currentTime = seg.start;
                             }
                           }
                         }}
@@ -1501,8 +1568,9 @@ function App() {
                           setSelectedSegmentId(seg.id);
                           if (videoRef.current) {
                             videoRef.current.currentTime = seg.start;
-                            if (activeAudioSource === "dubbed" && dubbedAudioRef.current) {
-                              dubbedAudioRef.current.currentTime = seg.start;
+                            if (activeAudioSource === "dubbed") {
+                              if (dubbedAudioRef.current) dubbedAudioRef.current.currentTime = seg.start;
+                              if (bgAudioRef.current) bgAudioRef.current.currentTime = seg.start;
                             }
                           }
                         }}
