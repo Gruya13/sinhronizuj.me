@@ -16,10 +16,11 @@ def get_redis_client():
     return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
 
 @celery_app.task(bind=True, name="analyze_video_task")
-def analyze_video_task(self, video_url: str, debug: bool = False):
-    print(f"--- [CELERY TASK] Započeta FAZA 1 (Analiza). Debug: {debug} ---", flush=True)
+def analyze_video_task(self, video_url: str, debug: bool = False, project_id: str = None):
+    print(f"--- [CELERY TASK] Započeta FAZA 1 (Analiza). Debug: {debug}, project_id: {project_id} ---", flush=True)
     r_client = get_redis_client()
     task_id = self.request.id
+    effective_project_id = project_id if project_id else task_id
 
     # Uspostavljanje izolovanog radnog prostora za ovaj task
     original_temp_workspace = settings.TEMP_WORKSPACE
@@ -116,8 +117,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False):
         update_progress(completed_step="Vokal izolovan")
         
         # Kopiramo vokal i no-vocal fajlove u privremeni direktorijum koji ostaje dostupan i nakon gašenja taska
-        vocals_filename = f"vocals_{task_id}.wav"
-        no_vocals_filename = f"no_vocals_{task_id}.wav"
+        vocals_filename = f"vocals_{effective_project_id}.wav"
+        no_vocals_filename = f"no_vocals_{effective_project_id}.wav"
         stable_vocals_path = os.path.join(original_temp_workspace, vocals_filename)
         stable_no_vocals_path = os.path.join(original_temp_workspace, no_vocals_filename)
         
@@ -167,7 +168,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False):
         from backend.worker.translator import translate_segments
         
         # Kopiramo originalni video u stabilnu lokaciju
-        video_filename = f"video_{task_id}.mp4"
+        video_filename = f"video_{effective_project_id}.mp4"
         stable_video_path = os.path.join(original_temp_workspace, video_filename)
         shutil.copy2(result["video_path"], stable_video_path)
         
@@ -204,9 +205,21 @@ def analyze_video_task(self, video_url: str, debug: bool = False):
                 "status": "draft"
             })
             
+        # Inicijalni naziv i kreiranje datuma za metapodatke
+        created_at_val = datetime.now().isoformat()
+        project_name = "Projekt " + effective_project_id[:8]
+        
+        if project_id:
+            meta_bytes = r_client.hget("projects:metadata", project_id)
+            if meta_bytes:
+                meta = json.loads(meta_bytes)
+                project_name = meta.get("name", project_name)
+                created_at_val = meta.get("created_at", created_at_val)
+
         # --- SAČUVAJ NACRT U REDIS ---
         draft_data = {
-            "project_id": task_id,
+            "project_id": effective_project_id,
+            "name": project_name,
             "video_url": video_url,
             "video_path": stable_video_path,
             "vocals_path": stable_vocals_path,
@@ -215,17 +228,28 @@ def analyze_video_task(self, video_url: str, debug: bool = False):
             "title": video_title,
             "segments": draft_segments,
             "costs": progress_metadata["costs"],
-            "status": "draft",
-            "created_at": datetime.now().isoformat()
+            "status": "ready",
+            "created_at": created_at_val
         }
         
         # Nacrt se čuva 7 dana
-        r_client.set(f"project:{task_id}:draft", json.dumps(draft_data), ex=604800)
-        print(f"[CELERY TASK] Nacrt uspešno sačuvan u Redis: project:{task_id}:draft", flush=True)
+        r_client.set(f"project:{effective_project_id}:draft", json.dumps(draft_data), ex=604800)
+        print(f"[CELERY TASK] Nacrt uspešno sačuvan u Redis: project:{effective_project_id}:draft", flush=True)
+        
+        # Ažuriramo metapodatke u projects:metadata HASH-u
+        if project_id:
+            meta_data = {
+                "id": project_id,
+                "name": project_name,
+                "video_title": video_title or "Video",
+                "status": "ready",
+                "created_at": created_at_val
+            }
+            r_client.hset("projects:metadata", project_id, json.dumps(meta_data))
         
         return {
             "status": "success",
-            "project_id": task_id,
+            "project_id": effective_project_id,
             "visual_context_url": visual_context_url,
             "segments": draft_segments,
             "costs": progress_metadata["costs"]
@@ -439,6 +463,13 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         project_data["costs"] = progress_metadata["costs"]
         r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
         
+        # Ažuriramo status projekta u metapodacima
+        meta_bytes = r_client.hget("projects:metadata", project_id)
+        if meta_bytes:
+            meta = json.loads(meta_bytes)
+            meta["status"] = "completed"
+            r_client.hset("projects:metadata", project_id, json.dumps(meta))
+        
         return {
             "status": "completed",
             "project_id": project_id,
@@ -449,6 +480,15 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
     except Exception as e:
         import traceback
         traceback.print_exc()
+        # Vraćamo status u metapodacima na 'ready' kako bi korisnik mogao opet pokrenuti render
+        try:
+            meta_bytes = r_client.hget("projects:metadata", project_id)
+            if meta_bytes:
+                meta = json.loads(meta_bytes)
+                meta["status"] = "ready"
+                r_client.hset("projects:metadata", project_id, json.dumps(meta))
+        except:
+            pass
         return {"status": "error", "message": str(e)}
     finally:
         # Vraćamo originalni workspace i čistimo render folder

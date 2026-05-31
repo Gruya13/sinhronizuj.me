@@ -50,6 +50,30 @@ function App() {
   const [visualContextError, setVisualContextError] = useState(false);
   const [hoveredSegmentId, setHoveredSegmentId] = useState(null);
 
+  // Stanja za upravljanje projektima
+  const [projects, setProjects] = useState([]);
+  const [showProjectsList, setShowProjectsList] = useState(true);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState(null);
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/projects`);
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+      }
+    } catch (err) {
+      console.error("Greška pri listanju projekata:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
   useEffect(() => {
     setVisualContextError(false);
   }, [project?.project_id]);
@@ -98,6 +122,7 @@ function App() {
       setLoading(true);
       setStatus('UČITAVANJE PROJEKTA...');
       setStartTime(Date.now());
+      setShowProjectsList(false);
     }
   }, [taskId]);
 
@@ -140,12 +165,16 @@ function App() {
               localStorage.removeItem('sinhronizuj_me_task_id');
               setRenderTaskId(null);
               clearInterval(interval);
+              fetchProjects();
             } else {
               // Faza 1 završena, prelazimo u Studio mod
               setProgressData(null);
               setLoading(false);
-              loadProjectData(taskId);
+              const targetProjId = data.project_id || taskId;
+              setCurrentProjectId(targetProjId);
+              loadProjectData(targetProjId);
               clearInterval(interval);
+              fetchProjects();
             }
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
             setError(data.error || 'Greška pri obradi.');
@@ -154,6 +183,7 @@ function App() {
             localStorage.removeItem('sinhronizuj_me_task_id');
             setRenderTaskId(null);
             clearInterval(interval);
+            fetchProjects();
           } else {
             // PROGRESS status
             if (data.progress_data) {
@@ -251,6 +281,81 @@ function App() {
     localStorage.removeItem('sinhronizuj_me_task_id');
     consecutiveErrorsRef.current = 0;
     setCosts(null);
+    
+    // Povratak na projekte
+    setCurrentProjectId(null);
+    setShowProjectsList(true);
+    fetchProjects();
+  };
+
+  const handleSelectProject = (proj) => {
+    setCurrentProjectId(proj.id);
+    setShowProjectsList(false);
+    setError(null);
+    setVideoUrl(null);
+    setPreviewFile(null);
+    setProject(null);
+    
+    if (proj.status === 'empty') {
+      // Prazan projekat, korisnik unosi video
+      setLoading(false);
+    } else if (proj.status === 'analyzing') {
+      // U fazi analize, ali proveravamo da li imamo taskId u localStorage-u
+      setLoading(true);
+      setStatus('Projekat se analizira u pozadini...');
+      loadProjectData(proj.id);
+    } else if (proj.status === 'ready' || proj.status === 'completed') {
+      // Spreman projekat, učitavamo studio
+      loadProjectData(proj.id);
+    }
+  };
+
+  const handleCreateProject = async (e) => {
+    if (e) e.preventDefault();
+    if (!newProjectName.trim()) return;
+    setCreatingProject(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/project`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newProjectName })
+      });
+      if (res.ok) {
+        const newProj = await res.json();
+        setProjects(prev => [newProj, ...prev]);
+        setNewProjectName('');
+        setIsCreateModalOpen(false);
+        handleSelectProject(newProj);
+      } else {
+        alert("Greška pri kreiranju projekta.");
+      }
+    } catch (err) {
+      alert("Mrežna greška pri kreiranju projekta: " + err.message);
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
+  const handleDeleteProject = async (e, projId) => {
+    e.stopPropagation();
+    if (!window.confirm("Da li ste sigurni da želite da obrišete ovaj projekat i sve njegove fajlove?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/project/${projId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setProjects(prev => prev.filter(p => p.id !== projId));
+        if (currentProjectId === projId) {
+          resetStudio();
+        }
+      } else {
+        alert("Greška pri brisanju projekta.");
+      }
+    } catch (err) {
+      alert("Mrežna greška pri brisanju projekta: " + err.message);
+    }
   };
 
   // Učitavanje spoljnog URL-a
@@ -312,7 +417,11 @@ function App() {
       const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl, debug: false })
+        body: JSON.stringify({ 
+          url: targetUrl, 
+          debug: false,
+          project_id: currentProjectId
+        })
       });
       const data = await res.json();
       if (data.status === 'success') {
@@ -952,9 +1061,193 @@ function App() {
           </div>
         </motion.div>
 
+        {/* DASHBOARD: LISTA PROJEKATA */}
+        {!loading && !videoUrl && !previewFile && !project && showProjectsList && (
+          <div className="projects-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f1f5f9' }}>Moji Projekti</h2>
+              <button 
+                onClick={() => setIsCreateModalOpen(true)} 
+                className="glow-button"
+                style={{ padding: '10px 20px', borderRadius: '12px' }}
+              >
+                + Novi Projekat
+              </button>
+            </div>
+
+            {projects.length === 0 ? (
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+                <Video size={48} style={{ margin: '0 auto 15px', color: '#64748b', opacity: 0.5 }} />
+                <p style={{ fontSize: '1rem', fontWeight: '600' }}>Nemate kreiranih projekata</p>
+                <p style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '5px' }}>Kliknite na dugme iznad da započnete novi projekat sinhronizacije.</p>
+              </div>
+            ) : (
+              <div className="projects-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                {projects.map((proj) => {
+                  let statusText = "Prazan";
+                  let statusClass = "asleep";
+                  if (proj.status === "analyzing") { statusText = "Analiza..."; statusClass = "analyzing"; }
+                  else if (proj.status === "ready") { statusText = "Spreman za rad"; statusClass = "active"; }
+                  else if (proj.status === "completed") { statusText = "Završen"; statusClass = "completed"; }
+                  
+                  return (
+                    <div 
+                      key={proj.id}
+                      onClick={() => handleSelectProject(proj)}
+                      style={{ 
+                        background: 'rgba(255,255,255,0.03)', 
+                        border: '1px solid rgba(255,255,255,0.05)', 
+                        borderRadius: '16px', 
+                        padding: '20px', 
+                        cursor: 'pointer', 
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '15px',
+                        position: 'relative'
+                      }}
+                      className="project-card"
+                    >
+                      <button 
+                        onClick={(e) => handleDeleteProject(e, proj.id)}
+                        style={{ 
+                          position: 'absolute', 
+                          top: '15px', 
+                          right: '15px', 
+                          background: 'transparent', 
+                          border: 'none', 
+                          color: '#64748b', 
+                          cursor: 'pointer',
+                          padding: '5px',
+                          borderRadius: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                        className="delete-project-btn"
+                        title="Obriši projekat"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '85%' }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{proj.name}</h3>
+                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', height: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {proj.video_title || "Nema učitanog videa"}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#64748b' }}>{new Date(proj.created_at).toLocaleDateString()}</span>
+                        <span className={`status-badge ${statusClass}`} style={{ fontSize: '10px' }}>{statusText}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MODAL ZA KREIRANJE PROJEKTA */}
+        <AnimatePresence>
+          {isCreateModalOpen && (
+            <div 
+              style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                width: '100vw', 
+                height: '100vh', 
+                background: 'rgba(0,0,0,0.6)', 
+                backdropFilter: 'blur(8px)', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                zIndex: 9999 
+              }}
+              onClick={() => setIsCreateModalOpen(false)}
+            >
+              <div 
+                style={{ 
+                  background: 'rgba(25, 28, 41, 0.95)', 
+                  border: '1px solid rgba(255,255,255,0.1)', 
+                  borderRadius: '24px', 
+                  padding: '30px', 
+                  width: '90%', 
+                  maxWidth: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>Novi Projekat</h3>
+                <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Naziv projekta</label>
+                    <input 
+                      type="text" 
+                      placeholder="npr. Sinhronizacija AI Agent"
+                      value={newProjectName} 
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        background: 'rgba(255,255,255,0.05)', 
+                        border: '1px solid rgba(255,255,255,0.1)', 
+                        borderRadius: '12px', 
+                        padding: '12px', 
+                        color: '#fff', 
+                        fontSize: '0.95rem',
+                        outline: 'none'
+                      }}
+                      autoFocus
+                      required
+                      disabled={creatingProject}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsCreateModalOpen(false)}
+                      style={{ 
+                        background: 'rgba(255,255,255,0.05)', 
+                        border: '1px solid rgba(255,255,255,0.1)', 
+                        color: '#fff', 
+                        padding: '10px 18px', 
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem'
+                      }}
+                      disabled={creatingProject}
+                    >
+                      Otkaži
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="glow-button"
+                      style={{ padding: '10px 18px', borderRadius: '12px', fontSize: '0.9rem' }}
+                      disabled={creatingProject}
+                    >
+                      {creatingProject ? "Kreiranje..." : "Kreiraj projekat"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* FAZA 0: UNOS VIDEA */}
-        {!loading && !videoUrl && !previewFile && !project && (
-          <div className="input-area">
+        {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
+          <div className="input-area" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+               <span style={{ fontSize: '0.95rem', color: '#94a3b8', fontWeight: '600' }}>Učitaj video za obradu</span>
+               <button onClick={resetStudio} className="back-btn" style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer' }}>
+                 Nazad na projekte
+               </button>
+             </div>
              <form onSubmit={handleLoadUrl} className="input-group main-input">
                 <div className="input-wrapper">
                 <input 
@@ -1082,6 +1375,17 @@ function App() {
         {/* FAZA 1.5: INTERAKTIVNI STUDIO EDITOR (DRAFT MOD STATUS) */}
         {project && !loading && !videoUrl && (
           <div className="studio-v2-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            
+            {/* STUDIO HEADER SA DUGMETOM NAZAD */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#f1f5f9' }}>📁 Projekat: {project.name || "Bez naziva"}</span>
+                <span className="status-badge active" style={{ fontSize: '10px' }}>Aktivan radni prostor</span>
+              </div>
+              <button onClick={resetStudio} className="back-btn" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}>
+                Nazad na projekte
+              </button>
+            </div>
             
             {/* Gornji radni blok: Video i Forma */}
             <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>

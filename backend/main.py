@@ -35,6 +35,10 @@ def get_redis_client():
 class VideoRequest(BaseModel):
     url: str
     debug: bool = False
+    project_id: Optional[str] = None
+
+class CreateProjectRequest(BaseModel):
+    name: str
 
 class SegmentItem(BaseModel):
     id: int
@@ -129,10 +133,31 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
 
 @app.post("/api/v1/process-video")
 def process_video(request: VideoRequest):
-    print(f"--- [API RECEIVE] Pokrećem FAZU 1 (Analiza): url={request.url}", flush=True)
+    print(f"--- [API RECEIVE] Pokrećem FAZU 1 (Analiza): url={request.url}, project_id={request.project_id}", flush=True)
     from backend.worker.tasks import analyze_video_task
-    # Pokrećemo analizu (Faza 1)
-    task = analyze_video_task.delay(request.url, request.debug)
+    
+    # Pokrećemo analizu (Faza 1) i prosleđujemo project_id
+    task = analyze_video_task.delay(request.url, request.debug, project_id=request.project_id)
+    
+    r = get_redis_client()
+    if request.project_id:
+        # Čuvamo mapiranje task -> project
+        r.set(f"task:{task.id}:project_id", request.project_id, ex=86400) # 24h
+        # Ažuriramo status projekta u metapodacima na 'analyzing'
+        meta_bytes = r.hget("projects:metadata", request.project_id)
+        if meta_bytes:
+            meta = json.loads(meta_bytes)
+            meta["status"] = "analyzing"
+            r.hset("projects:metadata", request.project_id, json.dumps(meta))
+            
+            # Ažuriramo i sam draft
+            draft_bytes = r.get(f"project:{request.project_id}:draft")
+            if draft_bytes:
+                draft = json.loads(draft_bytes)
+                draft["status"] = "analyzing"
+                draft["video_url"] = request.url
+                r.set(f"project:{request.project_id}:draft", json.dumps(draft), ex=604800)
+                
     return {
         "status": "success",
         "message": "Započet asinhroni proces analize videa.",
@@ -140,6 +165,83 @@ def process_video(request: VideoRequest):
     }
 
 # --- NOVE RUTE ZA DVOFAZNI PIPELINE ---
+
+@app.post("/api/v1/project")
+def create_project(request: CreateProjectRequest):
+    import uuid
+    from datetime import datetime
+    
+    project_id = str(uuid.uuid4())
+    r = get_redis_client()
+    
+    # Inicijalni draft objekat
+    draft_data = {
+        "project_id": project_id,
+        "name": request.name,
+        "status": "empty",
+        "created_at": datetime.now().isoformat(),
+        "segments": []
+    }
+    r.set(f"project:{project_id}:draft", json.dumps(draft_data), ex=604800)
+    
+    # Metapodatke čuvamo u projects:metadata HASH-u
+    meta_data = {
+        "id": project_id,
+        "name": request.name,
+        "video_title": "",
+        "status": "empty",
+        "created_at": datetime.now().isoformat()
+    }
+    r.hset("projects:metadata", project_id, json.dumps(meta_data))
+    
+    return meta_data
+
+@app.get("/api/v1/projects")
+def list_projects():
+    r = get_redis_client()
+    all_projects_raw = r.hgetall("projects:metadata")
+    projects = []
+    for pid_bytes, data_bytes in all_projects_raw.items():
+        try:
+            projects.append(json.loads(data_bytes))
+        except Exception:
+            continue
+    # Sortiramo od najnovijih ka najstarijim
+    projects.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    return projects
+
+@app.delete("/api/v1/project/{project_id}")
+def delete_project(project_id: str):
+    r = get_redis_client()
+    
+    # Učitavamo draft da bismo obrisali lokalne fajlove na disku ako postoje
+    draft_bytes = r.get(f"project:{project_id}:draft")
+    if draft_bytes:
+        try:
+            project_data = json.loads(draft_bytes)
+            # Brišemo video, vocals, no_vocals i dubbed_audio
+            for key in ["video_path", "vocals_path", "no_vocals_path", "dubbed_audio_path"]:
+                path = project_data.get(key)
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                        print(f"[CLEANUP] Obrisao fajl: {path}")
+                    except Exception as fe:
+                        print(f"[CLEANUP] Greška pri brisanju fajla {path}: {fe}")
+            # Brišemo i pojedinačne segment TTS fajlove
+            for s in project_data.get("segments", []):
+                tts_path = s.get("tts_path")
+                if tts_path and os.path.exists(tts_path):
+                    try:
+                        os.remove(tts_path)
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[CLEANUP ERROR] Greška pri čišćenju fajlova projekta: {e}")
+            
+    r.delete(f"project:{project_id}:draft")
+    r.hdel("projects:metadata", project_id)
+    return {"status": "success", "message": "Projekat je uspešno obrisan."}
 
 @app.get("/api/v1/project/{project_id}")
 def get_project_draft(project_id: str):
@@ -593,8 +695,15 @@ def save_mixer_settings(task_id: str, request: MixerSettingsRequest):
 @app.get("/api/v1/status/{task_id}")
 def get_task_status(task_id: str):
     task_result = AsyncResult(task_id, app=celery_app)
+    
+    r = get_redis_client()
+    project_id = r.get(f"task:{task_id}:project_id")
+    if project_id:
+        project_id = project_id.decode('utf-8')
+        
     response = {
         "task_id": task_id,
+        "project_id": project_id,
         "status": task_result.status,
     }
     if task_result.status == "PROGRESS":
