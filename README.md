@@ -141,8 +141,6 @@ sinhronizuj.me/
 ├── Dockerfile               # API/Worker Docker slika za Hetzner VPS
 ├── requirements.txt         # Python biblioteke
 ├── istorija_izrade.md       # Dnevnik razvoja sa hronološkim izmenama
-├── tok_podataka_pipeline_v2.md   # [NOVO] Detaljan dvofazni tok podataka kroz pipeline (Markdown)
-└── tok_podataka_pipeline_v2.txt  # [NOVO] Detaljan dvofazni tok podataka kroz pipeline (Text)
 ```
 
 ---

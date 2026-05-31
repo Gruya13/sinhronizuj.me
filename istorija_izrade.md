@@ -1413,3 +1413,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:**
     - **Uklonjeni testovi i privremene skripte:** Obrisao sam i uklonio iz Git praćenja cele foldere `scratch/` i `test/` koji su sadržali privremene i lokalne test skripte. Takođe, očistio sam lokalne privremene i log datoteke (`fetch_logs.py`, `fetch_logs_local.py`, `log.txt`, `test_out.txt`, `translation_debug.txt`).
 - **Status:** Repozitorijum je očišćen i spreman za produkciju. Izmene su push-ovane na granu development.
+
+### 31.05.2026. 11:25 — Uklanjanje datoteka toka podataka sa GitHub repozitorijuma
+- **Zahtev:** Korisnik je zatražio da se datoteke toka podataka uklone sa GitHub-a.
+- **Urađeno:**
+    - **Uklonjeni pipeline fajlovi:** Obrisao sam i uklonio iz Git praćenja sve datoteke toka podataka: `tok_podataka_pipeline.md`, `tok_podataka_pipeline.txt`, `tok_podataka_pipeline_v2.md` i `tok_podataka_pipeline_v2.txt`. Takođe, obrisao sam i lokalni `pipeline_map.md`.
+    - **Ažuriran README.md:** Uklonio sam reference na ove datoteke iz fajl strukture u `README.md`.
+- **Status:** Datoteke toka podataka uspešno uklonjene sa GitHub-a i lokalno, a izmene push-ovane na granu development.
