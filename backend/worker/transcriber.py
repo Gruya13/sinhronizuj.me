@@ -114,7 +114,7 @@ def arbitrate_transcripts(whisper_segments: list, sensevoice_text: str) -> list:
             "model": "qwen-lektor",
             "messages": [{"role": "user", "content": arbitration_prompt}],
             "temperature": 0.1,
-            "max_tokens": 4096
+            "max_tokens": 1500
         }
         url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
         

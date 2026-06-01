@@ -1148,96 +1148,8 @@ function App() {
           </div>
         )}
 
-        {/* MODAL ZA KREIRANJE PROJEKTA */}
-        <AnimatePresence>
-          {isCreateModalOpen && (
-            <div 
-              style={{ 
-                position: 'fixed', 
-                top: 0, 
-                left: 0, 
-                width: '100vw', 
-                height: '100vh', 
-                background: 'rgba(0,0,0,0.6)', 
-                backdropFilter: 'blur(8px)', 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                zIndex: 9999 
-              }}
-              onClick={() => setIsCreateModalOpen(false)}
-            >
-              <div 
-                style={{ 
-                  background: 'rgba(25, 28, 41, 0.95)', 
-                  border: '1px solid rgba(255,255,255,0.1)', 
-                  borderRadius: '24px', 
-                  padding: '30px', 
-                  width: '90%', 
-                  maxWidth: '400px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '20px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>Novi Projekat</h3>
-                <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Naziv projekta</label>
-                    <input 
-                      type="text" 
-                      placeholder="npr. Sinhronizacija AI Agent"
-                      value={newProjectName} 
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        background: 'rgba(255,255,255,0.05)', 
-                        border: '1px solid rgba(255,255,255,0.1)', 
-                        borderRadius: '12px', 
-                        padding: '12px', 
-                        color: '#fff', 
-                        fontSize: '0.95rem',
-                        outline: 'none'
-                      }}
-                      autoFocus
-                      required
-                      disabled={creatingProject}
-                    />
-                  </div>
 
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                    <button 
-                      type="button" 
-                      onClick={() => setIsCreateModalOpen(false)}
-                      style={{ 
-                        background: 'rgba(255,255,255,0.05)', 
-                        border: '1px solid rgba(255,255,255,0.1)', 
-                        color: '#fff', 
-                        padding: '10px 18px', 
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem'
-                      }}
-                      disabled={creatingProject}
-                    >
-                      Otkaži
-                    </button>
-                    <button 
-                      type="submit" 
-                      className="glow-button"
-                      style={{ padding: '10px 18px', borderRadius: '12px', fontSize: '0.9rem' }}
-                      disabled={creatingProject}
-                    >
-                      {creatingProject ? "Kreiranje..." : "Kreiraj projekat"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </AnimatePresence>
+
 
         {/* FAZA 0: UNOS VIDEA */}
         {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
@@ -2328,6 +2240,97 @@ function App() {
         )}
 
       </div>
+
+      {/* MODAL ZA KREIRANJE PROJEKTA */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <div 
+            style={{ 
+              position: 'fixed', 
+              top: 0, 
+              left: 0, 
+              width: '100vw', 
+              height: '100vh', 
+              background: 'rgba(0,0,0,0.6)', 
+              backdropFilter: 'blur(8px)', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              zIndex: 9999 
+            }}
+            onClick={() => setIsCreateModalOpen(false)}
+          >
+            <div 
+              style={{ 
+                background: 'rgba(25, 28, 41, 0.95)', 
+                border: '1px solid rgba(255,255,255,0.1)', 
+                borderRadius: '24px', 
+                padding: '30px', 
+                width: '90%', 
+                maxWidth: '400px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '20px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f1f5f9' }}>Novi Projekat</h3>
+              <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Naziv projekta</label>
+                  <input 
+                    type="text" 
+                    placeholder="npr. Sinhronizacija AI Agent"
+                    value={newProjectName} 
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    style={{ 
+                      width: '100%', 
+                      background: 'rgba(255,255,255,0.05)', 
+                      border: '1px solid rgba(255,255,255,0.1)', 
+                      borderRadius: '12px', 
+                      padding: '12px', 
+                      color: '#fff', 
+                      fontSize: '0.95rem',
+                      outline: 'none'
+                    }}
+                    autoFocus
+                    required
+                    disabled={creatingProject}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsCreateModalOpen(false)}
+                    style={{ 
+                      background: 'rgba(255,255,255,0.05)', 
+                      border: '1px solid rgba(255,255,255,0.1)', 
+                      color: '#fff', 
+                      padding: '10px 18px', 
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem'
+                    }}
+                    disabled={creatingProject}
+                  >
+                    Otkaži
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="glow-button"
+                    style={{ padding: '10px 18px', borderRadius: '12px', fontSize: '0.9rem' }}
+                    disabled={creatingProject}
+                  >
+                    {creatingProject ? "Kreiranje..." : "Kreiraj projekat"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

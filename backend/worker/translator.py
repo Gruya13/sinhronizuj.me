@@ -9,6 +9,26 @@ from typing import List, Dict
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
+CYRILLIC_TO_LATIN = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'ђ': 'đ', 'е': 'e', 'ж': 'ž',
+    'з': 'z', 'и': 'i', 'ј': 'j', 'к': 'k', 'л': 'l', 'љ': 'lj', 'м': 'm', 'н': 'n',
+    'њ': 'nj', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'ћ': 'ć', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'č', 'џ': 'dž', 'ш': 'š',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Ђ': 'Đ', 'Е': 'E', 'Ж': 'Ž',
+    'З': 'Z', 'И': 'I', 'Ј': 'J', 'К': 'K', 'Л': 'L', 'Љ': 'Lj', 'М': 'M', 'Н': 'N',
+    'Њ': 'Nj', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'Ћ': 'Ć', 'У': 'U',
+    'Ф': 'F', 'Х': 'H', 'Ц': 'C', 'Ч': 'Č', 'Џ': 'Dž', 'Ш': 'Š',
+    'ѓ': 'đ', 'ќ': 'ć', 'ѕ': 'dz', 'Ѓ': 'Đ', 'Ќ': 'Ć', 'Ѕ': 'Dz'
+}
+
+def to_latin(text: str) -> str:
+    if not text:
+        return text
+    res = []
+    for char in text:
+        res.append(CYRILLIC_TO_LATIN.get(char, char))
+    return "".join(res)
+
 def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
     """
     Izvlači num_frames frejmova iz videa i vraća ih kao Base64 stringove.
@@ -315,36 +335,74 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         for j, seg in enumerate(batch_translated):
             global_idx = batch_start + j
             duration = seg["end"] - seg["start"]
-            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {batch_original[j]['text']} | SRB: {seg['text']}\n"
+            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {batch_original[j]['text']} | SRB: {to_latin(seg['text'])}\n"
             
         lektor_prompt = (
-            "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, te da ga prilagodiš i potpuno preformulišeš tamo gde zvuči rogobatno, neprirodno ili je predugačak za izgovor.\n\n"
-            "PRAVILA ZA KOREKCIJU I UREĐIVANJE:\n"
-            "1. KROĆENJE I SAŽIMANJE PREMA TRAJANJU (KLJUČNO ZA PRIRODAN TEMPO GOVORA):\n"
-            "   - Broj karaktera u segmentu (uključujući razmake) ne sme preći (trajanje * 20). Skrati ga bez milosti ako prelazi limit, koristeći kraće sinonime i izbacujući suvišne reči (npr. 'U roku od pet minuta nakon uključivanja' -> 'Za pet minuta', 'kako bi videli da li može da vodi prodavnicu' -> 'da vide može li voditi radnju').\n"
-            "2. APSTRAKCIJA LINGVISTIČKIH PRAVILA:\n"
-            "   - PRAVILO ZA PASIV: Pretvaraj pasivne rečenice u aktivne jer su kraće i zvuče prirodnije na srpskom.\n"
-            "   - PRAVILO ZA UZVIKE I POŠTAPALICE: Ignoriši poštapalice (npr. 'like', 'you know', 'well', 'so') i ne prevodi ih.\n"
-            "   - PRAVILO ZA DEKLINACIJU STRANIH IMENA I BRENDOVA: Obavezno dekliniraj strana imena i brendove kroz padeže u srpskom jeziku (npr. 'stvorio Lunu', 'sa Klodom', 'preko Zuma', 'na Linkedinu'). Nikada ne ostavljaj ime u nominativu ako smisao zahteva drugi padež.\n"
-            "   - PRAVILO ZA FONETIKU: Sve strane brendove, platforme, lična imena i naslove piši isključivo FONETSKI, tj. onako kako se izgovaraju na srpskom ('Endon Labs', 'Klod', 'Zum', 'Linkedin', 'Indid', 'Kregzlist', 'Kau Holou'). Nemoj prevoditi njihovo značenje na srpski i ne ostavljaj engleski pravopis niti crtice (nikako ne piši 'Ej-Aj' sa crticom, već 'Ej Aj').\n"
-            "   - PREVOD REČI 'FUTURE': Reč 'future' kao imenica se uvek prevodi kao 'budućnost' (npr. 'tu budućnost' / 'takvu budućnost', nikako 'to buduće').\n"
-            "   - GRAMATIKA I PRAVOPIS: Oblast 'robotics' je na srpskom 'robotika' (koristi se u jednini - 'robotici', 'robotikom'). Glagol 'raditi' u 3. licu množine prezenta je isključivo 'RADE' (nikada 'radu'). Množina imenice 'intervju' u akuzativu je 'INTERVJUE' (nikada 'intervjuove').\n"
-            "   - DOSLEDNO OBRAĆANJE: Koristi isključivo neformalno obraćanje 'ti' (npr. 'ako želiš da ostaneš... prati za više'), nikako mešanje sa množinom 'vi' ('želiš... pratite').\n\n"
+            "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš sve greške i vratiš tečan, potpuno prirodan srpski prevod.\n\n"
+            "OBAVEZNA PRAVILA ZA PREVOĐENJE I UREĐIVANJE:\n\n"
+            "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM:\n"
+            "   - Celokupan tvoj izlaz mora biti na srpskoj latinici (nikada ćirilica i nikada mešavina pisama).\n\n"
+            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI ISKLJUČIVO ISPRAVNE LEKCIJE):\n"
+            "   * ZAVARIVANJE:\n"
+            "     - \"thin square tubes\" -> tanke kvadratne cevi (nikada \"navojne šipke\")\n"
+            "     - \"welding rods\" -> elektrode za zavarivanje (nikada \"vješačke žice\" ili \"navojne šipke\")\n"
+            "     - \"welder\" / \"welders\" -> zavarivač / zavarivači (nikada \"zavaričar\", \"vještački\", \"varilac\")\n"
+            "     - \"angle iron\" / \"angle irons\" -> ugaoni profil / ugaoni profili (nikada \"ugaona brusilica\" ili \"ugla čelika\")\n"
+            "     - \"angle grinder\" -> ugaona brusilica (nikada \"ugaoni šljivac\")\n"
+            "     - \"nut\" -> matica (nikada \"gumb\" ili \"matrica\")\n"
+            "     - \"seamless welding\" -> savršeni var / čisto zavarivanje\n"
+            "     - \"tack weld\" -> heftanje / punktiranje\n"
+            "     - \"steel pipe\" -> čelična cev (nikada \"čelikov trub\")\n"
+            "   * RUKOTVORINE / BIOLOGIJA / OSTALO:\n"
+            "     - \"seashell\" / \"shell\" -> školjka / školjke (nikada \"ljuska\" ili \"skalica\")\n"
+            "     - \"wire saw\" -> žičana testera (nikada \"žicni prugljac\")\n"
+            "     - \"grinding\" / \"sanding\" -> brušenje / šmirglanje (nikada \"grizem\" ili \"šareno\")\n"
+            "     - \"breeding\" -> uzgoj / razmnožavanje (nikada \"porodnja\" ili \"porodenje\")\n"
+            "     - \"mosquitoes\" -> komarci / ženke komaraca (nikada \"komarice\" ili \"žene komarice\")\n"
+            "     - \"hatch\" -> izleći se (nikada \"iskljući\" ili \"prenaseti\")\n"
+            "     - \"feels\" -> oseća (nikada \"čuje\")\n"
+            "     - \"wireless\" -> bežični / bežične (nikada \"bezvodne\")\n"
+            "     - \"jammer\" -> ometač / blokator (nikada \"blokera\")\n"
+            "     - \"serious\" -> ozbiljan (nikada \"seriozan\")\n\n"
+            "3. STRIKTNA EKAVICA I PRAVOPIS (BEZ DIJALEKATA, IJEKAVICE I STRANIH REČI):\n"
+            "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima:\n"
+            "     * \"koj\" / \"кој\" -> koji\n"
+            "     * \"čovekot\" -> čovek\n"
+            "     * \"исчезне\" / \"исчезнува\" -> nestane / nestaje\n"
+            "     * \"заштића\" / \"заштитуva\" -> štiti\n"
+            "     * \"anticonceptiv\" -> kontracepcija\n"
+            "     * \"mogućno\" -> moguće\n"
+            "     * \"funguje\" -> deluje / radi\n"
+            "     * \"Ne su\" / \"ne sa\" -> Nisu\n"
+            "     * \"seksuješ\" / \"seksovanje\" -> isečeš / sečenje / podela\n"
+            "     * \"škubi\" -> lomi se / puca\n"
+            "     * \"smije\" -> smeje\n"
+            "     * \"dijela\" / \"dijelovi\" -> dela / delovi\n"
+            "     * \"dijel\" -> deo\n"
+            "     * \"vidio\" -> video\n"
+            "     * \"rješenje\" -> rešenje\n"
+            "     * \"točke\" / \"točka\" -> tačke / tačka\n"
+            "     * \"spokoen\" -> spokojan\n"
+            "     * \"štorme\" / \"štormovi\" -> oluje\n"
+            "     * \"zavariť\" -> zavariti\n"
+            "     * \"poroditi se\" -> pariti se (za komarce/životinje)\n"
+            "     * \"zaostrili\" -> zabrinuli\n"
+            "     * \"korisnena\" -> korišćena\n"
+            "     * \"ispuskači\" -> pustiti / osloboditi\n"
+            "     * \"nacrtai\" -> nacrtaj\n"
+            "     * \"stricno\" -> striktno\n\n"
+            "4. STROGA OGRANIČENJA TRAJANJA I MIKRO-SEGMENTI:\n"
+            "   - Broj karaktera sa razmacima NE SME PREĆI (trajanje * 20). Ovo pravilo je apsolutno. Ako rečenica prelazi limit, skrati je bez milosti, izbaci nebitne reči ili detalje i ostavi samo osnovnu poruku.\n"
+            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!). Nema prevođenja niti objašnjavanja, samo vrati `\"\"`.\n"
+            "   - KRATKI SEGMENTI (trajanje od 0.5s do 1.2s): Skrati prevod na samo 1 do maksimalno 2 reči (npr. \"Jedan\", \"Dva\", \"Tri\", \"Da\", \"Ne\", \"Ozbiljno\").\n\n"
+            "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
+            "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\" ili \"Uredi\").\n"
+            "   - Koristi ispravne imperativne oblike: \"Poravnaj\" (a ne \"Poravna\"), \"Zavari\" (a ne \"Zavarite\"), \"Iseci\" (a ne \"Iseči\"), \"Nacrtaj\" (a ne \"Nacrtai\").\n\n"
             "FORMAT ODGOVORA:\n"
             "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
             "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
-            "  - 'analysis': kratko obrazloženje odluka (npr. 'Tema: biznis. Brz tempo, skraćujem rečenicu. Pasiv prebacujem u aktiv.')\n"
+            "  - 'analysis': kratko obrazloženje odluka (npr. 'Trajanje < 0.5s, vraćam prazan string.')\n"
             "  - 'refined_text': korigovan i očišćen prevod na srpskom jeziku\n\n"
-            "Primer JSON izlaza:\n"
-            "{\n"
-            "  \"segments\": [\n"
-            "    {\n"
-            "      \"id\": 0,\n"
-            "      \"analysis\": \"Original ima trajanje 8.2s. Prevod staje u limit. Zamenjujem 'AI' sa 'Ej Aj' u ispravnom padežu, fonetski pišem San Francisko.\",\n"
-            "      \"refined_text\": \"Ova firma je dala Ej Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku da vide može li voditi radnju.\"\n"
-            "    }\n"
-            "  ]\n"
-            "}\n\n"
             f"TEKST ZA LEKTURU:\n{lektor_input}"
         )
 
@@ -353,7 +411,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.1,
-                "max_tokens": 1000
+                "max_tokens": 2000
             }
             
             lektor_output = call_modal_endpoint(
@@ -370,23 +428,19 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
             print(f"[DEBUG] BATCH {batch_idx + 1} LEKTOR OUTPUT:\n{lektor_raw}", flush=True)
             
-            # Parsiranje JSON-a sa ugrađenim fallback mehanizmima
             try:
                 data = json.loads(lektor_raw)
                 for item in data.get("segments", []):
                     idx = item.get("id")
-                    text = item.get("refined_text", "").strip()
+                    text = item.get("refined_text", "")
+                    if isinstance(text, str):
+                        text = text.strip()
                     analysis = item.get("analysis", "")
-                    if idx is not None and text:
-                        # Verifikacija da je ID u opsegu ovog batch-a
+                    if idx is not None and isinstance(text, str):
                         if batch_start <= idx < batch_start + len(batch_translated):
                             parsed_lektor_dict[idx] = text
                             print(f"[LEKTOR] Segment {idx} lekturisan. CoT: {analysis}", flush=True)
-                        else:
-                            print(f"[WARNING] Lektor vratio ID {idx} van opsega batch-a ({batch_start} do {batch_start + len(batch_translated) - 1})")
-            except json.JSONDecodeError as json_err:
-                print(f"[ERROR] Greška pri JSON parsiranju izlaza lektora za batch {batch_idx + 1}: {json_err}")
-                print("[INFO] Pokušavam fallback čišćenje markdown tagova...")
+            except json.JSONDecodeError:
                 try:
                     clean_raw = lektor_raw.strip()
                     if clean_raw.startswith("```"):
@@ -395,12 +449,14 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                     data = json.loads(clean_raw)
                     for item in data.get("segments", []):
                         idx = item.get("id")
-                        text = item.get("refined_text", "").strip()
-                        if idx is not None and text:
+                        text = item.get("refined_text", "")
+                        if isinstance(text, str):
+                            text = text.strip()
+                        if idx is not None and isinstance(text, str):
                             if batch_start <= idx < batch_start + len(batch_translated):
                                 parsed_lektor_dict[idx] = text
                 except Exception as fallback_err:
-                    print(f"[ERROR] Fallback JSON parsiranje takođe neuspešno: {fallback_err}")
+                    print(f"[ERROR] Fallback JSON parsiranje neuspešno: {fallback_err}")
         except Exception as batch_err:
             print(f"[WARNING] Greška u Lektor batchu {batch_idx + 1}: {batch_err}")
 

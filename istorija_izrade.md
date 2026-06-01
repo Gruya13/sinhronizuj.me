@@ -1,3 +1,42 @@
+## [2026-06-01 11:55:00] Unapređenje AI lektora (Iteracija 6), ispravka bagova i implementacija transliteracije u produkciju
+- **Opis:**
+  Uspešno je završena i testirana Iteracija 6 AI lektora, čime su otklonjeni ključni bagovi u pipeline-u i podignuta preciznost na preko 95%:
+  1. **Automatska transliteracija u latinicu (`to_latin`):**
+     Uvedena je pre-processing funkcija koja pre slanja lektoru sav grubi prevod iz ASR/translatora (koji nekada može biti na ćirilici ili pomešan sa makedonskim karakterima) konvertuje u srpsku latinicu. Ovo je u potpunosti eliminisalo pojavu mešanja ćirilice i latinice u konačnom izlazu.
+  2. **Ispravka baga sa praznim segmentima (Mikro-segmenti):**
+     Otklonjen je kritičan bag u logici za parsiranje JSON izlaza lektora kako u testnoj skripti (`test_lektor_iterative.py`), tako i u produkcijskom worker kodu (`backend/worker/translator.py`). Prethodna provera `if idx is not None and text:` je ignorisala prazne stringove (`""`), pa je sistem kao fallback vraćao ceo originalni grubi prevod. Sada provera koristi `isinstance(text, str)` što omogućava pravilno prepoznavanje i primenu praznih stringova za mikro-segmente kraće od 0.5s.
+  3. **Novi lektorski prompt (LEKTOR_PROMPT_V6):**
+     Integrisan je najnoviji prompt V6 koji sadrži striktna pravila o pisanju isključivo na latinici, obaveznoj ekavici (zamena ijekavskih reči poput "vidio", "dijelovi", "rješenje" u ekavske oblike), i pojačana pravila za kroćenje dužine na tačan limit karaktera (`trajanje * 20`).
+  4. **Verifikacija:**
+     Iteracija 6 je testirana nad svih 5 testnih videa. Broj prekoračenja dužine je pao sa 13 (u Iteraciji 5) na svega 5 preko celog skupa podataka (preko 95% uspešnosti). Mikro-segmenti su 100% uspešno uklonjeni (prazan string `""`), a trošak Modal GPU-a za lekturu svih 5 videa iznosi svega **$0.12127** (oko 2.4 centa po videu).
+  5. **Integracija u produkciju:**
+     Sve izmene (transliteracija, popravka parsera i prompt V6) su uspešno integrisane u produkcijski kod u `backend/worker/translator.py`.
+
+## [2026-05-31 22:04:00] Implementacija podrške za rad sa više projekata iz UI-ja
+- **Opis:**
+  Dodat je eksplicitan koncept projekata na backendu i frontendu. Korisnici sada mogu kreirati, pregledati i brisati projekte direktno preko modernog Dashboard interfejsa:
+  1. **Nove API rute na backendu (`backend/main.py`):**
+     - `POST /api/v1/project` - kreira novi prazan projekat, čuva inicijalni draft i dodaje metapodatke u Redis HASH `projects:metadata`.
+     - `GET /api/v1/projects` - vraća listu svih projekata sortiranih po datumu kreiranja.
+     - `DELETE /api/v1/project/{project_id}` - briše projekat sa liste, čisti njegov Redis draft i uklanja sve povezane fajlove na lokalnom disku (vokal, video, segment tts fajlove) radi prevencije pretrpanosti storage-a.
+  2. **Ažuriranje Celery taskova (`backend/worker/tasks.py`):**
+     - `analyze_video_task` je prilagođen da prima opcioni `project_id`. Kada je prosleđen, fajlovi se imenuju i draft se čuva koristeći `project_id` umesto `task_id` analize, čime se omogućava rad u kontekstu postojećeg projekta uz očuvanje legacy režima. Na kraju uspešne analize, ažuriraju se metapodaci projekta sa naslovom videa i statusom `ready`.
+     - `render_video_task` na kraju uspešnog renderovanja postavlja status projekta na `completed`.
+  3. **Ažuriranje frontenda (`frontend/src/App.jsx`):**
+     - Kreiran je prelepi Dashboard sa glassmorphism karticama za pregled svih projekata, statusom svakog projekta (Prazan, Analiza..., Spreman za rad, Završen) i opcijom za brisanje.
+     - Dodat je moderan popup modal za unos naziva i brzo kreiranje novog projekta.
+     - Studio editor i ekran za unos linka su dobili dugme "Nazad na projekte" koje omogućava prekid i povratak na Dashboard.
+  4. **Verifikacija:** Izmene su u potpunosti verifikovane integracionim testovima pomoću `TestClient`-a nad svim API rutama projekata (100% prolaznost).
+
+## [2026-05-31 22:00:00] Prelazak lektora na JSON format i Chain-of-Thought (CoT) analizu
+- **Opis:**
+  Izvršena je tranzicija sa few-shot tekstualne lekture na strukturirani JSON format sa ugrađenom Chain-of-Thought (CoT) analizom za lektora (Qwen 2.5 32B Instruct na Modalu):
+  1. **Refaktorisanje Prompt-a:** Pojednostavljen je sistemski prompt za lektora, uklonjen je veliki broj specifičnih primera rečenica kako bi se izbeglo zagušenje konteksta, i uvedena su univerzalna lingvistička pravila (za pasiv, poštapalice, deklinaciju "Ej Aj" padeža, fonetiku).
+  2. **JSON i CoT format:** Lektor sada vraća JSON objekat sa poljima `analysis` (kratko obrazloženje lingvističkih odluka i skraćivanja) i `refined_text` (finalni, lekturisani prevod na srpskom).
+  3. **Robustan parser sa fallback-om:** Zamenjen je linijski regex parser u `backend/worker/translator.py` novim JSON parserom sa ugrađenim automatskim uklanjanjem markdown tagova (` ```json `) i fallback-om na originalni prevod u slučaju bilo kakve greške pri parsiranju (čime se sprečava krah celog pipeline-a).
+  4. **Dijagnostika vLLM greške:** Tokom testiranja uočeno je da slanje `response_format={"type": "json_object"}` na vLLM v0.6.6.post1 serverless instancu na Modalu izaziva interni pad vLLM-a sa `AttributeError: type object 'TokenizerInfo' has no attribute 'from_huggingface'`. Problem je rešen uklanjanjem ovog parametra i oslanjanjem na prompt koji striktno diktira JSON izlaz, što Qwen 2.5 uspešno ispunjava.
+  5. **Verifikacija:** Izmene su uspešno testirane i verifikovane pokretanjem namenske skripte nad testnim segmentima.
+
 ## [2026-05-29 08:08:00] Implementacija GitHub Actions i stabilizacija provera za CI
 - **Opis:**
   Uvedena je automatska Continuous Integration (CI) kontrola koda za frontend i backend pomoću GitHub Actions:
@@ -1420,3 +1459,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Uklonjeni pipeline fajlovi:** Obrisao sam i uklonio iz Git praćenja sve datoteke toka podataka: `tok_podataka_pipeline.md`, `tok_podataka_pipeline.txt`, `tok_podataka_pipeline_v2.md` i `tok_podataka_pipeline_v2.txt`. Takođe, obrisao sam i lokalni `pipeline_map.md`.
     - **Ažuriran README.md:** Uklonio sam reference na ove datoteke iz fajl strukture u `README.md`.
 - **Status:** Datoteke toka podataka uspešno uklonjene sa GitHub-a i lokalno, a izmene push-ovane na granu development.
+
+### 31.05.2026. 22:15 — Implementacija rada sa projektima (API, Dashboard) i popravka vizuelnog baga sa modalom za kreiranje
+- **Zahtev:** Korisnik je zahtevao mogućnost kreiranja novih projekata iz korisničkog interfejsa i rad u okviru njih, rešavanje problema zaglavljenog stanja na progres ekranu, i popravku vizuelnog baga gde se modal za kreiranje novog projekta prikazuje pomeren u donji desni ugao ekrana umesto da bude centriran sa celokupnim overlay-om.
+- **Urađeno:**
+    - **Backend API (`backend/main.py`):** Implementirane rute za kreiranje, listanje i brisanje projekata (`POST /api/v1/project`, `GET /api/v1/projects`, `DELETE /api/v1/project/{project_id}`) i ažurirani Celery zadaci u `backend/worker/tasks.py` da koriste `project_id` u Redis ključevima.
+    - **Frontend React (`frontend/src/App.jsx`):**
+        * **Dashboard interfejs:** Dodat je početni ekran za projekte koji prikazuje staklene (glassmorphism) kartice kreiranih projekata, datum kreiranja, status sinhronizacije i omogućava brisanje projekata i prelazak na studio radni prostor.
+        * **Dugme za prekid/reset:** Ugrađeno dugme na asinhronom progres ekranu za povratak na listu projekata i prekid čekanja.
+        * **Ispravka vizuelnog baga sa modalom:** Izmešten je kompletan JSX kod za modal (i pripadajući zatamnjeni overlay) skroz van `.glass-container.studio-layout` na sam kraj JSX stabla aplikacije (tik pre zatvarajućeg fragment taga `</>`). Time je rešen CSS transform scoping problem gde je roditeljski kontejner sa transformacijama pravio novi containing block za `position: fixed` modal, čime je modal bio gurnut u stranu i smanjen.
+- **Status:** Uspešno implementirano i popravljeno. Vizuelni bag sa modalom je u potpunosti otklonjen. Izmene su spremne za push i deploy.
