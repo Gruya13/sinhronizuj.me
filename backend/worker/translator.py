@@ -1,11 +1,10 @@
-import requests
 import json
 import cv2
 import base64
 import os
 import time
 import re
-from typing import List, Dict
+from typing import List
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
@@ -138,7 +137,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     """
     import time
     translator_duration = 0.0
-    lektor_duration = 0.0
 
     if not segments:
         return {"status": "success", "translated_segments": [], "metrics": {"translator_duration": 0.0, "lektor_duration": 0.0}}
@@ -352,7 +350,6 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bveliki log na zidu\b', 'veliki logo na zidu', text, flags=re.IGNORECASE)
     text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
     text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
-    
     # 14. Ispravka "žele ovo budućnost" -> "žele takvu budućnost"
     text = re.sub(r'\bžele ovo budućnost\b', 'žele takvu budućnost', text, flags=re.IGNORECASE)
     
@@ -368,7 +365,7 @@ def clean_translation_text(text: str) -> str:
 
 def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0):
     """
-    Druga faza: Qwen 2.5 32B (Lektor) lekturiše grubi prevod.
+    Druga faza: Qwen 2.5 32B (Lektor) lekturiše grubi prevod sa programskom deduplikacijom.
     """
     lektor_duration = 0.0
     if not settings.MODAL_LEKTOR_URL:
@@ -381,6 +378,53 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             }
         }
         
+    # 1. Programska deduplikacija ponovljenih identičnih segmenata
+    unique_segments = []
+    seen_keys = set()
+    orig_to_unique_map = {}
+    
+    for i, seg in enumerate(translated_segments):
+        orig_seg = original_segments[i]
+        duration = seg["end"] - seg["start"]
+        
+        # Ključ jedinstvenosti na osnovu engleskog teksta i limita karaktera
+        if duration < 2.5:
+            char_limit = int(duration * 15)
+        else:
+            char_limit = int(duration * 20)
+            
+        key = (orig_seg["text"].strip().lower(), char_limit)
+        
+        if key not in seen_keys:
+            seen_keys.add(key)
+            unique_idx = len(unique_segments)
+            unique_segments.append({
+                "unique_id": unique_idx,
+                "orig_indices": [i],
+                "orig_text": orig_seg["text"],
+                "translated_text": seg["text"],
+                "start": seg["start"],
+                "end": seg["end"],
+                "duration": duration
+            })
+            orig_to_unique_map[i] = unique_idx
+        else:
+            # Povezujemo duplikat sa postojećim jedinstvenim segmentom
+            for u_idx, u_seg in enumerate(unique_segments):
+                u_duration = u_seg["duration"]
+                if u_duration < 2.5:
+                    u_limit = int(u_duration * 15)
+                else:
+                    u_limit = int(u_duration * 20)
+                    
+                u_key = (u_seg["orig_text"].strip().lower(), u_limit)
+                if u_key == key:
+                    u_seg["orig_indices"].append(i)
+                    orig_to_unique_map[i] = u_idx
+                    break
+
+    print(f"[LEKTOR] Deduplikacija završena. Sa originalnih {len(translated_segments)} smanjeno na {len(unique_segments)} jedinstvenih segmenata.", flush=True)
+
     batch_size = 5
     parsed_lektor_dict = {}
     lektor_duration = 0.0
@@ -388,17 +432,16 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
     t_start_lektor = time.time()
     
-    for batch_idx, batch_start in enumerate(range(0, len(translated_segments), batch_size)):
-        batch_translated = translated_segments[batch_start:batch_start + batch_size]
-        batch_original = original_segments[batch_start:batch_start + batch_size]
+    for batch_idx, batch_start in enumerate(range(0, len(unique_segments), batch_size)):
+        batch_translated = unique_segments[batch_start:batch_start + batch_size]
         
         print(f"[LEKTOR] Pokrećem Lektor batch {batch_idx + 1} (segmenti {batch_start} do {batch_start + len(batch_translated) - 1})...", flush=True)
         
         lektor_input = ""
         for j, seg in enumerate(batch_translated):
             global_idx = batch_start + j
-            duration = seg["end"] - seg["start"]
-            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {batch_original[j]['text']} | SRB: {to_latin(seg['text'])}\n"
+            duration = seg["duration"]
+            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {seg['orig_text']} | SRB: {to_latin(seg['translated_text'])}\n"
             
         lektor_prompt = (
             "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš sve greške i vratiš tečan, potpuno prirodan srpski prevod na ekavici i latinici.\n\n"
@@ -466,6 +509,15 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
             "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\").\n"
             "   - Koristi ispravne imperativne oblike: \"Poravnaj\", \"Zavari\", \"Iseci\", \"Nacrtaj\".\n\n"
+            "6. LINGVISTIČKA SAMOKONTROLA (IZUZETNO VAŽNO):\n"
+            "   - Pre nego što doneseš konačan prevod, u polju 'analysis' (CoT) obavezno razloži značenje teških fraza u kontekstu i proveri gramatičko slaganje (rod, broj, padež).\n"
+            "   - NIKADA ne koristi nepravilne prevode poput:\n"
+            "     * \"where it gets crazy\" -> \"šaljubiti\" (ispravno: \"postaje ludo\" ili \"ludo počinje\")\n"
+            "     * \"It turns out...\" -> \"Ispitao je\" (ispravno: \"Ispostavilo se\")\n"
+            "     * \"laughs\" -> \"smejte\" ili \"smejne\" (ispravno: \"smeje se\")\n"
+            "     * \"cracked\" (u kontekstu metala/cevi) -> \"povredi\" (ispravno: \"napuklo\" ili \"pukotina\")\n"
+            "     * \"patience\" -> \"trpeće\" ili \"trpešćine\" (ispravno: \"strpljenje\")\n"
+            "     * \"rubs a dark paste\" -> \"smešta tamnim pasta\" (ispravno: \"maže tamnu pastu\")\n\n"
             "FORMAT ODGOVORA:\n"
             "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
             "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
@@ -533,10 +585,12 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
     lektor_duration = time.time() - t_start_lektor
     
+    # 3. Preslikavanje lekturisanih tekstova sa jedinstvenih segmenata na originalne segmente (uključujući duplikate)
     if len(parsed_lektor_dict) > 0:
         for i, seg in enumerate(translated_segments):
-            if i in parsed_lektor_dict:
-                seg["text"] = parsed_lektor_dict[i]
+            unique_idx = orig_to_unique_map.get(i)
+            if unique_idx is not None and unique_idx in parsed_lektor_dict:
+                seg["text"] = parsed_lektor_dict[unique_idx]
         
     # Na kraju, uvek primenjujemo post-processing čišćenje/korekciju teksta na sve segmente
     for seg in translated_segments:

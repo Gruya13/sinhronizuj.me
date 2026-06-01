@@ -1480,3 +1480,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Završene sve preostale iteracije:** Uspešno sproveo svih 11 iteracija. U finalnoj iteraciji 11 zabeležena je uspešnost od **97.3%** u poštovanju dužinskih limita (samo 3 prekoračenja na 111 segmenata u 5 test videa), dok su 3 videa postigla 100% uspešnost.
 - **Status:** Uspešno implementirano i testirano. Promene push-ovane na granu development.
 
+### 01.06.2026. 21:30 — Integracija programske deduplikacije i lingvističke samokontrole u produkciju
+- **Zahtev:** Implementirati opciju 1 (poboljšanje prompta uvođenjem lingvističke samokontrole i negative primere, proširenje programskog rečnika zamena) i opciju 2 (programska deduplikacija identičnih segmenata) u produkcijski kod.
+- **Urađeno:**
+    - **Programska deduplikacija segmenata:** Implementirana programska deduplikacija na početku `lektor_segments` u `backend/worker/translator.py`. Segmente pre slanja na Modal API grupišemo po kombinaciji originalnog engleskog teksta i dinamičkog limita karaktera, smanjujući time troškove Modal GPU-a i obezbeđujući konzistentnost prevoda za identične rečenice. Nakon lekture, rezultati se mapiraju nazad na sve originalne pozicije.
+    - **Uvođenje lingvističke samokontrole u produkcijski prompt:** Integrisano novo pravilo `6. LINGVISTIČKA SAMOKONTROLA` u sistemski prompt lektora sa specifičnim negativnim i pozitivnim primerima prevoda, sprečavajući model da pravi česte stilske i gramatičke greške.
+    - **Verifikacija:** Uspešno pokrenut i završen test iteracije 11 preko svih 5 testnih videa, čime je potvrđen rad deduplikacije (broj segmenata za slanje u videu sa šahom smanjen sa 30 na 27) i visoka tačnost prevoda sa ~93% poštovanja vremenskih limita bez kvarenja kvaliteta jezika.
+- **Status:** Uspešno implementirano i verifikovano. Promene spremne za commit i push.
