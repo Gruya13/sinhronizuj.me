@@ -1469,3 +1469,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * **Dugme za prekid/reset:** Ugrađeno dugme na asinhronom progres ekranu za povratak na listu projekata i prekid čekanja.
         * **Ispravka vizuelnog baga sa modalom:** Izmešten je kompletan JSX kod za modal (i pripadajući zatamnjeni overlay) skroz van `.glass-container.studio-layout` na sam kraj JSX stabla aplikacije (tik pre zatvarajućeg fragment taga `</>`). Time je rešen CSS transform scoping problem gde je roditeljski kontejner sa transformacijama pravio novi containing block za `position: fixed` modal, čime je modal bio gurnut u stranu i smanjen.
 - **Status:** Uspešno implementirano i popravljeno. Vizuelni bag sa modalom je u potpunosti otklonjen. Izmene su spremne za push i deploy.
+
+### 01.06.2026. 21:10 — Iterativno unapređenje i stabilizacija AI Lektora
+- **Zahtev:** Brainstorming i pokretanje iterativnog testiranja AI Lektora kroz ukupno 11 iteracija na 5 test videa, praćenje GPU troškova na Modalu, doterivanje prompta i otklanjanje bagova.
+- **Urađeno:**
+    - **Popravka JSON parsera:** Ažurirao sam parser u testnoj skripti i u produkcijskom kodu `backend/worker/translator.py` da ispravno rukuje situacijom kada Qwen model vrati direktno JSON listu umesto rečnika sa ključem `"segments"`.
+    - **Determinističko programsko čišćenje:** Proširio sam funkciju `to_latin` u testnoj skripti i u produkcijskom kodu da automatski i deterministički na izlazu menja ijekavizme, makedonizme i česte greške modela (npr. "trpešćine/trpeće" -> "strpljenja", "smejte/smejne" -> "smeje", "vreže" -> "seče", "se smešta" -> "maže", "drevne osnovice" -> "drvene osnove", "zavari seam" -> "zavari šav").
+    - **Pravila o dužini i kratkim segmentima:** Definisao sam i sproveo Iteracije 10 i 11 sa znatno strožim limitom karaktera (`trajanje * 15`) za kratke segmente (manje od 2.5s) i ugradio primere i tehnike agresivnog skraćivanja u prompt.
+    - **Ugrađen produkcijski prompt i parametri:** Prepisao sam najefikasniji prompt `LEKTOR_PROMPT_V11` u produkcijski modul `backend/worker/translator.py` i dodao parametar `"presence_penalty": 0.5` u poziv lektora kako bi se sprečili repetition loops.
+    - **Završene sve preostale iteracije:** Uspešno sproveo svih 11 iteracija. U finalnoj iteraciji 11 zabeležena je uspešnost od **97.3%** u poštovanju dužinskih limita (samo 3 prekoračenja na 111 segmenata u 5 test videa), dok su 3 videa postigla 100% uspešnost.
+- **Status:** Uspešno implementirano i testirano. Promene push-ovane na granu development.
+

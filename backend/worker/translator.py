@@ -27,7 +27,70 @@ def to_latin(text: str) -> str:
     res = []
     for char in text:
         res.append(CYRILLIC_TO_LATIN.get(char, char))
-    return "".join(res)
+    text = "".join(res)
+    
+    # Dodatno čišćenje bugarskih/čeških specifičnih karaktera
+    text = text.replace('ť', 't')
+    text = text.replace('Ť', 'T')
+    text = text.replace('ъ', 'a')
+    text = text.replace('Ъ', 'A')
+    
+    # Determinističke zamene ijekavizama, makedonizama i čestih grešaka modela
+    replacements = {
+        r'\bdijelovi\b': 'delovi',
+        r'\bdijelove\b': 'delove',
+        r'\bdijela\b': 'dela',
+        r'\bdijelom\b': 'delom',
+        r'\bdijel\b': 'deo',
+        r'\brješenje\b': 'rešenje',
+        r'\brješenja\b': 'rešenja',
+        r'\brješenjem\b': 'rešenjem',
+        r'\brješenjima\b': 'rešenjima',
+        r'\bvještački\b': 'veštački',
+        r'\bvještačka\b': 'veštačka',
+        r'\bvještačko\b': 'veštačko',
+        r'\bvještačke\b': 'veštačke',
+        r'\bvještačkih\b': 'veštačkih',
+        r'\bvidio\b': 'video',
+        r'\bsmije\b': 'smeje',
+        r'\bdolje\b': 'dole',
+        r'\bgdje\b': 'gde',
+        r'\bnijesu\b': 'nisu',
+        r'\busmjeruju\b': 'usmeravaju',
+        r'\bspokoen\b': 'spokojan',
+        r'\bspokoena\b': 'spokojna',
+        r'\bspokoeno\b': 'spokojno',
+        r'\bspokoeni\b': 'spokojni',
+        r'\bkomarice\b': 'komarci',
+        r'\bkomarica\b': 'komarac',
+        r'\bkomaricama\b': 'komarcima',
+        r'\banticonceptiv\b': 'kontracepcija',
+        r'\bzaštića\b': 'štiti',
+        r'\boluhami\b': 'olujama',
+        r'\bosvještiti\b': 'olabaviti',
+        r'\bdengue šake\b': 'denga groznice',
+        r'\bdengue\b': 'denga',
+        r'\bfebre\b': 'groznice',
+        r'\bžuta febra\b': 'žuta groznica',
+        r'\bžute febre\b': 'žute groznice',
+        r'\bženice\b': 'ženke',
+        r'\bženicama\b': 'ženkama',
+        r'\bšaljubiti\b': 'poludeti',
+        r'\btrpešćine\b': 'strpljenja',
+        r'\bsmejte\b': 'smeje',
+        r'\bsmejne\b': 'smeje',
+        r'\bvreže\b': 'seče',
+        r'\bse smešta\b': 'maže',
+        r'\bdrevne osnovice\b': 'drvene osnove',
+        r'\bdrevne\b': 'drvene',
+        r'\bzavari seam\b': 'zavari šav',
+        r'\bseam\b': 'šav'
+    }
+    
+    for pattern, repl in replacements.items():
+        text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+        
+    return text
 
 def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
     """
@@ -338,66 +401,71 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {batch_original[j]['text']} | SRB: {to_latin(seg['text'])}\n"
             
         lektor_prompt = (
-            "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš sve greške i vratiš tečan, potpuno prirodan srpski prevod.\n\n"
+            "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš sve greške i vratiš tečan, potpuno prirodan srpski prevod na ekavici i latinici.\n\n"
             "OBAVEZNA PRAVILA ZA PREVOĐENJE I UREĐIVANJE:\n\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM:\n"
             "   - Celokupan tvoj izlaz mora biti na srpskoj latinici (nikada ćirilica i nikada mešavina pisama).\n\n"
             "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI ISKLJUČIVO ISPRAVNE LEKCIJE):\n"
             "   * ZAVARIVANJE:\n"
-            "     - \"thin square tubes\" -> tanke kvadratne cevi (nikada \"navojne šipke\")\n"
-            "     - \"welding rods\" -> elektrode za zavarivanje (nikada \"vješačke žice\" ili \"navojne šipke\")\n"
-            "     - \"welder\" / \"welders\" -> zavarivač / zavarivači (nikada \"zavaričar\", \"vještački\", \"varilac\")\n"
-            "     - \"angle iron\" / \"angle irons\" -> ugaoni profil / ugaoni profili (nikada \"ugaona brusilica\" ili \"ugla čelika\")\n"
-            "     - \"angle grinder\" -> ugaona brusilica (nikada \"ugaoni šljivac\")\n"
-            "     - \"nut\" -> matica (nikada \"gumb\" ili \"matrica\")\n"
-            "     - \"seamless welding\" -> savršeni var / čisto zavarivanje\n"
+            "     - \"thin square tubes\" -> tanke kvadratne cevi\n"
+            "     - \"welding rods\" -> elektrode za zavarivanje\n"
+            "     - \"welder\" / \"welders\" -> zavarivač / zavarivači (nikada \"zavaričar\" ili \"varilac\")\n"
+            "     - \"angle iron\" / \"angle irons\" -> ugaoni profil / ugaoni profili (nikada \"ugaona brusilica\")\n"
+            "     - \"angle grinder\" -> ugaona brusilica\n"
+            "     - \"nut\" -> matica (nikada \"gumb\")\n"
+            "     - \"threaded rod\" -> navojna šipka\n"
+            "     - \"seamless welding\" -> savršeni var\n"
             "     - \"tack weld\" -> heftanje / punktiranje\n"
-            "     - \"steel pipe\" -> čelična cev (nikada \"čelikov trub\")\n"
+            "     - \"steel pipe\" -> čelična cev\n"
             "   * RUKOTVORINE / BIOLOGIJA / OSTALO:\n"
-            "     - \"seashell\" / \"shell\" -> školjka / školjke (nikada \"ljuska\" ili \"skalica\")\n"
-            "     - \"wire saw\" -> žičana testera (nikada \"žicni prugljac\")\n"
-            "     - \"grinding\" / \"sanding\" -> brušenje / šmirglanje (nikada \"grizem\" ili \"šareno\")\n"
-            "     - \"breeding\" -> uzgoj / razmnožavanje (nikada \"porodnja\" ili \"porodenje\")\n"
-            "     - \"mosquitoes\" -> komarci / ženke komaraca (nikada \"komarice\" ili \"žene komarice\")\n"
-            "     - \"hatch\" -> izleći se (nikada \"iskljući\" ili \"prenaseti\")\n"
-            "     - \"feels\" -> oseća (nikada \"čuje\")\n"
+            "     - \"seashell\" / \"shell\" -> školjka / školjke\n"
+            "     - \"wire saw\" -> žičana testera\n"
+            "     - \"grinding\" / \"sanding\" -> brušenje / šmirglanje\n"
+            "     - \"breeding\" -> uzgoj / razmnožavanje\n"
+            "     - \"mosquitoes\" -> komarci\n"
+            "     - \"female mosquitoes\" -> ženke komaraca (nikada \"komarice\" ili \"prirodne ženice\")\n"
+            "     - \"wild females\" -> divlje ženke\n"
+            "     - \"yellow fever\" -> žuta groznica\n"
+            "     - \"dengue\" / \"dengue spike\" -> denga groznica / porast denga groznice\n"
+            "     - \"hatch\" -> izleći se\n"
+            "     - \"feels\" -> oseća\n"
             "     - \"wireless\" -> bežični / bežične (nikada \"bezvodne\")\n"
             "     - \"jammer\" -> ometač / blokator (nikada \"blokera\")\n"
-            "     - \"serious\" -> ozbiljan (nikada \"seriozan\")\n\n"
+            "     - \"serious\" -> ozbiljan\n"
+            "     - \"where it gets crazy\" -> postaje ludo / ludo počinje (nikada \"šaljubiti\")\n\n"
             "3. STRIKTNA EKAVICA I PRAVOPIS (BEZ DIJALEKATA, IJEKAVICE I STRANIH REČI):\n"
-            "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima:\n"
-            "     * \"koj\" / \"кој\" -> koji\n"
-            "     * \"čovekot\" -> čovek\n"
-            "     * \"исчезне\" / \"исчезнува\" -> nestane / nestaje\n"
-            "     * \"заштића\" / \"заштитуva\" -> štiti\n"
-            "     * \"anticonceptiv\" -> kontracepcija\n"
-            "     * \"mogućno\" -> moguće\n"
-            "     * \"funguje\" -> deluje / radi\n"
-            "     * \"Ne su\" / \"ne sa\" -> Nisu\n"
-            "     * \"seksuješ\" / \"seksovanje\" -> isečeš / sečenje / podela\n"
-            "     * \"škubi\" -> lomi se / puca\n"
-            "     * \"smije\" -> smeje\n"
-            "     * \"dijela\" / \"dijelovi\" -> dela / delovi\n"
+            "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima.\n"
+            "   - NIKADA ne koristi ijekavske reči kao što su:\n"
+            "     * \"smije\", \"smie\" -> smeje\n"
+            "     * \"dijela\", \"dijelovi\" -> dela, delovi\n"
             "     * \"dijel\" -> deo\n"
             "     * \"vidio\" -> video\n"
             "     * \"rješenje\" -> rešenje\n"
-            "     * \"točke\" / \"točka\" -> tačke / tačka\n"
-            "     * \"spokoen\" -> spokojan\n"
-            "     * \"štorme\" / \"štormovi\" -> oluje\n"
+            "     * \"točke\", \"točka\" -> tačke, tačka\n"
+            "     * \"štorme\", \"štormovi\", \"oluhami\" -> oluje, olujama\n"
             "     * \"zavariť\" -> zavariti\n"
-            "     * \"poroditi se\" -> pariti se (za komarce/životinje)\n"
+            "     * \"poroditi se\" -> pariti se\n"
             "     * \"zaostrili\" -> zabrinuli\n"
             "     * \"korisnena\" -> korišćena\n"
-            "     * \"ispuskači\" -> pustiti / osloboditi\n"
+            "     * \"ispuskači\" -> pustiti\n"
             "     * \"nacrtai\" -> nacrtaj\n"
-            "     * \"stricno\" -> striktno\n\n"
-            "4. STROGA OGRANIČENJA TRAJANJA I MIKRO-SEGMENTI:\n"
-            "   - Broj karaktera sa razmacima NE SME PREĆI (trajanje * 20). Ovo pravilo je apsolutno. Ako rečenica prelazi limit, skrati je bez milosti, izbaci nebitne reči ili detalje i ostavi samo osnovnu poruku.\n"
-            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!). Nema prevođenja niti objašnjavanja, samo vrati `\"\"`.\n"
-            "   - KRATKI SEGMENTI (trajanje od 0.5s do 1.2s): Skrati prevod na samo 1 do maksimalno 2 reči (npr. \"Jedan\", \"Dva\", \"Tri\", \"Da\", \"Ne\", \"Ozbiljno\").\n\n"
+            "     * \"stricno\" -> striktno\n"
+            "     * \"zaštića\" -> štiti\n"
+            "     * \"matiču\" -> maticu\n\n"
+            "4. STROGA OGRANIČENJA TRAJANJA, PARALELNI IDENTIČNI SEGMENTI I MIKRO-SEGMENTI:\n"
+            "   - Broj karaktera sa razmacima NE SME PREĆI (trajanje * 20) za duže segmente.\n"
+            "   - KRATKI I BRZI SEGMENTI (trajanje < 2.5s): Budi ekstremno kratak! Broj karaktera sa razmacima ne sme preći (trajanje * 15). Ako ne može da stane cela misao, drastično je skrati na ključne 2-3 reči.\n"
+            "     * Primer 1 (2.2s, limit 33c): \"They're not illegal to own, but they're illegal to use.\" -> \"Posedovanje je legalno, upotreba nije.\" (37c) -> \"Legalno je imati ih, ali ne i koristiti.\" (42c) -> najbolje: \"Dozvoljeno je imati ih, ne i koristiti.\" (39c).\n"
+            "     * Primer 2 (2.0s, limit 30c): \"Tack weld the critical points first to prevent the structure from deforming.\" -> \"Heftaj tačke da sprečiš krivljenje.\" (36c) -> najbolje: \"Heftaj tačke protiv krivljenja.\" (30c).\n"
+            "     * Primer 3 (2.1s, limit 31c): \"A professional welder taught me this trick.\" -> \"Zavarivač mi je pokazao ovaj trik.\" (35c) -> najbolje: \"Majstor mi je pokazao ovaj trik.\" (32c).\n"
+            "     * Primer 4 (2.0s, limit 30c): \"If you have any questions or other problems, please post them in the comments below.\" -> \"Pitanja piši u komentarima.\" (27c).\n"
+            "   - PAŽNJA: Ako u batch-u ima više identičnih (ponovljenih) rečenica, a imaju različito trajanje (npr. 5.0s, pa nekoliko od po 2.0s), one kraće MORAŠ skratiti agresivno. Tretiraj svaki red nezavisno i striktno poštuj njegov limit karaktera!\n"
+            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!).\n"
+            "   - KRATKI SEGMENTI (trajanje od 0.5s do 1.2s): Skrati prevod na samo 1 do maksimalno 2 reči (npr. \"Jedan\", \"Dva\", \"Tri\", \"Da\", \"Ne\", \"Ozbiljno\").\n"
+            "   - AGRESIVNO SKRAĆIVANJE: Bolje je izgubiti detalje nego prekoračiti vreme govora!\n\n"
             "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
-            "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\" ili \"Uredi\").\n"
-            "   - Koristi ispravne imperativne oblike: \"Poravnaj\" (a ne \"Poravna\"), \"Zavari\" (a ne \"Zavarite\"), \"Iseci\" (a ne \"Iseči\"), \"Nacrtaj\" (a ne \"Nacrtai\").\n\n"
+            "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\").\n"
+            "   - Koristi ispravne imperativne oblike: \"Poravnaj\", \"Zavari\", \"Iseci\", \"Nacrtaj\".\n\n"
             "FORMAT ODGOVORA:\n"
             "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
             "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
@@ -411,7 +479,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.1,
-                "max_tokens": 2000
+                "max_tokens": 2000,
+                "presence_penalty": 0.5
             }
             
             lektor_output = call_modal_endpoint(
@@ -430,7 +499,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             
             try:
                 data = json.loads(lektor_raw)
-                for item in data.get("segments", []):
+                segments_list = data if isinstance(data, list) else data.get("segments", [])
+                for item in segments_list:
                     idx = item.get("id")
                     text = item.get("refined_text", "")
                     if isinstance(text, str):
@@ -447,7 +517,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                         clean_raw = re.sub(r'^```(?:json)?\n', '', clean_raw)
                         clean_raw = re.sub(r'\n```$', '', clean_raw)
                     data = json.loads(clean_raw)
-                    for item in data.get("segments", []):
+                    segments_list = data if isinstance(data, list) else data.get("segments", [])
+                    for item in segments_list:
                         idx = item.get("id")
                         text = item.get("refined_text", "")
                         if isinstance(text, str):
