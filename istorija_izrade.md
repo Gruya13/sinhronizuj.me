@@ -1505,3 +1505,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Smanjenje max_tokens:** Smanjio sam parametar `max_tokens` sa 2000 na 1000 u payload-u za lektora u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py). Ovo je više nego dovoljno za batch-eve od 5 segmenata i rešava grešku 400.
     - **Verifikacija:** Test skriptom je potvrđeno da Modal Lektor sada odgovara uspešno (status 200) i vraća ispravno lekturisane prevode.
 - **Status:** Uspešno dijagnostikovano, popravljeno, ažurirano na VPS-u i spremno za ponovnu proveru.
+
+
+### 02.06.2026. 12:05 — Uvođenje Dinamičkog Glosara i Ažuriranje Lektor Zavisnosti na Modalu
+- **Zahtev:** Korisnik je tražio zamenu modela sa novim `Qwen3-Thinking` modelom i kreiranje dinamičkog glosara bez uvođenja u UI.
+- **Urađeno:**
+    - **Ažuriranje Lektor Zavisnosti (vLLM i Transformers):** Pokušaj pokretanja `Qwen3-30B-A3B-Thinking-2507-FP8` je prvobitno propao sa CUDA Out-Of-Memory greškom jer 30B MoE model u FP8 formatu zahteva ~30GB memorije (što ne staje u 24GB na A10G). Zbog toga smo vratili pouzdan i stabilan `Qwen 2.5 32B Instruct AWQ` model na Modalu, ali smo uspešno ažurirali biblioteke (`vllm` i `transformers` na najnovije verzije) u [lektor_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/lektor_worker.py) radi stabilnosti.
+    - **Implementacija Dinamičkog Glosara:** Uveli smo hibridni dinamički glosar. Kreirana je lokalna baza standardnih termina u [glossaries.json](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/glossaries.json) za najčešće teme (zavarivanje, biologija, IT).
+    - **Backend logika u translatoru:** U [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) smo dodali funkcije za analizu engleskog teksta (`detect_topic_and_terms`), učitavanje i pretraživanje baze, kao i prevođenje nedostajućih stručnih reči preko LLM-a (`translate_terms_to_serbian`) sa instrukcijama za izbegavanje lažnih prevoda i dijalektizama. Glosar se formira jednom po videu i dinamički ubacuje u prompt lektora.
+    - **thought parser:** Ugrađeno je čišćenje `<thought>` blokova pre parsiranja JSON odgovora kako bi sistem bio kompatibilan sa budućim thinking modelima.
+    - **Verifikacija:** Test skriptom je potvrđeno da dinamički glosar i lektor sada rade savršeno i vraćaju visoko kvalitetne, konzistentne srpske prevode bez izmišljenih reči.
+- **Status:** Uspešno implementirano, testirano, ažurirano na VPS-u i push-ovano na granu development.

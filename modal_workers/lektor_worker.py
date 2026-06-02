@@ -10,9 +10,9 @@ image = (
     .apt_install("git", "ffmpeg", "libsm6", "libxext6")
     .pip_install("torch==2.5.1", "torchvision", index_url="https://download.pytorch.org/whl/cu124")
     .pip_install(
-        "vllm==0.6.6.post1",
+        "vllm",
         "huggingface-hub",
-        "transformers==4.46.3",
+        "transformers",
         "git+https://github.com/nicta/pyairports.git"
     )
 )

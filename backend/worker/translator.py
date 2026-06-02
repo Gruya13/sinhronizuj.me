@@ -363,9 +363,157 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
+GLOSSARY_FILE = os.path.join(os.path.dirname(__file__), "glossaries.json")
+
+def load_glossaries() -> dict:
+    if os.path.exists(GLOSSARY_FILE):
+        try:
+            with open(GLOSSARY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[GLOSSARY] Greška pri čitanju {GLOSSARY_FILE}: {e}")
+    return {}
+
+def detect_topic_and_terms(transcript_text: str) -> dict:
+    """
+    Poziva Modal Lektor da detektuje temu i izvuče 5-10 ključnih stručnih termina iz transkripta.
+    Vraća rečnik sa ključevima 'topic' i 'terms'.
+    """
+    if not settings.MODAL_LEKTOR_URL:
+        return {"topic": "other", "terms": []}
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        "Analyze the following English transcript from a video. "
+        "1. Identify the main topic of the video (choose one of: 'welding_and_crafts', 'biology_and_nature', 'technology_and_it', or 'other').\n"
+        "2. Extract 5-10 key technical nouns, verbs, or phrases (jargon) that are central to this video.\n\n"
+        "Respond strictly in JSON format with the following keys:\n"
+        "{\n"
+        "  \"topic\": \"topic_name\",\n"
+        "  \"terms\": [\"term1\", \"term2\", ...]\n"
+        "}\n\n"
+        f"TRANSCRIPT:\n{transcript_text}"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 300
+    }
+    
+    try:
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
+        content = res["choices"][0]["message"]["content"].strip()
+        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```(?:json)?\n', '', content)
+            content = re.sub(r'\n```$', '', content)
+        data = json.loads(content)
+        return {
+            "topic": data.get("topic", "other"),
+            "terms": data.get("terms", [])
+        }
+    except Exception as e:
+        print(f"[GLOSSARY DETECT ERROR] Greška pri detekciji teme: {e}")
+        return {"topic": "other", "terms": []}
+
+def translate_terms_to_serbian(terms: list) -> dict:
+    """
+    Prevedi listu engleskih stručnih pojmova na srpski jezik (ekavica, latinica).
+    """
+    if not terms or not settings.MODAL_LEKTOR_URL:
+        return {}
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        "You are an expert English-to-Serbian translator. Translate the following list of English technical terms "
+        "or jargon into standard Serbian as spoken in Serbia (ekavica, latinica). Keep translations short, accurate, and natural. "
+        "IMPORTANT RULES:\n"
+        "- Use standard Serbian vocabulary only (Serbia, ekavica). Avoid dialectal, archaic, or invented words.\n"
+        "- Avoid Bulgarian, Macedonian, Croatian, or Slovenian words (e.g. do NOT translate 'pipes' as 'trublji' or 'trube' -> use 'cevi'; do NOT translate 'weld' as 'zavar' or 'var'; do NOT translate 'welders' as 'varilci' -> use 'zavarivači'; do NOT translate 'fold' as 'ugovo' -> use 'preklop' or 'presavijanje').\n"
+        "- Translate exactly the list of terms.\n\n"
+        "Respond strictly in JSON format (a single dictionary where keys are English terms and values are Serbian translations):\n"
+        "{\n"
+        "  \"english term\": \"serbian translation\"\n"
+        "}\n\n"
+        f"TERMS: {json.dumps(terms)}"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 400
+    }
+    
+    try:
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
+        content = res["choices"][0]["message"]["content"].strip()
+        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```(?:json)?\n', '', content)
+            content = re.sub(r'\n```$', '', content)
+        return json.loads(content)
+    except Exception as e:
+        print(f"[GLOSSARY TRANSLATE ERROR] Greška pri prevođenju termina: {e}")
+        return {}
+
+def get_dynamic_glossary(transcript_text: str) -> str:
+    """
+    Glavna funkcija koja orkestrira detekciju teme, proveru u bazi i automatski prevod nepoznatih reči.
+    Vraća formatirani tekstualni glosar za prompt lektora.
+    """
+    print("[GLOSSARY] Pokrećem analizu teme i prepoznavanje termina...", flush=True)
+    detect_res = detect_topic_and_terms(transcript_text)
+    topic = detect_res.get("topic", "other")
+    terms = detect_res.get("terms", [])
+    
+    print(f"[GLOSSARY] Detektovana tema: {topic}. Izvučeni termini: {terms}", flush=True)
+    
+    glossaries = load_glossaries()
+    predefined = glossaries.get(topic, {})
+    
+    final_glossary = {}
+    missing_terms = []
+    
+    for term in terms:
+        term_clean = term.strip().lower()
+        found = False
+        for category, cat_dict in glossaries.items():
+            if term_clean in cat_dict:
+                final_glossary[term] = cat_dict[term_clean]
+                found = True
+                break
+        
+        if not found:
+            missing_terms.append(term)
+            
+    if missing_terms:
+        print(f"[GLOSSARY] Prevodim {len(missing_terms)} nepoznatih stručnih termina preko LLM...", flush=True)
+        llm_translations = translate_terms_to_serbian(missing_terms)
+        for eng, srb in llm_translations.items():
+            if srb:
+                final_glossary[eng] = srb
+                
+    for eng, srb in predefined.items():
+        if eng not in final_glossary:
+            final_glossary[eng] = srb
+            
+    if not final_glossary:
+        return "Nema specifičnih termina za ovaj video."
+        
+    glossary_lines = []
+    for eng, srb in final_glossary.items():
+        glossary_lines.append(f'- "{eng}" -> "{srb}"')
+        
+    glossary_str = "\n".join(glossary_lines)
+    print(f"[GLOSSARY] Formiran dinamički glosar sa {len(final_glossary)} stavki.", flush=True)
+    return glossary_str
+
 def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0):
     """
-    Druga faza: Qwen 2.5 32B (Lektor) lekturiše grubi prevod sa programskom deduplikacijom.
+    Druga faza: Qwen 2.5/3.0 Lektor lekturiše grubi prevod sa programskom deduplikacijom i dinamičkim glosarom.
     """
     lektor_duration = 0.0
     if not settings.MODAL_LEKTOR_URL:
@@ -387,7 +535,6 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         orig_seg = original_segments[i]
         duration = seg["end"] - seg["start"]
         
-        # Ključ jedinstvenosti isključivo na osnovu engleskog teksta
         key = orig_seg["text"].strip().lower()
         
         if key not in seen_keys:
@@ -404,7 +551,6 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             })
             orig_to_unique_map[i] = unique_idx
         else:
-            # Povezujemo duplikat sa postojećim jedinstvenim segmentom
             for u_idx, u_seg in enumerate(unique_segments):
                 u_key = u_seg["orig_text"].strip().lower()
                 if u_key == key:
@@ -413,6 +559,14 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                     break
 
     print(f"[LEKTOR] Deduplikacija završena. Sa originalnih {len(translated_segments)} smanjeno na {len(unique_segments)} jedinstvenih segmenata.", flush=True)
+
+    # Generisanje dinamičkog glosara za ceo video pre pokretanja lekture
+    try:
+        transcript_text = " ".join([seg["orig_text"] for seg in unique_segments])
+        dynamic_glossary_str = get_dynamic_glossary(transcript_text)
+    except Exception as e:
+        print(f"[WARNING] Greška pri kreiranju dinamičkog glosara: {e}. Koristim prazan glosar.")
+        dynamic_glossary_str = "Nema specifičnih termina za ovaj video."
 
     batch_size = 5
     parsed_lektor_dict = {}
@@ -437,34 +591,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "OBAVEZNA PRAVILA ZA PREVOĐENJE I UREĐIVANJE:\n\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM:\n"
             "   - Celokupan tvoj izlaz mora biti na srpskoj latinici (nikada ćirilica i nikada mešavina pisama).\n\n"
-            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI ISKLJUČIVO ISPRAVNE LEKCIJE):\n"
-            "   * ZAVARIVANJE:\n"
-            "     - \"thin square tubes\" -> tanke kvadratne cevi\n"
-            "     - \"welding rods\" -> elektrode za zavarivanje\n"
-            "     - \"welder\" / \"welders\" -> zavarivač / zavarivači (nikada \"zavaričar\" ili \"varilac\")\n"
-            "     - \"angle iron\" / \"angle irons\" -> ugaoni profil / ugaoni profili (nikada \"ugaona brusilica\")\n"
-            "     - \"angle grinder\" -> ugaona brusilica\n"
-            "     - \"nut\" -> matica (nikada \"gumb\")\n"
-            "     - \"threaded rod\" -> navojna šipka\n"
-            "     - \"seamless welding\" -> savršeni var\n"
-            "     - \"tack weld\" -> heftanje / punktiranje\n"
-            "     - \"steel pipe\" -> čelična cev\n"
-            "   * RUKOTVORINE / BIOLOGIJA / OSTALO:\n"
-            "     - \"seashell\" / \"shell\" -> školjka / školjke\n"
-            "     - \"wire saw\" -> žičana testera\n"
-            "     - \"grinding\" / \"sanding\" -> brušenje / šmirglanje\n"
-            "     - \"breeding\" -> uzgoj / razmnožavanje\n"
-            "     - \"mosquitoes\" -> komarci\n"
-            "     - \"female mosquitoes\" -> ženke komaraca (nikada \"komarice\" ili \"prirodne ženice\")\n"
-            "     - \"wild females\" -> divlje ženke\n"
-            "     - \"yellow fever\" -> žuta groznica\n"
-            "     - \"dengue\" / \"dengue spike\" -> denga groznica / porast denga groznice\n"
-            "     - \"hatch\" -> izleći se\n"
-            "     - \"feels\" -> oseća\n"
-            "     - \"wireless\" -> bežični / bežične (nikada \"bezvodne\")\n"
-            "     - \"jammer\" -> ometač / blokator (nikada \"blokera\")\n"
-            "     - \"serious\" -> ozbiljan\n"
-            "     - \"where it gets crazy\" -> postaje ludo / ludo počinje (nikada \"šaljubiti\")\n\n"
+            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI OVE PREVODE AKO SE POJAVE U TEKSTU):\n"
+            f"{dynamic_glossary_str}\n\n"
             "3. STRIKTNA EKAVICA I PRAVOPIS (BEZ DIJALEKATA, IJEKAVICE I STRANIH REČI):\n"
             "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima.\n"
             "   - NIKADA ne koristi ijekavske reči kao što su:\n"
@@ -529,10 +657,12 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             except (KeyError, IndexError):
                 lektor_raw = str(lektor_output)
 
-            print(f"[DEBUG] BATCH {batch_idx + 1} LEKTOR OUTPUT:\n{lektor_raw}", flush=True)
+            # Čišćenje thought tagova ako ih model sa rezonovanjem (Qwen3-Thinking) vrati
+            lektor_raw_clean = re.sub(r'<thought>.*?</thought>', '', lektor_raw, flags=re.DOTALL).strip()
+            print(f"[DEBUG] BATCH {batch_idx + 1} LEKTOR CLEANED OUTPUT:\n{lektor_raw_clean}", flush=True)
             
             try:
-                data = json.loads(lektor_raw)
+                data = json.loads(lektor_raw_clean)
                 segments_list = data if isinstance(data, list) else data.get("segments", [])
                 for item in segments_list:
                     idx = item.get("id")
@@ -546,7 +676,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                             print(f"[LEKTOR] Segment {idx} lekturisan. CoT: {analysis}", flush=True)
             except json.JSONDecodeError:
                 try:
-                    clean_raw = lektor_raw.strip()
+                    clean_raw = lektor_raw_clean.strip()
                     if clean_raw.startswith("```"):
                         clean_raw = re.sub(r'^```(?:json)?\n', '', clean_raw)
                         clean_raw = re.sub(r'\n```$', '', clean_raw)
@@ -567,14 +697,12 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
     lektor_duration = time.time() - t_start_lektor
     
-    # 3. Preslikavanje lekturisanih tekstova sa jedinstvenih segmenata na originalne segmente (uključujući duplikate)
     if len(parsed_lektor_dict) > 0:
         for i, seg in enumerate(translated_segments):
             unique_idx = orig_to_unique_map.get(i)
             if unique_idx is not None and unique_idx in parsed_lektor_dict:
                 seg["text"] = parsed_lektor_dict[unique_idx]
         
-    # Na kraju, uvek primenjujemo post-processing čišćenje/korekciju teksta na sve segmente
     for seg in translated_segments:
         if "text" in seg:
             seg["text"] = clean_translation_text(seg["text"])
