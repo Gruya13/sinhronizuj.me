@@ -1496,3 +1496,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Poboljšan "Čarobni štapić" na backendu:** U [main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) na endpointu `/api/v1/project/{project_id}/segment/{segment_id}/shorten` ažurirao sam prompt da striktno sprovodi limit karaktera (`trajanje * 15` za segmente < 2.5s, odnosno `trajanje * 20` za duže) i primenjuje sva leksička i stilska pravila (ekavica, latinica, glosar, ti-forma). Takođe, izlazni tekst se sada post-procesira kroz `clean_translation_text` i `to_latin`.
     - **Verifikacija:** Ažurirao sam testnu skriptu [test_lektor_iterative.py](file:///home/gruya/Projektri/sinhronizuj.me/brainstorming/test_lektor_iterative.py) u skladu sa izmenama i pokrenuo evaluaciju kako bih se uverio da sve radi stabilno bez sintaksnih ili API grešaka.
 - **Status:** Uspešno implementirano, verifikovano i spremno za commit/push.
+
+
+### 02.06.2026. 11:35 — Ispravka vLLM Lektor greške 400 Bad Request
+- **Zahtev:** Korisnik je prijavio da je prevod loš i da ima izmišljenih reči nakon promene toka lektora.
+- **Urađeno:**
+    - **Dijagnostika 400 Bad Request greške:** Analizom logova workera utvrđeno je da Modal Lektor (vLLM Qwen 2.5 32B Instruct) puca sa greškom `400 Client Error: Bad Request` za batch-eve 6, 7 i 8. Daljim testiranjem smo otkrili da zbir tokena ulaza (prompt + input segmenti ~2200) i `max_tokens` (2000) prelazi maksimalnu dužinu konteksta modela od 4096 tokena na vLLM instanci (`2207 + 2000 = 4207 > 4096`). Zbog pucanja lektora, sistem je upadao u fallback na grubi prevodilac koji je vraćao loše prevode sa makedonizmima/ijekavizmima (`vještanje`, `vještaci`).
+    - **Smanjenje max_tokens:** Smanjio sam parametar `max_tokens` sa 2000 na 1000 u payload-u za lektora u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py). Ovo je više nego dovoljno za batch-eve od 5 segmenata i rešava grešku 400.
+    - **Verifikacija:** Test skriptom je potvrđeno da Modal Lektor sada odgovara uspešno (status 200) i vraća ispravno lekturisane prevode.
+- **Status:** Uspešno dijagnostikovano, popravljeno, ažurirano na VPS-u i spremno za ponovnu proveru.

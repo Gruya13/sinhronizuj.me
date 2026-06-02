@@ -513,7 +513,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.1,
-                "max_tokens": 2000,
+                "max_tokens": 1000,
                 "presence_penalty": 0.5
             }
             
