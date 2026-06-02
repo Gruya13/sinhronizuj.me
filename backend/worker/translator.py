@@ -387,13 +387,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         orig_seg = original_segments[i]
         duration = seg["end"] - seg["start"]
         
-        # Ključ jedinstvenosti na osnovu engleskog teksta i limita karaktera
-        if duration < 2.5:
-            char_limit = int(duration * 15)
-        else:
-            char_limit = int(duration * 20)
-            
-        key = (orig_seg["text"].strip().lower(), char_limit)
+        # Ključ jedinstvenosti isključivo na osnovu engleskog teksta
+        key = orig_seg["text"].strip().lower()
         
         if key not in seen_keys:
             seen_keys.add(key)
@@ -411,13 +406,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         else:
             # Povezujemo duplikat sa postojećim jedinstvenim segmentom
             for u_idx, u_seg in enumerate(unique_segments):
-                u_duration = u_seg["duration"]
-                if u_duration < 2.5:
-                    u_limit = int(u_duration * 15)
-                else:
-                    u_limit = int(u_duration * 20)
-                    
-                u_key = (u_seg["orig_text"].strip().lower(), u_limit)
+                u_key = u_seg["orig_text"].strip().lower()
                 if u_key == key:
                     u_seg["orig_indices"].append(i)
                     orig_to_unique_map[i] = u_idx
@@ -495,17 +484,10 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "     * \"stricno\" -> striktno\n"
             "     * \"zaštića\" -> štiti\n"
             "     * \"matiču\" -> maticu\n\n"
-            "4. STROGA OGRANIČENJA TRAJANJA, PARALELNI IDENTIČNI SEGMENTI I MIKRO-SEGMENTI:\n"
-            "   - Broj karaktera sa razmacima NE SME PREĆI (trajanje * 20) za duže segmente.\n"
-            "   - KRATKI I BRZI SEGMENTI (trajanje < 2.5s): Budi ekstremno kratak! Broj karaktera sa razmacima ne sme preći (trajanje * 15). Ako ne može da stane cela misao, drastično je skrati na ključne 2-3 reči.\n"
-            "     * Primer 1 (2.2s, limit 33c): \"They're not illegal to own, but they're illegal to use.\" -> \"Posedovanje je legalno, upotreba nije.\" (37c) -> \"Legalno je imati ih, ali ne i koristiti.\" (42c) -> najbolje: \"Dozvoljeno je imati ih, ne i koristiti.\" (39c).\n"
-            "     * Primer 2 (2.0s, limit 30c): \"Tack weld the critical points first to prevent the structure from deforming.\" -> \"Heftaj tačke da sprečiš krivljenje.\" (36c) -> najbolje: \"Heftaj tačke protiv krivljenja.\" (30c).\n"
-            "     * Primer 3 (2.1s, limit 31c): \"A professional welder taught me this trick.\" -> \"Zavarivač mi je pokazao ovaj trik.\" (35c) -> najbolje: \"Majstor mi je pokazao ovaj trik.\" (32c).\n"
-            "     * Primer 4 (2.0s, limit 30c): \"If you have any questions or other problems, please post them in the comments below.\" -> \"Pitanja piši u komentarima.\" (27c).\n"
-            "   - PAŽNJA: Ako u batch-u ima više identičnih (ponovljenih) rečenica, a imaju različito trajanje (npr. 5.0s, pa nekoliko od po 2.0s), one kraće MORAŠ skratiti agresivno. Tretiraj svaki red nezavisno i striktno poštuj njegov limit karaktera!\n"
+            "4. BEZ SKRAĆIVANJA PREMA DUŽINI SEGMENTA (OSIM MIKRO-SEGMENATA):\n"
+            "   - U ovoj fazi tvoj prioritet je potpunost, bogatstvo i gramatička tačnost prevoda. NIKADA ne skraćuj rečenicu niti izbacuj detalje samo da bi se uklopio u vremenski limit. Prevedi kompletnu misao iz engleskog teksta prirodno i tačno na srpski.\n"
             "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!).\n"
-            "   - KRATKI SEGMENTI (trajanje od 0.5s do 1.2s): Skrati prevod na samo 1 do maksimalno 2 reči (npr. \"Jedan\", \"Dva\", \"Tri\", \"Da\", \"Ne\", \"Ozbiljno\").\n"
-            "   - AGRESIVNO SKRAĆIVANJE: Bolje je izgubiti detalje nego prekoračiti vreme govora!\n\n"
+            "   - Za sve ostale segmente, bez obzira na trajanje, vrati pun, bogat prevod.\n\n"
             "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
             "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\").\n"
             "   - Koristi ispravne imperativne oblike: \"Poravnaj\", \"Zavari\", \"Iseci\", \"Nacrtaj\".\n\n"

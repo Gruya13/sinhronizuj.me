@@ -108,7 +108,7 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4'):
     try:
         try:
             s3_internal.head_bucket(Bucket=settings.MINIO_BUCKET)
-        except:
+        except Exception:
             s3_internal.create_bucket(Bucket=settings.MINIO_BUCKET)
             
         url = s3_public.generate_presigned_url(
@@ -313,7 +313,11 @@ def shorten_segment_translation(project_id: str, segment_id: int, request: Short
         
     original_text = target_segment.get("original", "")
     duration = target_segment.get("end", 0.0) - target_segment.get("start", 0.0)
-    limit = max(int(duration * 20), 10)
+    
+    if duration < 2.5:
+        limit = max(int(duration * 15), 10)
+    else:
+        limit = max(int(duration * 20), 10)
     
     if not settings.MODAL_LEKTOR_URL:
         raise HTTPException(status_code=500, detail="Modal Lektor nije konfigurisan na serveru.")
@@ -321,16 +325,19 @@ def shorten_segment_translation(project_id: str, segment_id: int, request: Short
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
     
     lektor_prompt = (
-        "Ti si stručni lektor i prevodilac za srpski jezik. Dobio si zadatak da skratiš i lekturišeš prevod na srpskom jeziku kako bi stao u predviđeni vremenski okvir sinhronizacije.\n\n"
+        "Ti si stručni lektor i prevodilac za srpski jezik (ekavica, latinica). Dobio si zadatak da skratiš i lekturišeš prevod na srpskom jeziku kako bi stao u predviđeni vremenski okvir sinhronizacije (govora).\n\n"
         f"Originalni engleski tekst: {original_text}\n"
         f"Maksimalno dozvoljeno trajanje: {duration:.2f}s\n"
-        f"Preporučeni limit karaktera: {limit} (Vaš prevod MORA biti kraći od ovog limita!)\n"
+        f"Strogi limit karaktera sa razmacima: {limit} (Tvoj novi prevod MORA imati manje karaktera od ovog limita!)\n"
         f"Trenutni prevod koji treba da skratiš: {request.text}\n\n"
-        "PRAVILA:\n"
-        "1. Prevod mora biti kraći i jezgrovitiji, idealno ispod limita karaktera.\n"
-        "2. Sačuvaj smisao originalne engleske rečenice.\n"
-        "3. Piši isključivo na srpskom jeziku (latinica), koristeći prirodne fraze bez engleskih reči (npr. piši brendove fonetski).\n"
-        "4. Vrati SAMO i isključivo novi skraćeni tekst, bez ikakvih uvoda, komentara, navodnika ili objašnjenja."
+        "OBAVEZNA PRAVILA ZA SKRAĆIVANJE:\n"
+        "1. Prevod mora biti kraći i jezgrovitiji, STRIKTNO ispod limita karaktera. Bolje je izgubiti detalje nego prekoračiti vreme govora!\n"
+        "2. Sačuvaj osnovnu poruku originalne engleske rečenice.\n"
+        "3. Piši isključivo na srpskoj latinici (ekavica) i koristi prirodne fraze.\n"
+        "4. Poštuj glosar i pravila za reči (npr. 'thin square tubes' -> tanke kvadratne cevi, 'welding rods' -> elektrode za zavarivanje, 'welder' -> zavarivač, 'nut' -> matica, 'jammer' -> ometač, 'feels' -> oseća, 'seashell' -> školjka).\n"
+        "5. NIKADA ne koristi ijekavske reči (npr. smeje, dela, delovi, deo, video, rešenje, tačke, tačka) niti strane neprevedene termine.\n"
+        "6. Obraćaj se sa 'ti' (npr. 'ako želiš', 'uradi').\n"
+        "7. Vrati SAMO i isključivo novi skraćeni tekst, bez ikakvih uvoda, komentara, navodnika, objašnjenja ili CoT analize. Tvoj odgovor treba da bude čista rečenica."
     )
     
     payload = {
@@ -342,6 +349,8 @@ def shorten_segment_translation(project_id: str, segment_id: int, request: Short
     
     try:
         from backend.worker.utils import call_modal_endpoint
+        from backend.worker.translator import clean_translation_text, to_latin
+        
         response_data = call_modal_endpoint(url=url, payload=payload)
         
         choices = response_data.get("choices", [])
@@ -353,6 +362,9 @@ def shorten_segment_translation(project_id: str, segment_id: int, request: Short
             shortened_text = shortened_text[1:-1].strip()
         if shortened_text.startswith("'") and shortened_text.endswith("'"):
             shortened_text = shortened_text[1:-1].strip()
+            
+        # Post-processing čišćenje i konverzija u latinicu
+        shortened_text = clean_translation_text(to_latin(shortened_text))
             
         return {
             "status": "success",
@@ -580,7 +592,6 @@ def generate_all_tts(project_id: str, request: GenerateAllTTSRequest):
     
     # Ažuriramo segmente u Redis nacrtu i gradimo novi finalni miks sa svim podešavanjima
     from backend.worker.utils import apply_audio_modifiers
-    import shutil
     
     for s in segments:
         if s["id"] in res_map:
