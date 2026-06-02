@@ -1528,3 +1528,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Verifikacija:** Pokrenuli smo debug test skriptu nad segmentima zavarivanja i dobili 100% prirodne ekavske prevode na srpskoj latinici bez ikakvih izmišljenih ili ijekavskih reči.
 - **Status:** Uspešno verifikovano, ažurirano na Hetzner VPS-u i push-ovano na GitHub `development` granu.
 
+
+### 02.06.2026. 12:20 — Kreiranje Dokumentacije Pipeline Toka
+- **Zahtev:** Korisnik je tražio da se kreira markdown fajl u korenu projekta koji detaljno opisuje ceo tok pipeline-a, svaki korak i kako radi.
+- **Urađeno:**
+    - **Dokumentacija:** Kreirali smo [pipeline_tok.md](file:///home/gruya/Projektri/sinhronizuj.me/pipeline_tok.md) u korenu projekta sa detaljnim opisom Faze 1 (Analiza), Faze 2 (Renderovanje), Studio realtime toka, Mermaid dijagramima arhitekture i tabelarnim prikazom svih korišćenih AI modela i hardvera.
+- **Status:** Dokumentacija kreirana, komitovana i push-ovana na granu development.
+
+
