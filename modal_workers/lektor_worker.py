@@ -37,7 +37,7 @@ def serve():
 
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", "Qwen/Qwen2.5-32B-Instruct-AWQ",
+        "--model", "Qwen/Qwen3-32B-AWQ",
         "--quantization", "awq_marlin",
         "--served-model-name", "qwen-lektor",
         "--tensor-parallel-size", "1",

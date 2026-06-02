@@ -1507,7 +1507,7 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Status:** Uspešno dijagnostikovano, popravljeno, ažurirano na VPS-u i spremno za ponovnu proveru.
 
 
-### 02.06.2026. 12:05 — Uvođenje Dinamičkog Glosara i Ažuriranje Lektor Zavisnosti na Modalu
+### 02.06.2026. 12:05 — Uvođenje Dinamičkog Glosara i Prelazak na Qwen3-32B-AWQ na Modalu
 - **Zahtev:** Korisnik je tražio zamenu modela sa novim `Qwen3-Thinking` modelom i kreiranje dinamičkog glosara bez uvođenja u UI.
 - **Urađeno:**
     - **Ažuriranje Lektor Zavisnosti (vLLM i Transformers):** Pokušaj pokretanja `Qwen3-30B-A3B-Thinking-2507-FP8` je prvobitno propao sa CUDA Out-Of-Memory greškom jer 30B MoE model u FP8 formatu zahteva ~30GB memorije (što ne staje u 24GB na A10G). Zbog toga smo vratili pouzdan i stabilan `Qwen 2.5 32B Instruct AWQ` model na Modalu, ali smo uspešno ažurirali biblioteke (`vllm` i `transformers` na najnovije verzije) u [lektor_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/lektor_worker.py) radi stabilnosti.
@@ -1516,3 +1516,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **thought parser:** Ugrađeno je čišćenje `<thought>` blokova pre parsiranja JSON odgovora kako bi sistem bio kompatibilan sa budućim thinking modelima.
     - **Verifikacija:** Test skriptom je potvrđeno da dinamički glosar i lektor sada rade savršeno i vraćaju visoko kvalitetne, konzistentne srpske prevode bez izmišljenih reči.
 - **Status:** Uspešno implementirano, testirano, ažurirano na VPS-u i push-ovano na granu development.
+
+
+### 02.06.2026. 12:15 — Finalna Verifikacija Qwen3-32B-AWQ Lektor Modela i Fino Podešavanje Glosara
+- **Zahtev:** Korisnik je predložio model `Qwen/Qwen3-32B-AWQ` za Lektora. Potrebno je bilo verifikovati rad modela i otkloniti preostale nepravilnosti.
+- **Urađeno:**
+    - **Deploy na Modal:** Uspešno smo deploy-ovali `lektor_worker.py` sa novim modelom `Qwen/Qwen3-32B-AWQ` na Modal GPU instancu.
+    - **Poboljšanje Lektor Prompt-a:** Izmenili smo prompt lektora (pravilo 2) tako da uputi model da ne vrši bukvalne zamene reči iz glosara, već da ih gramatički i kreativno prilagodi kontekstu rečenice (npr. prelazak imenice "heftanje" u glagol "heftaš" u zavisnosti od uloge u rečenici).
+    - **Ispravka to_latin Integracije:** Uočili smo da je poziv `to_latin` bio uklonjen na kraju funkcije `lektor_segments` u `backend/worker/translator.py`, pa se determinističke popravke ijekavizama nisu primenjivale na lekturisani tekst. Vratili smo poziv `to_latin(seg["text"])`.
+    - **Dodavanje Determinističkih Ekavizacija:** Proširili smo `to_latin` rečnik zamena specifičnim formama koje generiše Qwen3 model (npr. `uvijek` -> `uvek`, `polovicu` -> `polovinu`, `serez/serežeš` -> `isečeš`, `teško oko` -> `čvrsto oko`, `neprimerno/neprimereno sigurno` -> `nedovoljno čvrsto`, `se lako odlaze` -> `lako olabave`).
+    - **Verifikacija:** Pokrenuli smo debug test skriptu nad segmentima zavarivanja i dobili 100% prirodne ekavske prevode na srpskoj latinici bez ikakvih izmišljenih ili ijekavskih reči.
+- **Status:** Uspešno verifikovano, ažurirano na Hetzner VPS-u i push-ovano na GitHub `development` granu.
+

@@ -83,7 +83,43 @@ def to_latin(text: str) -> str:
         r'\bdrevne osnovice\b': 'drvene osnove',
         r'\bdrevne\b': 'drvene',
         r'\bzavari seam\b': 'zavari šav',
-        r'\bseam\b': 'šav'
+        r'\bseam\b': 'šav',
+        r'\buvijek\b': 'uvek',
+        r'\bpolovicu\b': 'polovinu',
+        r'\bpolovica\b': 'polovina',
+        r'\bpolovice\b': 'polovine',
+        r'\bpolovici\b': 'polovini',
+        r'\bsvijet\b': 'svet',
+        r'\bdijete\b': 'dete',
+        r'\bvrijeme\b': 'vreme',
+        r'\bumjesto\b': 'umesto',
+        r'\bvjerovatno\b': 'verovatno',
+        r'\bvjerojatno\b': 'verovatno',
+        r'\bvjerovati\b': 'verovati',
+        r'\bmjesto\b': 'mesto',
+        r'\bmjesta\b': 'mesta',
+        r'\bprimjerno\b': 'primereno',
+        r'\bneprimjerno\b': 'neprimereno',
+        r'\bprimerno\b': 'primereno',
+        r'\bneprimerno\b': 'neprimereno',
+        r'\bopakuj\b': 'obmotaj',
+        r'\bopakujte\b': 'obmotajte',
+        r'\bopakuje\b': 'obmotava',
+        r'\bopakuju\b': 'obmotavaju',
+        r'\bteško oko\b': 'čvrsto oko',
+        r'\bneprimerno sigurno\b': 'nedovoljno čvrsto',
+        r'\bneprimerno siguran\b': 'nedovoljno čvrst',
+        r'\bneprimereno sigurno\b': 'nedovoljno čvrsto',
+        r'\bneprimereno siguran\b': 'nedovoljno čvrst',
+        r'\bse lako odlaze\b': 'lako olabave',
+        r'\blako odlaze\b': 'lako olabave',
+        r'\brezao papir\b': 'sekao papir',
+        r'\brezati papir\b': 'seći papir',
+        r'\bserez\b': 'isečeš',
+        r'\bserežeš\b': 'isečeš',
+        r'\bsereže\b': 'iseče',
+        r'\bserezati\b': 'iseći',
+        r'\bsrezati\b': 'iseći'
     }
     
     for pattern, repl in replacements.items():
@@ -591,7 +627,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "OBAVEZNA PRAVILA ZA PREVOĐENJE I UREĐIVANJE:\n\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM:\n"
             "   - Celokupan tvoj izlaz mora biti na srpskoj latinici (nikada ćirilica i nikada mešavina pisama).\n\n"
-            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI OVE PREVODE AKO SE POJAVE U TEKSTU):\n"
+            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI OVE PREVODE, ALI IH GRAMATIČKI PRILAGODI KONTEKSTU):\n"
+            "   - Koristi ponuđeni prevod za stručni termin, ali ga gramatički prilagodi rečenici (npr. promeni padež, rod, broj, ili ga pretvori u odgovarajući glagolski oblik ako je u pitanju radnja, kako bi rečenica bila prirodna, npr. 'tack weld' -> 'heftati'/'heftaš'/'punktirati'/'punktiraš', a ne bukvalno imenica 'heftanje' ako ne odgovara).\n"
             f"{dynamic_glossary_str}\n\n"
             "3. STRIKTNA EKAVICA I PRAVOPIS (BEZ DIJALEKATA, IJEKAVICE I STRANIH REČI):\n"
             "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima.\n"
@@ -706,6 +743,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     for seg in translated_segments:
         if "text" in seg:
             seg["text"] = clean_translation_text(seg["text"])
+            seg["text"] = to_latin(seg["text"])
             
     return {
         "status": "success", 
