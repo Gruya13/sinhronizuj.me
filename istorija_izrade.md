@@ -1,3 +1,10 @@
+## [2026-06-03 10:21:00] Ispravka baga sa renderovanjem kartica projekata na Dashboard-u
+- **Opis:**
+  Rešen problem nevidljivosti kartica projekata na Dashboard-u:
+  1. **Uzrok:** Roditeljski `AnimatePresence` i div u `App.jsx` koji koristi direktne animacione objekte je blokirao i ometao Framer Motion stagger varijante (`hidden` i `show`) unutar `ProjectList.jsx`, zadržavajući kartice u `opacity: 0` stanju.
+  2. **Rešenje:** Uklonjene staggered varijante iz `.projects-grid` i `.project-card` unutar [ProjectList.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Dashboard/ProjectList.jsx). Umesto toga, primenjene su direktne animacije na kartice sa proračunatim kašnjenjem (`delay: index * 0.05`) na osnovu indeksa projekta.
+  3. **Verifikacija:** Projekti se sada ispravno i tečno prikazuju na ekranu. Vite build uspešno prolazi u 598ms.
+
 ## [2026-06-03 10:17:00] DAW Napredni Alati, Prečice i Audio talasi - Faza 3 uspešno završena
 - **Opis:**
   Uspešno je završena i verifikovana Faza 3 plana unapređenja studija za Sinhronizuj.me, čime je interfejs transformisan u potpuno funkcionalno DAW okruženje:

@@ -123,10 +123,7 @@ export default function ProjectList() {
           </p>
         </motion.div>
       ) : (
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
+        <div 
           className="projects-grid" 
           style={{ 
             display: 'grid', 
@@ -134,7 +131,7 @@ export default function ProjectList() {
             gap: '20px' 
           }}
         >
-          {projects.map((proj) => {
+          {projects.map((proj, index) => {
             let statusText = "Prazan";
             let statusClass = "asleep";
             let StatusIcon = Video;
@@ -162,7 +159,9 @@ export default function ProjectList() {
             return (
               <motion.div 
                 key={proj.id}
-                variants={itemVariants}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 120, damping: 14, delay: index * 0.05 }}
                 whileHover={{ 
                   y: -6, 
                   borderColor: 'rgba(139, 92, 246, 0.25)',
@@ -263,7 +262,7 @@ export default function ProjectList() {
               </motion.div>
             );
           })}
-        </motion.div>
+        </div>
       )}
     </div>
   );
