@@ -1544,4 +1544,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Kreiranje izveštaja i artifakata:** Izveštaj o auditu je napisan i sačuvan kao [audit_izvestaj.md](file:///home/gruya/Projektri/sinhronizuj.me/audit_izvestaj.md) u korenu projekta, i kreiran je kao zvanični artifakt sesije.
 - **Status:** Audit uspešno završen, izveštaji kreirani i sačuvani.
 
+### 03.06.2026. 10:00 — Izrada Plana Budućih Radova (Roadmap)
+- **Zahtev:** Na osnovu audita uraditi sveobuhvatan plan budućih radova (Roadmap) uključujući analizu troškova, rate limiting, fallback strategije, analizu rizika frontenda i optimizaciju splicing-a na VPS-u.
+- **Urađeno:**
+    - **Izrada plana:** Kreiran je detaljan planski dokument u obliku [implementation_plan.md](file:///home/gruya/.gemini/antigravity/brain/febdf33c-3310-4470-b649-b397923aab4b/implementation_plan.md) koji pokriva optimizaciju troškova Modal.com, rate limiting i zaštitu od zloupotrebe, fallback mehanizme u slučaju nedostupnosti serverless GPU-ova, modularizaciju frontenda radi uklanjanja rizika monolita, i prelazak na chunk-based / stream-copy splicing radi prevazilaženja RAM/CPU uskih grla na Hetzner VPS-u. Takođe su uključeni koraci za migraciju Wav2Lip-a na Modal i uvođenje PostgreSQL baze sa relativnim S3 ključevima.
+- **Status:** Plan (Roadmap) uspešno kreiran i postavljen kao zvanični artifakt sesije sa zahtevom za korisnikovu proveru.
+
 
