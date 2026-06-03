@@ -32,7 +32,78 @@ export function StudioProvider({ children }) {
 
   // Studio v2 specifična stanja
   const [project, setProject] = useState(null);
-  const [selectedSegmentId, setSelectedSegmentId] = useState(0);
+  const [selectedSegmentId, setSelectedSegmentIdState] = useState(0);
+  const [selectedSegmentIds, setSelectedSegmentIds] = useState([]);
+
+  const setSelectedSegmentId = (id) => {
+    setSelectedSegmentIdState(id);
+    setSelectedSegmentIds(prev => {
+      if (prev.includes(id) && prev.length === 1) return prev;
+      return [id];
+    });
+  };
+
+  // Undo/Redo istorija
+  const [historyStack, setHistoryStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+
+  const saveToHistory = (segmentsToSave) => {
+    if (!segmentsToSave) return;
+    const copy = JSON.parse(JSON.stringify(segmentsToSave));
+    setHistoryStack(prev => {
+      const next = [...prev, copy];
+      if (next.length > 50) {
+        next.shift();
+      }
+      return next;
+    });
+    setRedoStack([]);
+  };
+
+  const handleUndo = () => {
+    if (historyStack.length === 0 || !project) return;
+    const currentSegs = JSON.parse(JSON.stringify(project.segments));
+    setHistoryStack(prev => {
+      const nextStack = [...prev];
+      const prevSegs = nextStack.pop();
+      setRedoStack(redo => [...redo, currentSegs]);
+      setProject(prevProj => ({
+        ...prevProj,
+        segments: prevSegs
+      }));
+      // Sinhronizuj selektovani segment ako je stari id nestao ili se promenio
+      if (prevSegs.length > 0) {
+        const stillExists = prevSegs.some(s => s.id === selectedSegmentId);
+        if (!stillExists) {
+          setSelectedSegmentIdState(prevSegs[0].id);
+          setSelectedSegmentIds([prevSegs[0].id]);
+        }
+      }
+      return nextStack;
+    });
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0 || !project) return;
+    const currentSegs = JSON.parse(JSON.stringify(project.segments));
+    setRedoStack(prev => {
+      const nextStack = [...prev];
+      const nextSegs = nextStack.pop();
+      setHistoryStack(history => [...history, currentSegs]);
+      setProject(prevProj => ({
+        ...prevProj,
+        segments: nextSegs
+      }));
+      if (nextSegs.length > 0) {
+        const stillExists = nextSegs.some(s => s.id === selectedSegmentId);
+        if (!stillExists) {
+          setSelectedSegmentIdState(nextSegs[0].id);
+          setSelectedSegmentIds([nextSegs[0].id]);
+        }
+      }
+      return nextStack;
+    });
+  };
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [bgVolume, setBgVolume] = useState(-5);
@@ -53,6 +124,7 @@ export function StudioProvider({ children }) {
   const [applyAudioToAll, setApplyAudioToAll] = useState(false);
   const [visualContextError, setVisualContextError] = useState(false);
   const [hoveredSegmentId, setHoveredSegmentId] = useState(null);
+  const [shouldFocusTextarea, setShouldFocusTextarea] = useState(false);
 
   // Reference za audio/video
   const videoRef = useRef(null);
@@ -148,6 +220,9 @@ export function StudioProvider({ children }) {
     localStorage.removeItem('sinhronizuj_me_task_id');
     consecutiveErrorsRef.current = 0;
     setCosts(null);
+    setHistoryStack([]);
+    setRedoStack([]);
+    setSelectedSegmentIds([]);
     
     // Povratak na projekte
     setCurrentProjectId(null);
@@ -173,6 +248,8 @@ export function StudioProvider({ children }) {
         }));
       }
       setProject(data);
+      setHistoryStack([]);
+      setRedoStack([]);
       if (data.costs) setCosts(data.costs);
       if (data.segments && data.segments.length > 0) {
         setSelectedSegmentId(data.segments[0].id);
@@ -553,6 +630,9 @@ export function StudioProvider({ children }) {
       previewFile, setPreviewFile,
       project, setProject,
       selectedSegmentId, setSelectedSegmentId,
+      selectedSegmentIds, setSelectedSegmentIds,
+      historyStack, redoStack,
+      saveToHistory, handleUndo, handleRedo,
       currentTime, setCurrentTime,
       isPlaying, setIsPlaying,
       bgVolume, setBgVolume,
@@ -573,6 +653,7 @@ export function StudioProvider({ children }) {
       applyAudioToAll, setApplyAudioToAll,
       visualContextError, setVisualContextError,
       hoveredSegmentId, setHoveredSegmentId,
+      shouldFocusTextarea, setShouldFocusTextarea,
       url, setUrl,
       videoRef,
       timelineRef,

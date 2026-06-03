@@ -1,11 +1,15 @@
+import { useEffect, useRef, useState } from 'react';
 import { Mic, Loader2, Wand2 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
+import Knob from '../Common/Knob';
 
 export default function SegmentRow() {
   const {
     project,
     selectedSegmentId,
     setSelectedSegmentId,
+    selectedSegmentIds,
+    setSelectedSegmentIds,
     segmentEditorTab,
     setSegmentEditorTab,
     applyAudioToAll,
@@ -16,11 +20,243 @@ export default function SegmentRow() {
     isPlaying,
     setProject,
     handleMagicShorten,
-    handleTestSegmentTTS
+    handleTestSegmentTTS,
+    saveToHistory,
+    shouldFocusTextarea,
+    setShouldFocusTextarea,
+    handleSaveDraft
   } = useStudio();
+
+  const textareaRef = useRef(null);
+  const [originalTextOnFocus, setOriginalTextOnFocus] = useState('');
+
+  // Sinhronizacija fokusa iz prečica
+  useEffect(() => {
+    if (shouldFocusTextarea && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+      setShouldFocusTextarea(false);
+    }
+  }, [selectedSegmentId, shouldFocusTextarea, setShouldFocusTextarea]);
 
   if (!project || !project.segments || !project.segments.length) return null;
 
+  // AKO JE SELEKTOVANO VIŠE SEGMENTA -> RENDERUJ BULK OPERATIONS PANEL
+  if (selectedSegmentIds && selectedSegmentIds.length > 1) {
+    const activeSeg = project.segments.find(s => s.id === selectedSegmentId) || project.segments[0] || {};
+    
+    return (
+      <div 
+        className="segment-editor-card" 
+        style={{ 
+          background: 'rgba(139, 92, 246, 0.03)', 
+          border: '1px solid rgba(139, 92, 246, 0.15)', 
+          borderRadius: '20px', 
+          padding: '24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '20px' 
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            🎛️ Grupne Akcije ({selectedSegmentIds.length} selektovano)
+          </h3>
+          <button
+            onClick={() => setSelectedSegmentIds([selectedSegmentId])}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+              color: '#fff',
+              fontSize: '0.75rem',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              outline: 'none',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+          >
+            Poništi grupu
+          </button>
+        </div>
+
+        <p style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: '1.4' }}>
+          Izmene na kružnim kontrolama i odabiru glasa biće primenjene na sve selektovane segmente (ID: {selectedSegmentIds.join(', ')}).
+        </p>
+
+        {/* Grupni izbor glasa */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Glas za selektovane:</span>
+          <select
+            value={activeSeg.voice_type || "clone"}
+            onChange={(e) => {
+              saveToHistory(project.segments);
+              const val = e.target.value;
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, voice_type: val, status: "edited" };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+              setTimeout(() => handleSaveDraft(), 50);
+            }}
+            style={{ 
+              background: 'rgba(0,0,0,0.2)', 
+              border: '1px solid rgba(255,255,255,0.08)', 
+              color: '#fff', 
+              padding: '8px 12px', 
+              borderRadius: '8px', 
+              outline: 'none', 
+              fontSize: '0.85rem', 
+              cursor: 'pointer' 
+            }}
+          >
+            <option value="clone">Kloniraj originalni glas (OpenVoice V2)</option>
+            <option value="male">Muški glas (Piper - sr_Marko)</option>
+          </select>
+        </div>
+
+        {/* Grupni DAW kontrolni panel */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', padding: '16px 8px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.03)' }}>
+          <Knob
+            label="Volume"
+            min={-20}
+            max={10}
+            step={1}
+            value={activeSeg.volume !== undefined ? activeSeg.volume : 0}
+            defaultValue={0}
+            unit="dB"
+            onStartChange={() => saveToHistory(project.segments)}
+            onChange={(val) => {
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, volume: val };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+            }}
+            onRelease={handleSaveDraft}
+          />
+
+          <Knob
+            label="Tempo"
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            value={activeSeg.speed !== undefined ? activeSeg.speed : 1.0}
+            defaultValue={1.0}
+            unit="x"
+            onStartChange={() => saveToHistory(project.segments)}
+            onChange={(val) => {
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, speed: val };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+            }}
+            onRelease={handleSaveDraft}
+          />
+
+          <Knob
+            label="Pitch"
+            min={-6}
+            max={6}
+            step={1}
+            value={activeSeg.pitch !== undefined ? activeSeg.pitch : 0}
+            defaultValue={0}
+            unit="st"
+            onStartChange={() => saveToHistory(project.segments)}
+            onChange={(val) => {
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, pitch: val };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+            }}
+            onRelease={handleSaveDraft}
+          />
+
+          <Knob
+            label="Ducking"
+            min={-20}
+            max={10}
+            step={1}
+            value={activeSeg.bg_volume !== undefined ? activeSeg.bg_volume : 0}
+            defaultValue={0}
+            unit="dB"
+            onStartChange={() => saveToHistory(project.segments)}
+            onChange={(val) => {
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, bg_volume: val };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+            }}
+            onRelease={handleSaveDraft}
+          />
+        </div>
+
+        {/* Akcije za grupnu selekciju */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '15px' }}>
+          <button
+            onClick={() => {
+              saveToHistory(project.segments);
+              const updated = project.segments.map(s => {
+                if (selectedSegmentIds.includes(s.id)) {
+                  return { ...s, volume: 0, speed: 1.0, pitch: 0, bg_volume: 0, status: "edited" };
+                }
+                return s;
+              });
+              setProject({ ...project, segments: updated });
+              setTimeout(() => handleSaveDraft(), 50);
+            }}
+            className="new-task-btn"
+            style={{ flex: 1, fontSize: '0.85rem' }}
+          >
+            Resetuj
+          </button>
+          
+          <button
+            onClick={async () => {
+              // Pokrećemo sekvencijalnu regeneraciju za sve selektovane segmente
+              for (const id of selectedSegmentIds) {
+                const seg = project.segments.find(s => s.id === id);
+                if (seg) {
+                  await handleTestSegmentTTS(
+                    id,
+                    seg.translated || "",
+                    seg.voice_type,
+                    seg.volume,
+                    seg.speed,
+                    seg.pitch,
+                    seg.bg_volume,
+                    false // autoplay = false
+                  );
+                }
+              }
+            }}
+            className="glow-button"
+            style={{ flex: 2, background: '#8b5cf6', justifyContent: 'center', fontSize: '0.85rem' }}
+          >
+            🎙️ Generiši glas za selektovane
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // STANDARDNI EDIT PANEL ZA POJEDINAČNI SEGMENT
   const activeSegment = project.segments.find(s => s.id === selectedSegmentId) || project.segments[0] || {};
   
   // Automatsko pokretanje regeneracije/podešavanja tona nakon što korisnik pusti slajder
@@ -98,8 +334,41 @@ export default function SegmentRow() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: '700' }}>Prevod na Srpski:</span>
             <textarea
+              ref={textareaRef}
               className="edit-segment-textarea"
               value={activeSegment.translated || ""}
+              onFocus={() => {
+                setOriginalTextOnFocus(activeSegment.translated || "");
+              }}
+              onBlur={() => {
+                if ((activeSegment.translated || "") !== originalTextOnFocus) {
+                  // Snimamo pređašnje stanje
+                  const oldSegments = project.segments.map(s => {
+                    if (s.id === selectedSegmentId) {
+                      return { ...s, translated: originalTextOnFocus };
+                    }
+                    return s;
+                  });
+                  saveToHistory(oldSegments);
+                  handleSaveDraft();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                  handleTestSegmentTTS(
+                    selectedSegmentId,
+                    activeSegment.translated || "",
+                    activeSegment.voice_type,
+                    activeSegment.volume,
+                    activeSegment.speed,
+                    activeSegment.pitch,
+                    activeSegment.bg_volume,
+                    true
+                  );
+                }
+              }}
               onChange={(e) => {
                 const updated = project.segments.map(s => {
                   if (s.id === selectedSegmentId) {
@@ -163,6 +432,7 @@ export default function SegmentRow() {
             <select
               value={activeSegment.voice_type || "clone"}
               onChange={(e) => {
+                saveToHistory(project.segments);
                 const updated = project.segments.map(s => {
                   if (s.id === selectedSegmentId) {
                     return { ...s, voice_type: e.target.value, status: "edited" };
@@ -170,6 +440,7 @@ export default function SegmentRow() {
                   return s;
                 });
                 setProject({ ...project, segments: updated });
+                setTimeout(() => handleSaveDraft(), 50);
               }}
               style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none', fontSize: '0.85rem', cursor: 'pointer' }}
             >
@@ -190,7 +461,7 @@ export default function SegmentRow() {
                 const checked = e.target.checked;
                 setApplyAudioToAll(checked);
                 if (checked && activeSegment) {
-                  // Odmah iskopiraj trenutna podešavanja na sve segmente
+                  saveToHistory(project.segments);
                   const updated = project.segments.map(s => ({
                     ...s,
                     volume: activeSegment.volume !== undefined ? activeSegment.volume : 0.0,
@@ -199,7 +470,6 @@ export default function SegmentRow() {
                     bg_volume: activeSegment.bg_volume !== undefined ? activeSegment.bg_volume : 0.0
                   }));
                   setProject({ ...project, segments: updated });
-                  // Pokreni auto adjust nakon kratkog timeout-a
                   setTimeout(() => {
                     handleAutoAdjust();
                   }, 50);
@@ -212,20 +482,18 @@ export default function SegmentRow() {
             </label>
           </div>
 
-          {/* Jačina zvuka (Volume) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
-              <span>Jačina zvuka (Volume):</span>
-              <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.volume > 0 ? `+${activeSegment.volume}` : activeSegment.volume || 0} dB</span>
-            </div>
-            <input
-              type="range"
-              min="-20"
-              max="10"
-              step="1"
+          {/* Kružni DAW kontrolni panel */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', padding: '16px 8px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <Knob
+              label="Volume"
+              min={-20}
+              max={10}
+              step={1}
               value={activeSegment.volume !== undefined ? activeSegment.volume : 0}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
+              defaultValue={0}
+              unit="dB"
+              onStartChange={() => saveToHistory(project.segments)}
+              onChange={(val) => {
                 const updated = project.segments.map(s => {
                   if (applyAudioToAll || s.id === selectedSegmentId) {
                     return { ...s, volume: val };
@@ -234,31 +502,19 @@ export default function SegmentRow() {
                 });
                 setProject({ ...project, segments: updated });
               }}
-              onMouseUp={handleAutoAdjust}
-              onTouchEnd={handleAutoAdjust}
-              style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+              onRelease={handleAutoAdjust}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-              <span>-20 dB (Tiho)</span>
-              <span>0 dB (Default)</span>
-              <span>+10 dB (Glasno)</span>
-            </div>
-          </div>
 
-          {/* Brzina / Tempo (x) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
-              <span>Brzina govora (Tempo):</span>
-              <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.speed !== undefined ? activeSegment.speed.toFixed(1) : "1.0"}x</span>
-            </div>
-            <input
-              type="range"
-              min="0.5"
-              max="2.0"
-              step="0.1"
+            <Knob
+              label="Tempo"
+              min={0.5}
+              max={2.0}
+              step={0.1}
               value={activeSegment.speed !== undefined ? activeSegment.speed : 1.0}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
+              defaultValue={1.0}
+              unit="x"
+              onStartChange={() => saveToHistory(project.segments)}
+              onChange={(val) => {
                 const updated = project.segments.map(s => {
                   if (applyAudioToAll || s.id === selectedSegmentId) {
                     return { ...s, speed: val };
@@ -267,31 +523,19 @@ export default function SegmentRow() {
                 });
                 setProject({ ...project, segments: updated });
               }}
-              onMouseUp={handleAutoAdjust}
-              onTouchEnd={handleAutoAdjust}
-              style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+              onRelease={handleAutoAdjust}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-              <span>0.5x (Sporo)</span>
-              <span>1.0x (Normalno)</span>
-              <span>2.0x (Brzo)</span>
-            </div>
-          </div>
 
-          {/* Visina glasa (Pitch semitoni) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
-              <span>Visina tona (Pitch):</span>
-              <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.pitch > 0 ? `+${activeSegment.pitch}` : activeSegment.pitch || 0} st</span>
-            </div>
-            <input
-              type="range"
-              min="-6"
-              max="6"
-              step="1"
+            <Knob
+              label="Pitch"
+              min={-6}
+              max={6}
+              step={1}
               value={activeSegment.pitch !== undefined ? activeSegment.pitch : 0}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
+              defaultValue={0}
+              unit="st"
+              onStartChange={() => saveToHistory(project.segments)}
+              onChange={(val) => {
                 const updated = project.segments.map(s => {
                   if (applyAudioToAll || s.id === selectedSegmentId) {
                     return { ...s, pitch: val };
@@ -300,31 +544,19 @@ export default function SegmentRow() {
                 });
                 setProject({ ...project, segments: updated });
               }}
-              onMouseUp={handleAutoAdjust}
-              onTouchEnd={handleAutoAdjust}
-              style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+              onRelease={handleAutoAdjust}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-              <span>Dubok muški</span>
-              <span>0 (Original)</span>
-              <span>Visok piskav</span>
-            </div>
-          </div>
 
-          {/* Jačina pozadinske muzike (Ducking) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#cbd5e1' }}>
-              <span>Jačina pozadinske muzike (Ducking):</span>
-              <span style={{ fontWeight: 'bold', color: '#a78bfa' }}>{activeSegment.bg_volume > 0 ? `+${activeSegment.bg_volume}` : activeSegment.bg_volume || 0} dB</span>
-            </div>
-            <input
-              type="range"
-              min="-20"
-              max="10"
-              step="1"
+            <Knob
+              label="Ducking"
+              min={-20}
+              max={10}
+              step={1}
               value={activeSegment.bg_volume !== undefined ? activeSegment.bg_volume : 0}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
+              defaultValue={0}
+              unit="dB"
+              onStartChange={() => saveToHistory(project.segments)}
+              onChange={(val) => {
                 const updated = project.segments.map(s => {
                   if (applyAudioToAll || s.id === selectedSegmentId) {
                     return { ...s, bg_volume: val };
@@ -333,15 +565,8 @@ export default function SegmentRow() {
                 });
                 setProject({ ...project, segments: updated });
               }}
-              onMouseUp={handleAutoAdjust}
-              onTouchEnd={handleAutoAdjust}
-              style={{ width: '100%', accentColor: '#8b5cf6', cursor: 'pointer' }}
+              onRelease={handleAutoAdjust}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748b' }}>
-              <span>-20 dB (Prigušeno)</span>
-              <span>0 dB (Default)</span>
-              <span>+10 dB (Glasno)</span>
-            </div>
           </div>
         </div>
       ) }

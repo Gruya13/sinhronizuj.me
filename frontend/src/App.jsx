@@ -32,6 +32,10 @@ function App() {
     previewFile,
     project,
     selectedSegmentId, setSelectedSegmentId,
+    selectedSegmentIds, setSelectedSegmentIds,
+    historyStack, redoStack,
+    saveToHistory, handleUndo, handleRedo,
+    shouldFocusTextarea, setShouldFocusTextarea,
     currentTime, setCurrentTime,
     isPlaying, setIsPlaying,
     bgVolume,
@@ -242,30 +246,95 @@ function App() {
     setIsPlaying(!isPlaying);
   };
 
-  // Prečica za Spacebar play/pause
+  // Globalne prečice na tastaturi (Space, Tab, Shift+Tab, Ctrl+Z, Ctrl+Y, Esc)
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const active = document.activeElement;
+      const isTextInput = active && (
+        (active.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'image', 'reset'].includes(active.type)) || 
+        active.tagName === 'TEXTAREA' || 
+        active.isContentEditable
+      );
+
+      // 1. SPACEBAR: Play/Pause reprodukcija
       if (e.code === 'Space') {
-        const active = document.activeElement;
-        const isTextInput = active && (
-          (active.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'image', 'reset'].includes(active.type)) || 
-          active.tagName === 'TEXTAREA' || 
-          active.isContentEditable
-        );
-        if (isTextInput) {
-          return;
-        }
+        if (isTextInput) return;
         e.preventDefault();
         if (active && typeof active.blur === 'function') {
           active.blur();
         }
         togglePlay();
+        return;
+      }
+
+      // 2. ESCAPE: Blur iz inputa/textarea
+      if (e.code === 'Escape') {
+        if (active && typeof active.blur === 'function') {
+          e.preventDefault();
+          active.blur();
+        }
+        return;
+      }
+
+      // 3. CTRL + Z: Undo istorije
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // 4. CTRL + Y: Redo istorije
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // 5. TAB / SHIFT + TAB: Navigacija kroz segmente na vremenskoj liniji
+      if (e.code === 'Tab') {
+        if (!project || !project.segments || project.segments.length === 0) return;
+        
+        e.preventDefault();
+        
+        // Pronađi indeks trenutnog segmenta
+        const currentIdx = project.segments.findIndex(s => s.id === selectedSegmentId);
+        if (currentIdx === -1) return;
+
+        let nextIdx;
+        if (e.shiftKey) {
+          // Shift + Tab ide unazad
+          nextIdx = currentIdx - 1;
+          if (nextIdx < 0) nextIdx = project.segments.length - 1;
+        } else {
+          // Tab ide unapred
+          nextIdx = currentIdx + 1;
+          if (nextIdx >= project.segments.length) nextIdx = 0;
+        }
+
+        const nextSeg = project.segments[nextIdx];
+        
+        // Postavi selekciju
+        setSelectedSegmentId(nextSeg.id);
+        
+        // Premotaj video na početak novog segmenta
+        if (videoRef.current) {
+          videoRef.current.currentTime = nextSeg.start;
+          if (activeAudioSource === "dubbed") {
+            if (dubbedAudioRef.current) dubbedAudioRef.current.currentTime = nextSeg.start;
+            if (bgAudioRef.current) bgAudioRef.current.currentTime = nextSeg.start;
+          }
+        }
+
+        // Ako smo bili u tekstualnom polju, trigeruj automatski fokus na novo
+        if (isTextInput) {
+          setShouldFocusTextarea(true);
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPlaying, project, activeAudioSource]);
+  }, [isPlaying, project, selectedSegmentId, activeAudioSource, handleUndo, handleRedo, setSelectedSegmentId, setShouldFocusTextarea, videoRef, dubbedAudioRef, bgAudioRef]);
 
   const formatTime = (s) => {
     const mins = Math.floor(s / 60);

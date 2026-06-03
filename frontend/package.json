@@ -13,7 +13,8 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.8.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "wavesurfer.js": "^7.12.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -1,9 +1,12 @@
+import { useEffect, useRef, useState } from 'react';
 import { Film, Video, Mic, Volume2, Music } from 'lucide-react';
+import WaveSurfer from 'wavesurfer.js';
 import { useStudio } from '../../context/StudioContext';
 
 export default function Timeline() {
   const {
     project,
+    setProject,
     timelineRef,
     handleTimelineClick,
     getVideoDuration,
@@ -14,31 +17,241 @@ export default function Timeline() {
     setActiveAudioSource,
     selectedSegmentId,
     setSelectedSegmentId,
+    selectedSegmentIds,
+    setSelectedSegmentIds,
     videoRef,
     dubbedAudioRef,
     bgAudioRef,
     hoveredSegmentId,
     setHoveredSegmentId,
-    dubbedBuster
+    dubbedBuster,
+    saveToHistory,
+    handleSaveDraft
   } = useStudio();
 
-  // Izvedena vrednost za putanju dubbed zvuka
+  // Reference za wavesurfer.js
+  const musicWaveformRef = useRef(null);
+  const musicWavesurfer = useRef(null);
+  const dubbedWaveformRef = useRef(null);
+  const dubbedWavesurfer = useRef(null);
+
+  // Informacije o prevlačenju (drag-and-drop)
+  const dragInfoRef = useRef(null);
+
+  // Izvedene vrednosti za putanje zvuka
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
   const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}?cb=${dubbedBuster}` : null;
 
-  // Pomoćna funkcija za iscrtavanje waveform barova u SVG-u
+  const noVocalsFilename = project?.no_vocals_path ? project.no_vocals_path.split('/').pop() : null;
+  const noVocalsAudioUrl = noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null;
+
+  // 1. Wavesurfer za pozadinsku muziku
+  useEffect(() => {
+    if (!musicWaveformRef.current || !noVocalsAudioUrl) return;
+
+    try {
+      musicWavesurfer.current = WaveSurfer.create({
+        container: musicWaveformRef.current,
+        waveColor: 'rgba(203, 213, 225, 0.1)',
+        progressColor: 'rgba(139, 92, 246, 0.15)',
+        cursorColor: 'transparent',
+        height: 38,
+        responsive: true,
+        interact: false,
+      });
+
+      musicWavesurfer.current.load(noVocalsAudioUrl);
+    } catch (err) {
+      console.error("Greška pri inicijalizaciji Wavesurfer-a za muziku:", err);
+    }
+
+    return () => {
+      if (musicWavesurfer.current) {
+        try {
+          musicWavesurfer.current.destroy();
+        } catch (e) {}
+      }
+    };
+  }, [noVocalsAudioUrl]);
+
+  // 2. Wavesurfer za srpski sinhronizovani glas (kada je izgenerisan)
+  useEffect(() => {
+    if (!dubbedWaveformRef.current || !dubbedAudioUrl) return;
+
+    try {
+      if (dubbedWavesurfer.current) {
+        dubbedWavesurfer.current.destroy();
+      }
+
+      dubbedWavesurfer.current = WaveSurfer.create({
+        container: dubbedWaveformRef.current,
+        waveColor: 'rgba(34, 197, 94, 0.08)',
+        progressColor: 'rgba(34, 197, 94, 0.18)',
+        cursorColor: 'transparent',
+        height: 52,
+        responsive: true,
+        interact: false,
+      });
+
+      dubbedWavesurfer.current.load(dubbedAudioUrl);
+    } catch (err) {
+      console.error("Greška pri inicijalizaciji Wavesurfer-a za srpski glas:", err);
+    }
+
+    return () => {
+      if (dubbedWavesurfer.current) {
+        try {
+          dubbedWavesurfer.current.destroy();
+        } catch (e) {}
+      }
+    };
+  }, [dubbedAudioUrl]);
+
+  // Sinhronizacija wavesurfer-a sa vremenom reprodukcije
+  useEffect(() => {
+    if (musicWavesurfer.current && typeof musicWavesurfer.current.setTime === 'function') {
+      try {
+        musicWavesurfer.current.setTime(currentTime);
+      } catch (e) {}
+    }
+    if (dubbedWavesurfer.current && typeof dubbedWavesurfer.current.setTime === 'function') {
+      try {
+        dubbedWavesurfer.current.setTime(currentTime);
+      } catch (e) {}
+    }
+  }, [currentTime]);
+
+  // Pomoćna funkcija za iscrtavanje lažnog waveform barova (fallback ako nema wavesurfer-a)
   const generateWaveformBars = (duration, id) => {
     const numBars = Math.max(Math.floor(duration * 6), 5);
     const bars = [];
     let seed = id * 5.7;
     for (let i = 0; i < numBars; i++) {
       seed = (seed * 9301 + 49297) % 233280;
-      const height = 15 + (seed / 233280.0) * 35; // Visine između 15px i 50px
+      const height = 15 + (seed / 233280.0) * 35; 
       bars.push(height);
     }
     return bars;
   };
+
+  // DRAG AND DROP I RESIZE LOGIKA
+  const handleStartResizeLeft = (e, seg) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!timelineRef.current) return;
+    saveToHistory(project.segments); // Sačuvaj pre početka pomeranja
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    dragInfoRef.current = {
+      type: 'resize-start',
+      segId: seg.id,
+      startX: e.clientX,
+      startVal: seg.start,
+      endVal: seg.end,
+      timelineWidth: rect.width,
+      videoDuration: getVideoDuration()
+    };
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+  };
+
+  const handleStartResizeRight = (e, seg) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!timelineRef.current) return;
+    saveToHistory(project.segments); // Sačuvaj pre početka pomeranja
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    dragInfoRef.current = {
+      type: 'resize-end',
+      segId: seg.id,
+      startX: e.clientX,
+      startVal: seg.start,
+      endVal: seg.end,
+      timelineWidth: rect.width,
+      videoDuration: getVideoDuration()
+    };
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+  };
+
+  const handleStartDragMove = (e, seg) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!timelineRef.current) return;
+    saveToHistory(project.segments); // Sačuvaj pre početka pomeranja
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    dragInfoRef.current = {
+      type: 'move',
+      segId: seg.id,
+      startX: e.clientX,
+      startVal: seg.start,
+      endVal: seg.end,
+      timelineWidth: rect.width,
+      videoDuration: getVideoDuration()
+    };
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+  };
+
+  const handleGlobalMouseMove = (e) => {
+    if (!dragInfoRef.current) return;
+    const info = dragInfoRef.current;
+    const deltaX = e.clientX - info.startX;
+    const deltaSeconds = (deltaX / info.timelineWidth) * info.videoDuration;
+
+    let newStart = info.startVal;
+    let newEnd = info.endVal;
+
+    if (info.type === 'move') {
+      const length = info.endVal - info.startVal;
+      newStart = Math.max(0, info.startVal + deltaSeconds);
+      newEnd = newStart + length;
+      
+      const maxDur = info.videoDuration;
+      if (newEnd > maxDur) {
+        newEnd = maxDur;
+        newStart = Math.max(0, maxDur - length);
+      }
+    } else if (info.type === 'resize-start') {
+      newStart = Math.max(0, Math.min(info.startVal + deltaSeconds, info.endVal - 0.2));
+    } else if (info.type === 'resize-end') {
+      newEnd = Math.max(info.startVal + 0.2, Math.min(info.endVal + deltaSeconds, info.videoDuration));
+    }
+
+    setProject(prevProj => {
+      if (!prevProj) return prevProj;
+      const updated = prevProj.segments.map(s => {
+        if (s.id === info.segId) {
+          return { 
+            ...s, 
+            start: parseFloat(newStart.toFixed(2)), 
+            end: parseFloat(newEnd.toFixed(2)),
+            status: 'edited'
+          };
+        }
+        return s;
+      });
+      return { ...prevProj, segments: updated };
+    });
+  };
+
+  const handleGlobalMouseUp = () => {
+    if (!dragInfoRef.current) return;
+    handleSaveDraft();
+    dragInfoRef.current = null;
+    document.removeEventListener('mousemove', handleGlobalMouseMove);
+    document.removeEventListener('mouseup', handleGlobalMouseUp);
+  };
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
 
   if (!project) return null;
 
@@ -55,14 +268,14 @@ export default function Timeline() {
       <div 
         ref={timelineRef}
         onClick={handleTimelineClick}
-        style={{ minWidth: '800px', position: 'relative', cursor: 'ew-resize', display: 'flex', flexDirection: 'column', gap: '4px' }}
+        style={{ minWidth: '800px', position: 'relative', cursor: 'ew-resize', display: 'flex', flexDirection: 'column', gap: '4px', userSelect: 'none' }}
       >
         {/* 1. Skala sekundi */}
         <div style={{ height: '24px', position: 'relative', borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#475569', fontSize: '0.75rem' }}>
           {(() => {
             const dur = getVideoDuration();
             const ticks = [];
-            const step = dur > 60 ? 10 : 5; // Ticks na svakih 5 ili 10 sekundi
+            const step = dur > 60 ? 10 : 5; 
             for (let i = 0; i <= dur; i += step) {
               const leftPercent = (i / dur) * 100;
               ticks.push(
@@ -76,7 +289,7 @@ export default function Timeline() {
           })()}
         </div>
 
-        {/* 2. TRAKA: VIDEO SLIČICE (Frame list) */}
+        {/* 2. TRAKA: VIDEO SLIČICE (Keyframes) */}
         <div style={{ height: '36px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.03)', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
           <div style={{ position: 'absolute', left: '10px', fontSize: '0.7rem', color: '#475569', zIndex: 5, pointerEvents: 'none', textTransform: 'uppercase', fontWeight: 'bold' }}>
             <Video size={10} style={{ display: 'inline', marginRight: '4px' }} /> Video Sličice
@@ -122,13 +335,29 @@ export default function Timeline() {
             const dur = getVideoDuration();
             const left = (seg.start / dur) * 100;
             const width = ((seg.end - seg.start) / dur) * 100;
-            const isActive = selectedSegmentId === seg.id;
+            const isActive = selectedSegmentIds.includes(seg.id);
+            
             return (
               <div 
                 key={seg.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedSegmentId(seg.id);
+                  if (e.ctrlKey || e.metaKey) {
+                    setSelectedSegmentIds(prev => {
+                      if (prev.includes(seg.id)) {
+                        const next = prev.filter(id => id !== seg.id);
+                        if (next.length === 0) return [seg.id];
+                        return next;
+                      } else {
+                        return [...prev, seg.id];
+                      }
+                    });
+                    setSelectedSegmentId(seg.id);
+                  } else {
+                    setSelectedSegmentId(seg.id);
+                    setSelectedSegmentIds([seg.id]);
+                  }
+                  
                   if (videoRef.current) {
                     videoRef.current.currentTime = seg.start;
                     if (activeAudioSource === "dubbed") {
@@ -150,16 +379,30 @@ export default function Timeline() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
-                  transition: 'all 0.15s ease'
+                  transition: 'background-color 0.15s, border-color 0.15s'
                 }}
               >
+                {/* Drag-and-drop i resize kontrole za ivice */}
+                <div 
+                  onMouseDown={(e) => handleStartResizeLeft(e, seg)}
+                  style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
+                />
+                <div 
+                  onMouseDown={(e) => handleStartDragMove(e, seg)}
+                  style={{ position: 'absolute', left: '6px', right: '6px', top: 0, bottom: 0, cursor: 'move', zIndex: 10 }}
+                />
+                <div 
+                  onMouseDown={(e) => handleStartResizeRight(e, seg)}
+                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
+                />
+
                 {/* Custom Waveform u pozadini */}
-                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.45 : 0.25 }}>
+                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.45 : 0.25, pointerEvents: 'none' }}>
                   {generateWaveformBars(seg.end - seg.start, seg.id).map((h, i) => (
                     <div key={i} style={{ width: '2px', height: `${h}%`, background: '#8b5cf6', borderRadius: '1px' }} />
                   ))}
                 </div>
-                <span style={{ fontSize: '0.65rem', color: '#c084fc', fontWeight: 'bold', zIndex: 10, pointerEvents: 'none' }}>
+                <span style={{ fontSize: '0.65rem', color: '#c084fc', fontWeight: 'bold', zIndex: 20, pointerEvents: 'none' }}>
                   #{seg.id}
                 </span>
               </div>
@@ -169,6 +412,14 @@ export default function Timeline() {
 
         {/* 4. TRAKA: SRPSKI SINHRONIZOVANI GLAS */}
         <div style={{ height: '54px', background: 'rgba(34, 197, 94, 0.02)', borderRadius: '6px', border: '1px solid rgba(34, 197, 94, 0.08)', position: 'relative' }}>
+          {/* Wavesurfer stvarni talasni oblik u pozadini cele trake */}
+          {dubbedAudioUrl && (
+            <div 
+              ref={dubbedWaveformRef} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} 
+            />
+          )}
+
           <div style={{ position: 'absolute', left: '10px', top: '5px', zIndex: 5, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button 
               onClick={(e) => { 
@@ -208,11 +459,21 @@ export default function Timeline() {
             const left = (seg.start / dur) * 100;
             const origWidth = ((seg.end - seg.start) / dur) * 100;
             
-            // Ako imamo generisan tts_duration, koristimo njega da vidimo da li je duži
-            const ttsDur = seg.tts_duration || (seg.end - seg.start);
-            const ttsWidth = (ttsDur / dur) * 100;
-            const isLonger = seg.tts_duration && (seg.tts_duration > (seg.end - seg.start));
-            const isActive = selectedSegmentId === seg.id;
+            // Dinamički proračun procenjene dužine na osnovu brzine (tempa)
+            const baseTtsDuration = seg.tts_duration || (seg.end - seg.start);
+            const speedRatio = seg.last_generated_speed ? (seg.last_generated_speed / seg.speed) : (1.0 / seg.speed);
+            const estimatedTtsDuration = baseTtsDuration * speedRatio;
+            
+            const ttsWidth = (estimatedTtsDuration / dur) * 100;
+            const isLonger = estimatedTtsDuration > (seg.end - seg.start);
+            
+            // Detekcija kolizije
+            const nextSeg = project.segments
+              .filter(s => s.start >= seg.end)
+              .sort((a, b) => a.start - b.start)[0];
+            const hasCollision = nextSeg && (seg.start + estimatedTtsDuration > nextSeg.start);
+
+            const isActive = selectedSegmentIds.includes(seg.id);
             const isHovered = hoveredSegmentId === seg.id;
             
             return (
@@ -222,7 +483,22 @@ export default function Timeline() {
                 onMouseLeave={() => setHoveredSegmentId(null)}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedSegmentId(seg.id);
+                  if (e.ctrlKey || e.metaKey) {
+                    setSelectedSegmentIds(prev => {
+                      if (prev.includes(seg.id)) {
+                        const next = prev.filter(id => id !== seg.id);
+                        if (next.length === 0) return [seg.id];
+                        return next;
+                      } else {
+                        return [...prev, seg.id];
+                      }
+                    });
+                    setSelectedSegmentId(seg.id);
+                  } else {
+                    setSelectedSegmentId(seg.id);
+                    setSelectedSegmentIds([seg.id]);
+                  }
+
                   if (videoRef.current) {
                     videoRef.current.currentTime = seg.start;
                     if (activeAudioSource === "dubbed") {
@@ -241,13 +517,33 @@ export default function Timeline() {
                   display: 'flex',
                   alignItems: 'center',
                   overflow: 'visible',
-                  border: isActive ? '2px solid #22c55e' : '1px solid rgba(34, 197, 94, 0.15)',
+                  zIndex: 2,
                   background: isActive ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.05)',
-                  transition: 'all 0.15s ease'
+                  border: hasCollision
+                    ? '2px solid #f43f5e'
+                    : (isActive ? '2px solid #22c55e' : '1px solid rgba(34, 197, 94, 0.15)'),
+                  boxShadow: hasCollision 
+                    ? '0 0 12px #f43f5e, inset 0 0 6px rgba(244, 63, 94, 0.4)' 
+                    : (isActive ? '0 0 10px rgba(34, 197, 94, 0.2)' : 'none'),
+                  transition: 'background-color 0.15s, border-color 0.15s, box-shadow 0.2s'
                 }}
               >
-                {/* Premium Tooltip prozorčić na hover ako segment ima upozorenje */}
-                {isLonger && isHovered && (
+                {/* Drag-and-drop i resize kontrole za ivice */}
+                <div 
+                  onMouseDown={(e) => handleStartResizeLeft(e, seg)}
+                  style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
+                />
+                <div 
+                  onMouseDown={(e) => handleStartDragMove(e, seg)}
+                  style={{ position: 'absolute', left: '6px', right: '6px', top: 0, bottom: 0, cursor: 'move', zIndex: 10 }}
+                />
+                <div 
+                  onMouseDown={(e) => handleStartResizeRight(e, seg)}
+                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
+                />
+
+                {/* Premium Tooltip prozorčić na hover ako segment ima upozorenje ili koliziju */}
+                {(isLonger || hasCollision) && isHovered && (
                   <div style={{
                     position: 'absolute',
                     bottom: '100%',
@@ -266,7 +562,6 @@ export default function Timeline() {
                     transition: 'all 0.2s ease',
                     display: 'block'
                   }}>
-                    {/* Strelica nadole */}
                     <div style={{
                       position: 'absolute',
                       top: '100%',
@@ -282,9 +577,14 @@ export default function Timeline() {
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                       <span style={{ fontSize: '1.1rem', marginTop: '-2px' }}>⚠️</span>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', whiteSpace: 'normal' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>Predugačak srpski izgovor!</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>
+                          {hasCollision ? "Kolizija tajminga!" : "Predugačak srpski izgovor!"}
+                        </span>
                         <span style={{ fontSize: '0.7rem', color: '#cbd5e1', lineHeight: '1.3' }}>
-                          Srpski glas traje <strong>{seg.tts_duration.toFixed(2)}s</strong> što je za <strong>{(seg.tts_duration - (seg.end - seg.start)).toFixed(2)}s</strong> duže od originalnog prozora ({((seg.end - seg.start)).toFixed(2)}s).
+                          {hasCollision 
+                            ? `Srpski izgovor se preklapa sa početkom sledećeg segmenta #${nextSeg.id}.`
+                            : `Srpski glas traje ${estimatedTtsDuration.toFixed(2)}s što je za ${(estimatedTtsDuration - (seg.end - seg.start)).toFixed(2)}s duže od originalnog prozora.`
+                          }
                         </span>
                         <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '4px' }}>
                           💡 Skratite prevod ili ubrzajte segment u Podešavanjima Zvuka.
@@ -296,18 +596,18 @@ export default function Timeline() {
 
                 {/* Ako je duži, obeležavamo crvenom pozadinom višak trajanja */}
                 {isLonger && (
-                  <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((seg.tts_duration - (seg.end - seg.start)) / seg.tts_duration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444', borderRadius: '0 4px 4px 0' }} />
+                  <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((estimatedTtsDuration - (seg.end - seg.start)) / estimatedTtsDuration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444', borderRadius: '0 4px 4px 0', pointerEvents: 'none' }} />
                 )}
          
                 {/* Waveform */}
-                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : 0.25, overflow: 'hidden' }}>
-                  {generateWaveformBars(ttsDur, seg.id + 10).map((h, i) => (
-                    <div key={i} style={{ width: '2px', height: `${h}%`, background: isLonger ? '#f87171' : '#4ade80', borderRadius: '1px' }} />
+                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : 0.25, overflow: 'hidden', pointerEvents: 'none' }}>
+                  {generateWaveformBars(estimatedTtsDuration, seg.id + 10).map((h, i) => (
+                    <div key={i} style={{ width: '2px', height: `${h}%`, background: (isLonger || hasCollision) ? '#f87171' : '#4ade80', borderRadius: '1px' }} />
                   ))}
                 </div>
          
-                <span style={{ fontSize: '0.65rem', color: isLonger ? '#f87171' : '#86efac', fontWeight: 'bold', marginLeft: '6px', zIndex: 10 }}>
-                  #{seg.id} {isLonger ? `(⚠️ +${(seg.tts_duration - (seg.end - seg.start)).toFixed(1)}s)` : ''}
+                <span style={{ fontSize: '0.65rem', color: (isLonger || hasCollision) ? '#f87171' : '#86efac', fontWeight: 'bold', marginLeft: '6px', zIndex: 20, pointerEvents: 'none' }}>
+                  #{seg.id} {(isLonger && !hasCollision) ? `(⚠️ +${(estimatedTtsDuration - (seg.end - seg.start)).toFixed(1)}s)` : ''} {hasCollision ? '(⚠️ KOLIZIJA)' : ''}
                 </span>
               </div>
             );
@@ -316,15 +616,26 @@ export default function Timeline() {
 
         {/* 5. TRAKA: POZADINSKA MUZIKA */}
         <div style={{ height: '40px', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
+          {/* Wavesurfer stvarni talasni oblik u pozadini */}
+          {noVocalsAudioUrl && (
+            <div 
+              ref={musicWaveformRef} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} 
+            />
+          )}
+
           <div style={{ position: 'absolute', left: '10px', top: '4px', fontSize: '0.7rem', color: '#475569', zIndex: 5, pointerEvents: 'none', textTransform: 'uppercase', fontWeight: 'bold' }}>
             <Music size={10} style={{ display: 'inline', marginRight: '4px' }} /> Pozadinski zvuk (Muzika / Efekti)
           </div>
-          {/* Crtamo talasni oblik celom dužinom */}
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 10px', opacity: 0.1, pointerEvents: 'none' }}>
-            {Array.from({ length: 80 }).map((_, i) => (
-              <div key={i} style={{ width: '2px', height: `${20 + Math.sin(i * 0.3) * 15}%`, background: '#cbd5e1', borderRadius: '1px' }} />
-            ))}
-          </div>
+          
+          {/* Fallback sinusoidni waveform ako nemamo wavesurfer */}
+          {!noVocalsAudioUrl && (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 10px', opacity: 0.1, pointerEvents: 'none' }}>
+              {Array.from({ length: 80 }).map((_, i) => (
+                <div key={i} style={{ width: '2px', height: `${20 + Math.sin(i * 0.3) * 15}%`, background: '#cbd5e1', borderRadius: '1px' }} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* KURSOR (PLAYHEAD) KOJI KLIZI */}

@@ -1,5 +1,6 @@
 import { Loader2, Mic, Save, Zap } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
+import Knob from '../Common/Knob';
 
 export default function MixerPanel() {
   const {
@@ -28,31 +29,27 @@ export default function MixerPanel() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <h4 style={{ fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8' }}>🎛️ Audio Mikser & Podešavanje glasa</h4>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Jačina pozadine */}
-          <div className="mixer-control" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <span>Muzika i efekti:</span>
-              <strong>{bgVolume} dB</strong>
-            </label>
-            <input 
-              type="range" min="-30" max="10" step="1" value={bgVolume} 
-              onChange={(e) => setBgVolume(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--primary)' }}
-            />
-          </div>
-          {/* Jačina srpskog glasa */}
-          <div className="mixer-control" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-              <span>Srpski AI glas:</span>
-              <strong>{dubVolume} dB</strong>
-            </label>
-            <input 
-              type="range" min="-15" max="15" step="1" value={dubVolume} 
-              onChange={(e) => setDubVolume(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--primary)' }}
-            />
-          </div>
+        <div style={{ display: 'flex', gap: '30px', justifyContent: 'flex-start', background: 'rgba(0,0,0,0.15)', padding: '16px 20px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.03)', width: 'fit-content' }}>
+          <Knob
+            label="Muzika & Efekti"
+            min={-30}
+            max={10}
+            step={1}
+            value={bgVolume}
+            defaultValue={-5}
+            unit="dB"
+            onChange={setBgVolume}
+          />
+          <Knob
+            label="Srpski AI Glas"
+            min={-15}
+            max={15}
+            step={1}
+            value={dubVolume}
+            defaultValue={0}
+            unit="dB"
+            onChange={setDubVolume}
+          />
         </div>
 
         {/* Izbor glasa */}

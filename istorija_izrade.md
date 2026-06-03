@@ -1,3 +1,33 @@
+## [2026-06-03 10:17:00] DAW Napredni Alati, Prečice i Audio talasi - Faza 3 uspešno završena
+- **Opis:**
+  Uspešno je završena i verifikovana Faza 3 plana unapređenja studija za Sinhronizuj.me, čime je interfejs transformisan u potpuno funkcionalno DAW okruženje:
+  1. **Klijentski Undo/Redo istorija:** Implementiran je stack za praćenje izmena (do 50 stanja) koji se bezbedno okida na blur prevodilačkog polja, promenu glasa, prevlačenje segmenata ili promenu Knob-ova.
+  2. **Globalne prečice:** Dodata podrška za navigaciju kroz segmente pomoću `Tab` i `Shift + Tab` (uz sinhronizovano fokusiranje textarea i premotavanje videa na početak segmenta), `Space` za play/pause reprodukciju, `Esc` za blur, i `Ctrl + Z`/`Ctrl + Y` za Undo/Redo.
+  3. **Grupne Selekcije (Bulk Operations):** Korisnik može držanjem `Ctrl` kliknuti na više segmenata i na desnom panelu dobiti namenske kontrole za grupnu promenu jačine, brzine, pitch-a, glasa ili grupnu TTS sintezu.
+  4. **Wavesurfer.js Integracija:** Implementirano iscrtavanje stvarnih talasnih oblika za muzičku traku i sinhronizovanu traku, koje se sinhronizuje i kreće u realnom vremenu sa reprodukcijom videa.
+  5. **Drag-and-Drop i kolizije:** Omogućeno je direktno pomeranje celih segmenata ili rastezanje/skupljanje njihovih ivica na vremenskoj liniji. Sistem automatski u realnom vremenu detektuje i crveno označava preklapanja (kolizije) sa sledećim segmentom.
+  6. **Verifikacija:** Pokrenut Vite build koji uspešno spakuje produkcioni kod za 525ms bez ijedne sintaksne ili import greške.
+
+## [2026-06-03 10:11:00] Vizuelni redizajn (Aesthetics v3) i animacije - Faza 2 uspešno završena
+- **Opis:**
+  Uveden je novi vizuelni identitet i premium tamni režim za Sinhronizuj.me:
+  1. **Tipografija i boje:** Uvezeni Google Fontovi *Outfit* (naslovi, brending) i *Inter* (tekstualni podaci). Redefinisane CSS varijable sa HSL slate paletom boja za premium vizuelni izgled.
+  2. **Premium pozadina i glassmorphism:** Dodata tri aktivna aurora bloba sa blend režimima na pozadini i unapređene senke, unutrašnje ivice i zamućenje (`backdrop-filter: blur(24px)`) na staklenom kontejneru.
+  3. **Moderni Dashboard i statistike:** Dodat panel sa statistikama projekata na vrhu Dashboard-a (ukupno, u obradi, završeno/spremno). Kartice projekata su redizajnirane sa prelepim hover efektima (y-offset, purple glow senka) i ikonama statusa.
+  4. **Fluidne animacije:** Integrisani framer-motion prelazi sa `AnimatePresence` modom "wait" između svih glavnih ekrana (Dashboard, unos videa, preview, progres i studio).
+
+## [2026-06-03 10:07:00] UI/Frontend Modularizacija - Faza 1 uspešno završena
+- **Opis:**
+  Uspešno je završena Faza 1 plana modularizacije frontenda aplikacije:
+  1. **Upravljanje globalnim stanjem (`StudioContext.jsx`):** Kreiran je centralizovani React Context i provajder koji preuzima kompletno stanje studija i preusmerava sve API pozive, olakšavajući testiranje i uklanjajući zavisnost od monolita.
+  2. **Razbijanje monolitnog `App.jsx` na komponente:**
+     - `components/Common/HardwareMonitor.jsx` - premešten bar sa VPS i Modal GPU statusima i komandom za čišćenje Redis keša.
+     - `components/Dashboard/ProjectList.jsx` - premešten celokupan Dashboard sa listom i brisanjem projekata.
+     - `components/Studio/Timeline.jsx` - izvučena vremenska skala sa frejmovima, audio trakama (original, tts, muzika) i kursorom reprodukcije.
+     - `components/Studio/SegmentRow.jsx` - premešten detaljan editor za editovanje prevoda i audio parametara (jačina, brzina, pitch, ducking) selektovanog segmenta.
+     - `components/Studio/MixerPanel.jsx` - premešten mikser panel sa slider-ima za Volume/Ducking i akcijama za finalni render i čuvanje nacrta.
+  3. **Povezivanje i verifikacija:** Ažurirani su `main.jsx` i `App.jsx` da koriste `StudioProvider` i nove modularne komponente. Build frontenda uspešno prolazi bez sintaksnih ili import grešaka.
+
 ## [2026-06-01 11:55:00] Unapređenje AI lektora (Iteracija 6), ispravka bagova i implementacija transliteracije u produkciju
 - **Opis:**
   Uspešno je završena i testirana Iteracija 6 AI lektora, čime su otklonjeni ključni bagovi u pipeline-u i podignuta preciznost na preko 95%:
