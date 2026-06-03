@@ -27,82 +27,131 @@ async function handleResponse(response) {
   return response.json();
 }
 
+/**
+ * Pomoćni omotač za fetch koji automatski dodaje JWT token u zaglavlje.
+ */
+async function authFetch(url, options = {}) {
+  const token = localStorage.getItem('sinhronizuj_me_token');
+  options.headers = options.headers || {};
+  
+  if (token) {
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const res = await fetch(url, options);
+  
+  if (res.status === 401) {
+    localStorage.removeItem('sinhronizuj_me_token');
+    // Bacamo izuzetak koji će biti uhvaćen na frontendu
+    throw new ApiError("Sesija je istekla. Molimo prijavite se ponovo.", 401);
+  }
+  
+  return handleResponse(res);
+}
+
 export const api = {
   /**
-   * Izlistava sve projekte.
+   * Prijava korisnika.
+   */
+  async login(email, password) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await handleResponse(res);
+    if (data.access_token) {
+      localStorage.setItem('sinhronizuj_me_token', data.access_token);
+    }
+    return data;
+  },
+
+  /**
+   * Registracija korisnika.
+   */
+  async register(email, password) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    return handleResponse(res);
+  },
+
+  /**
+   * Dobavljanje trenutno prijavljenog korisnika.
+   */
+  async getMe() {
+    return authFetch(`${API_BASE_URL}/api/v1/auth/me`);
+  },
+
+  /**
+   * Izlistava sve projekte koji pripadaju korisniku.
    */
   async getProjects() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/projects`);
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/projects`);
   },
 
   /**
    * Dobavlja statistiku hardvera VPS-a.
    */
   async getHwStats() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/hw-stats`);
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/hw-stats`);
   },
 
   /**
    * Dobavlja status Modal.com radnika.
    */
   async getModalStatus() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/modal-status`);
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/modal-status`);
   },
 
   /**
    * Dobavlja status određenog Celery zadatka (task-a).
    */
   async getTaskStatus(taskId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/status/${taskId}`);
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/status/${taskId}`);
   },
 
   /**
    * Učitava podatke o specifičnom projektu iz baze.
    */
   async getProject(projectId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}`);
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}`);
   },
 
   /**
    * Briše kompletnu Redis bazu (čišćenje).
    */
   async flushRedis() {
-    const res = await fetch(`${API_BASE_URL}/api/v1/redis/flush`, { method: 'POST' });
-    return handleResponse(res);
+    return authFetch(`${API_BASE_URL}/api/v1/redis/flush`, { method: 'POST' });
   },
 
   /**
    * Kreira novi prazan projekat.
    */
   async createProject(name) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
     });
-    return handleResponse(res);
   },
 
   /**
    * Briše projekat i sve njegove povezane fajlove.
    */
   async deleteProject(projectId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}`, {
       method: 'DELETE'
     });
-    return handleResponse(res);
   },
 
   /**
    * Pokreće Fazu 1 (Analiza videa).
    */
   async processVideo(url, projectId) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
+    return authFetch(`${API_BASE_URL}/api/v1/process-video`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -111,48 +160,44 @@ export const api = {
         project_id: projectId
       })
     });
-    return handleResponse(res);
   },
 
   /**
    * Dobavlja presigned URL za upload lokalnog fajla na MinIO.
    */
   async getUploadUrl(filename, contentType) {
-    const res = await fetch(
+    return authFetch(
       `${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(filename)}&content_type=${encodeURIComponent(contentType)}`
     );
-    return handleResponse(res);
   },
 
   /**
    * Poziva AI lektora da skrati tekst segmenta.
    */
   async shortenSegment(projectId, segmentId, text) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}/segment/${segmentId}/shorten`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}/segment/${segmentId}/shorten`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
     });
-    return handleResponse(res);
   },
 
   /**
    * Čuva najnoviji nacrt (draft) segmenata na serveru.
    */
   async saveProjectDraft(projectId, segments) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}/save`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ segments })
     });
-    return handleResponse(res);
   },
 
   /**
    * Generiše TTS za pojedinačni segment sa zadatim audio modifikatorima.
    */
   async generateSegmentTTS(projectId, segmentId, text, voiceType, volume, speed, pitch, bgVolume) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}/segment/${segmentId}/tts`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}/segment/${segmentId}/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -164,26 +209,24 @@ export const api = {
         bg_volume: bgVolume
       })
     });
-    return handleResponse(res);
   },
 
   /**
    * Generiše TTS glasove za sve segmente u projektu odjednom.
    */
   async generateAllTTS(projectId, voiceType) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}/generate-all-tts`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}/generate-all-tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ voice_type: voiceType })
     });
-    return handleResponse(res);
   },
 
   /**
    * Pokreće Fazu 2 (Renderovanje finalnog videa).
    */
   async renderProject(projectId, voiceType, backgroundVolume, dubbedVolume) {
-    const res = await fetch(`${API_BASE_URL}/api/v1/project/${projectId}/render`, {
+    return authFetch(`${API_BASE_URL}/api/v1/project/${projectId}/render`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -192,6 +235,5 @@ export const api = {
         dubbed_volume: dubbedVolume
       })
     });
-    return handleResponse(res);
   }
 };

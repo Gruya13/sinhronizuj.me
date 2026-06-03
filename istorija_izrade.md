@@ -1,3 +1,12 @@
+## [2026-06-03 15:45:00] Implementacija P0 i P1 Faze Arhitekture (Stateless S3 radnici, Postgres perzistencija i Backup)
+- **Opis:**
+  Uspešno je završena i verifikovana integracija P0 i P1 faza arhitekture aplikacije Sinhronizuj.me:
+  1. **Stateless Celery radnik (`tasks.py`):** Celery radnici su kompletno prebačeni na stateless režim rada. Više ne zavise od lokalnog deljenog fajl sistema Hetzner VPS-a niti od lokalnih putanja. Na početku svakog zadatka (Analiza i Render), radnik preuzima sve originalne fajlove i generisane TTS segmente sa S3 (MinIO) na osnovu jedinstvenih ključeva, a na kraju zadatka otprema rezultate na S3 i briše sve privremene lokalne fajlove.
+  2. **PostgreSQL kao primarni izvor istine:** Uklonjena je zavisnost od Redisa kao primarnog skladišta nacrta (Redis sada služi samo kao Celery broker). Svi podaci o projektima i segmentima se upisuju i čitaju direktno iz PostgreSQL baze podataka kroz SQLAlchemy.
+  3. **Presigned S3 URL-ovi za Frontend:** Rute na backendu i logika na frontendu (`App.jsx` i `StudioContext.jsx`) su prilagođeni da generišu i reprodukuju privremene presigned URL-ove sa rokom važenja od 24 sata za originalni video, no-vocals traku, tts segmente i finalni video direktno sa privatnog S3 skladišta.
+  4. **Backup Strategija:** Kreirana je skripta `infra/backup.py` i njen bash omotač `infra/backup.sh` koji automatski vrše `pg_dump` baze iz Docker-a, gzipuju dump, otpremaju ga u `backups` bucket na MinIO, i automatski rotiraju bekap fajlove čuvajući samo poslednjih 7 dana. Kreirana je i dokumentacija `infra/README_backup.md` za podešavanje cron-a.
+  5. **Verifikacija:** Uspešno su ručno testirane sve rute i pokrenut je ručni backup koji je bez greške kreirao i poslao dump baze na S3, završavajući proces rotacije.
+
 ## [2026-06-03 10:25:00] Implementacija globalnog Header-a sa dropdown menijem za projekte
 - **Opis:**
   Dodata je nova globalna navigaciona komponenta na vrhu aplikacije:

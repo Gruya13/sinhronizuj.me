@@ -9,6 +9,48 @@ import re
 import time
 import threading
 from datetime import datetime, timedelta, timezone
+import boto3
+from botocore.config import Config
+from backend.core.database import SessionLocal
+from backend.core.models import Project, Segment
+
+def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str):
+    if not os.path.exists(file_path):
+        print(f"[S3 UPLOAD ERROR] Lokalni fajl ne postoji: {file_path}", flush=True)
+        return False
+    s3_internal = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+    try:
+        s3_internal.upload_file(file_path, bucket_name, object_key)
+        print(f"[S3 UPLOAD SUCCESS] Otpremljen {file_path} -> s3://{bucket_name}/{object_key}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[S3 UPLOAD ERROR] Greška pri otpremanju na S3: {e}", flush=True)
+        return False
+
+def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
+    s3_internal = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+    try:
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        s3_internal.download_file(bucket_name, object_key, local_path)
+        print(f"[S3 DOWNLOAD SUCCESS] Preuzet s3://{bucket_name}/{object_key} -> {local_path}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[S3 DOWNLOAD ERROR] Greška pri preuzimanju sa S3: {e}", flush=True)
+        return False
 
 def get_redis_client():
     match = re.search(r'@([^:/]+)', settings.REDIS_URL)
@@ -216,25 +258,105 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 project_name = meta.get("name", project_name)
                 created_at_val = meta.get("created_at", created_at_val)
 
-        # --- SAČUVAJ NACRT U REDIS ---
+        # --- SAČUVAJ PODATKE U POSTGRES I S3 ---
+        video_key = f"projects/{effective_project_id}/video.mp4"
+        vocals_key = f"projects/{effective_project_id}/vocals.wav"
+        no_vocals_key = f"projects/{effective_project_id}/no_vocals.wav"
+        visual_context_key = vc_result.get("key")
+        
+        update_progress(detail="Otpremanje originalnog videa na S3...")
+        upload_file_to_s3(stable_video_path, settings.MINIO_BUCKET, video_key)
+        
+        update_progress(detail="Otpremanje izolovanog vokala na S3...")
+        upload_file_to_s3(stable_vocals_path, settings.MINIO_BUCKET, vocals_key)
+        
+        update_progress(detail="Otpremanje pozadinske muzike na S3...")
+        upload_file_to_s3(stable_no_vocals_path, settings.MINIO_BUCKET, no_vocals_key)
+        
+        # Čišćenje lokalnih fajlova sa diska radnika
+        if os.path.exists(stable_video_path): os.remove(stable_video_path)
+        if os.path.exists(stable_vocals_path): os.remove(stable_vocals_path)
+        if os.path.exists(stable_no_vocals_path): os.remove(stable_no_vocals_path)
+        
+        db = SessionLocal()
+        try:
+            p_db = db.query(Project).filter(Project.id == effective_project_id).first()
+            if p_db:
+                p_db.video_s3_key = video_key
+                p_db.vocals_s3_key = vocals_key
+                p_db.no_vocals_s3_key = no_vocals_key
+                p_db.visual_context_s3_key = visual_context_key
+                p_db.video_title = video_title
+                p_db.costs = progress_metadata["costs"]
+                p_db.status = "ready"
+                
+                # Brišemo stare segmente pre kreiranja novih
+                db.query(Segment).filter(Segment.project_id == effective_project_id).delete()
+                
+                for i, s in enumerate(translation_result["translated_segments"]):
+                    db_seg = Segment(
+                        project_id=effective_project_id,
+                        segment_id=i,
+                        start=s["start"],
+                        end=s["end"],
+                        original=s.get("original_text", ""),
+                        translated=s["text"],
+                        voice_type="clone",
+                        volume=0.0,
+                        speed=1.0,
+                        pitch=0.0,
+                        bg_volume=0.0,
+                        tts_s3_key=None,
+                        tts_duration=None,
+                        status="draft"
+                    )
+                    db.add(db_seg)
+                db.commit()
+                print(f"[CELERY TASK] Podaci uspešno upisani u PostgreSQL za projekat {effective_project_id}", flush=True)
+            else:
+                print(f"[CELERY TASK WARNING] Projekat {effective_project_id} nije pronađen u Postgres bazi podataka.", flush=True)
+        except Exception as db_err:
+            db.rollback()
+            print(f"[CELERY TASK ERROR] Greška pri upisu u Postgres: {db_err}", flush=True)
+            raise db_err
+        finally:
+            db.close()
+            
+        # Generišemo presigned URL-ove za Redis draft kompatibilnost
+        from backend.main import get_presigned_download_url
+        
+        redis_segments = []
+        for i, s in enumerate(translation_result["translated_segments"]):
+            redis_segments.append({
+                "id": i,
+                "start": s["start"],
+                "end": s["end"],
+                "original": s.get("original_text", ""),
+                "translated": s["text"],
+                "tts_path": None,
+                "tts_duration": None,
+                "status": "draft"
+            })
+            
         draft_data = {
             "project_id": effective_project_id,
             "name": project_name,
-            "video_url": video_url,
-            "video_path": stable_video_path,
-            "vocals_path": stable_vocals_path,
-            "no_vocals_path": stable_no_vocals_path,
+            "video_url": get_presigned_download_url(settings.MINIO_BUCKET, video_key),
+            "video_path": video_key,
+            "vocals_path": vocals_key,
+            "no_vocals_path": no_vocals_key,
+            "no_vocals_url": get_presigned_download_url(settings.MINIO_BUCKET, no_vocals_key),
             "visual_context_url": visual_context_url,
             "title": video_title,
-            "segments": draft_segments,
+            "segments": redis_segments,
             "costs": progress_metadata["costs"],
             "status": "ready",
             "created_at": created_at_val
         }
         
-        # Nacrt se čuva 7 dana
+        # Keširamo u Redisu
         r_client.set(f"project:{effective_project_id}:draft", json.dumps(draft_data), ex=604800)
-        print(f"[CELERY TASK] Nacrt uspešno sačuvan u Redis: project:{effective_project_id}:draft", flush=True)
+        print(f"[CELERY TASK] Keširan draft u Redis: project:{effective_project_id}:draft", flush=True)
         
         # Ažuriramo metapodatke u projects:metadata HASH-u
         if project_id:
@@ -246,12 +368,12 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "created_at": created_at_val
             }
             r_client.hset("projects:metadata", project_id, json.dumps(meta_data))
-        
+            
         return {
             "status": "success",
             "project_id": effective_project_id,
             "visual_context_url": visual_context_url,
-            "segments": draft_segments,
+            "segments": redis_segments,
             "costs": progress_metadata["costs"]
         }
         
@@ -259,27 +381,50 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
-    finally:
-        # Vraćamo originalni TEMP_WORKSPACE i čistimo privremeni radni folder zadatka
-        settings.TEMP_WORKSPACE = original_temp_workspace
-        if os.path.exists(task_workspace):
-            print(f"[CELERY TASK] Čistim privremeni radni prostor: {task_workspace}", flush=True)
-            shutil.rmtree(task_workspace, ignore_errors=True)
-
 @celery_app.task(bind=True, name="render_video_task")
 def render_video_task(self, project_id: str, voice_type: str = "clone", background_vol: float = -5.0, dubbed_vol: float = 0.0):
     print(f"--- [CELERY TASK] Započeta FAZA 2 (Render). Projekat: {project_id} ---", flush=True)
     r_client = get_redis_client()
     task_id = self.request.id
     
-    # Učitavamo nacrt iz Redisa
-    draft_bytes = r_client.get(f"project:{project_id}:draft")
-    if not draft_bytes:
-        return {"status": "error", "message": f"Nacrt projekta {project_id} nije pronađen."}
+    # 1. Učitavamo projekat i segmente iz PostgreSQL-a da bismo bili potpuno stateless i ažurni
+    db = SessionLocal()
+    try:
+        p_db = db.query(Project).filter(Project.id == project_id).first()
+        if not p_db:
+            return {"status": "error", "message": f"Projekat {project_id} nije pronađen u PostgreSQL-u."}
         
-    project_data = json.loads(draft_bytes)
-    
-    # Inicijalizujemo workspace
+        project_name = p_db.name
+        video_s3_key = p_db.video_s3_key
+        vocals_s3_key = p_db.vocals_s3_key
+        no_vocals_s3_key = p_db.no_vocals_s3_key
+        visual_context_s3_key = p_db.visual_context_s3_key
+        costs_val = p_db.costs or {"phases": {}, "total_usd": 0.0}
+        created_at_val = p_db.created_at.isoformat() if p_db.created_at else ""
+        video_title = p_db.video_title
+        
+        db_segments = db.query(Segment).filter(Segment.project_id == project_id).order_by(Segment.segment_id).all()
+        segments = []
+        for s in db_segments:
+            segments.append({
+                "id": s.segment_id,
+                "start": s.start,
+                "end": s.end,
+                "original": s.original,
+                "translated": s.translated,
+                "voice_type": s.voice_type,
+                "volume": s.volume,
+                "speed": s.speed,
+                "pitch": s.pitch,
+                "bg_volume": s.bg_volume,
+                "tts_s3_key": s.tts_s3_key,
+                "tts_duration": s.tts_duration,
+                "status": s.status
+            })
+    finally:
+        db.close()
+        
+    # Inicijalizujemo local workspace
     original_temp_workspace = settings.TEMP_WORKSPACE
     task_workspace = os.path.join(original_temp_workspace, task_id)
     os.makedirs(task_workspace, exist_ok=True)
@@ -292,7 +437,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         'completed_steps': [],
         'detail': "Priprema fajlova za renderovanje...",
         'logs': [],
-        'costs': project_data.get("costs", {"phases": {}, "total_usd": 0.0})
+        'costs': costs_val
     }
     
     def add_phase_cost(phase_id, name, gpu, duration, rate):
@@ -319,15 +464,35 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
 
     try:
+        # --- PREUZIMANJE OSNOVNIH FAJLOVA SA S3 ---
+        update_progress("Preuzimanje resursa...", 10, detail="Preuzimam originalni video i audio kanale sa S3...")
+        local_video_path = os.path.join(task_workspace, "video.mp4")
+        local_vocals_path = os.path.join(task_workspace, "vocals.wav")
+        local_no_vocals_path = os.path.join(task_workspace, "no_vocals.wav")
+        
+        if not download_file_from_s3(settings.MINIO_BUCKET, video_s3_key, local_video_path):
+            return {"status": "error", "message": "Preuzimanje video.mp4 sa S3 nije uspelo."}
+        if not download_file_from_s3(settings.MINIO_BUCKET, vocals_s3_key, local_vocals_path):
+            return {"status": "error", "message": "Preuzimanje vocals.wav sa S3 nije uspelo."}
+        if not download_file_from_s3(settings.MINIO_BUCKET, no_vocals_s3_key, local_no_vocals_path):
+            return {"status": "error", "message": "Preuzimanje no_vocals.wav sa S3 nije uspelo."}
+
         # --- KORAK 1: Sinteza Govora (TTS) ---
         update_progress("Sinteza govora...", 20, detail="Provera generisanih zvučnih fajlova...")
         
-        segments = project_data["segments"]
         missing_tts_segments = []
         
-        # Proveravamo koji segmenti nemaju generisan audio
+        # Proveravamo koji segmenti nemaju generisan audio i preuzimamo postojeće
         for s in segments:
-            if not s.get("tts_path") or not os.path.exists(s["tts_path"]):
+            local_path = os.path.join(task_workspace, f"tts_seg_{s['id']}.wav")
+            s["tts_path"] = local_path
+            
+            if s.get("tts_s3_key"):
+                print(f"[RENDER] Preuzimam tts za segment {s['id']} sa S3...", flush=True)
+                download_file_from_s3(settings.MINIO_BUCKET, s["tts_s3_key"], local_path)
+                if not os.path.exists(local_path):
+                    missing_tts_segments.append(s)
+            else:
                 missing_tts_segments.append(s)
                 
         if missing_tts_segments:
@@ -345,7 +510,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             
             t_start_tts = time.time()
             tts_result = synthesize_audio(
-                project_data["vocals_path"],
+                local_vocals_path,
                 tts_input_segments,
                 voice_type=voice_type,
                 disable_openvoice=settings.DISABLE_OPENVOICE,
@@ -358,44 +523,65 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 return tts_result
                 
             # Akumuliramo trošak
-            existing_tts = progress_metadata['costs']['phases'].get("tts", {})
+            existing_tts = progress_metadata['costs'].get("phases", {}).get("tts", {})
             existing_duration = existing_tts.get("duration_sec", 0.0)
             total_duration_tts = existing_duration + duration_tts
             add_phase_cost("tts", "Sinteza govora (OpenVoice)", "L4", total_duration_tts, 0.00025)
             
-            # Ažuriramo putanje u našim segmentima i kopiramo ih u stabilnu lokaciju
             # Ažuriramo putanje u našim segmentima i kopiramo ih u stabilnu lokaciju sa primenom modifikatora
             from backend.worker.utils import apply_audio_modifiers
             tts_map = {s["id"]: s for s in tts_result["tts_segments"]}
-            for s in segments:
-                if s["id"] in tts_map:
-                    res_seg = tts_map[s["id"]]
-                    stable_seg_filename = f"tts_seg_{project_id}_{s['id']}.wav"
-                    stable_seg_path = os.path.join(original_temp_workspace, stable_seg_filename)
-                    
-                    apply_audio_modifiers(
-                        res_seg["path"],
-                        stable_seg_path,
-                        volume=s.get("volume", 0.0),
-                        speed=s.get("speed", 1.0),
-                        pitch=s.get("pitch", 0.0)
-                    )
-                    
-                    # Provera novog trajanja posle modifikatora
-                    try:
-                        from pydub import AudioSegment
-                        updated_audio = AudioSegment.from_wav(stable_seg_path)
-                        actual_duration = len(updated_audio) / 1000.0
-                    except Exception:
-                        actual_duration = res_seg["duration"]
+            
+            db = SessionLocal()
+            try:
+                for s in segments:
+                    if s["id"] in tts_map:
+                        res_seg = tts_map[s["id"]]
+                        local_raw_path = res_seg["path"]
+                        local_processed_path = os.path.join(task_workspace, f"tts_seg_processed_{s['id']}.wav")
                         
-                    s["tts_path"] = stable_seg_path
-                    s["tts_duration"] = actual_duration
-                    
-            # Ažuriramo draft u Redisu
-            project_data["segments"] = segments
-            project_data["costs"] = progress_metadata["costs"]
-            r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+                        apply_audio_modifiers(
+                            local_raw_path,
+                            local_processed_path,
+                            volume=s.get("volume", 0.0),
+                            speed=s.get("speed", 1.0),
+                            pitch=s.get("pitch", 0.0)
+                        )
+                        
+                        # Provera novog trajanja posle modifikatora
+                        try:
+                            from pydub import AudioSegment
+                            updated_audio = AudioSegment.from_wav(local_processed_path)
+                            actual_duration = len(updated_audio) / 1000.0
+                        except Exception:
+                            actual_duration = res_seg["duration"]
+                            
+                        # Upload na S3
+                        tts_s3_key = f"projects/{project_id}/tts_seg_{s['id']}.wav"
+                        upload_file_to_s3(local_processed_path, settings.MINIO_BUCKET, tts_s3_key)
+                        
+                        if os.path.exists(local_raw_path):
+                            os.remove(local_raw_path)
+                            
+                        s["tts_path"] = local_processed_path
+                        s["tts_duration"] = actual_duration
+                        s["tts_s3_key"] = tts_s3_key
+                        
+                        # Ažuriranje u PostgreSQL
+                        db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == s["id"]).first()
+                        if db_seg:
+                            db_seg.tts_s3_key = tts_s3_key
+                            db_seg.tts_duration = actual_duration
+                db.commit()
+            except Exception as db_err:
+                db.rollback()
+                print(f"[RENDER ERROR] Greška pri upisu TTS-a u bazu: {db_err}", flush=True)
+                raise db_err
+            finally:
+                db.close()
+                
+            if "dubbed_audio_path" in tts_result and os.path.exists(tts_result["dubbed_audio_path"]):
+                os.remove(tts_result["dubbed_audio_path"])
             
         update_progress(completed_step="Svi vokali sintetizovani")
         
@@ -416,8 +602,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         t_start_merge = time.time()
         
         merge_result = merge_audio_and_video_dynamic(
-            project_data["video_path"],
-            project_data["no_vocals_path"],
+            local_video_path,
+            local_no_vocals_path,
             merger_segments,
             background_vol=background_vol,
             dubbed_vol=dubbed_vol
@@ -450,20 +636,60 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         else:
             add_phase_cost("lipsync", "Lip Sync preskočen (nema lica)", "Lokalni VPS", duration_lip, 0.0)
             
+        update_progress(completed_step="Renderovanje završeno", percentage=95)
+        
+        # --- OTPREMANJE FINALNOG VIDEA NA S3 ---
+        final_video_s3_key = f"projects/{project_id}/final_video.mp4"
+        update_progress("Otpremanje finalnog videa...", 98, detail="Slanje gotovog video zapisa na S3...")
+        if not upload_file_to_s3(final_output, settings.MINIO_BUCKET, final_video_s3_key):
+            return {"status": "error", "message": "Otpremanje finalnog videa na S3 nije uspelo."}
+            
+        # Ažuriramo status projekta u bazi podataka
+        db = SessionLocal()
+        try:
+            p_db = db.query(Project).filter(Project.id == project_id).first()
+            if p_db:
+                p_db.final_video_s3_key = final_video_s3_key
+                p_db.status = "completed"
+                p_db.costs = progress_metadata["costs"]
+                db.commit()
+        except Exception as db_err:
+            db.rollback()
+            print(f"[RENDER ERROR] Greška pri upisu finalnog statusa u bazu: {db_err}", flush=True)
+            raise db_err
+        finally:
+            db.close()
+            
+        # Obrišemo lokalne privremene audio/video fajlove
+        if os.path.exists(final_output):
+            os.remove(final_output)
+            
         update_progress(completed_step="Renderovanje završeno", percentage=100)
         
-        # Pomeranje finalnih fajlova u korenski temp_workspace
-        final_video_filename = f"final_{project_id}.mp4"
-        destination_final_video = os.path.join(original_temp_workspace, final_video_filename)
-        shutil.move(final_output, destination_final_video)
+        # Generišemo presigned URL za status kompatibilnost
+        from backend.main import get_presigned_download_url
+        final_presigned_url = get_presigned_download_url(settings.MINIO_BUCKET, final_video_s3_key)
         
-        # Ažuriramo status projekta u Redisu na completed
-        project_data["status"] = "completed"
-        project_data["final_video_url"] = f"/videos/{final_video_filename}"
-        project_data["costs"] = progress_metadata["costs"]
+        # Sinhronizujemo Redis draft za unazadnu kompatibilnost
+        project_data = {
+            "project_id": project_id,
+            "name": project_name,
+            "video_url": get_presigned_download_url(settings.MINIO_BUCKET, video_s3_key),
+            "video_path": video_s3_key,
+            "vocals_path": vocals_s3_key,
+            "no_vocals_path": no_vocals_s3_key,
+            "no_vocals_url": get_presigned_download_url(settings.MINIO_BUCKET, no_vocals_s3_key),
+            "visual_context_url": get_presigned_download_url("previews", visual_context_s3_key) if visual_context_s3_key else "",
+            "title": video_title,
+            "segments": segments,
+            "costs": progress_metadata["costs"],
+            "status": "completed",
+            "final_video_url": final_presigned_url,
+            "created_at": created_at_val
+        }
         r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
         
-        # Ažuriramo status projekta u metapodacima
+        # Ažuriramo status projekta u metapodacima u Redisu
         meta_bytes = r_client.hget("projects:metadata", project_id)
         if meta_bytes:
             meta = json.loads(meta_bytes)
@@ -473,7 +699,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         return {
             "status": "completed",
             "project_id": project_id,
-            "video_url": f"/videos/{final_video_filename}",
+            "video_url": final_presigned_url,
             "costs": progress_metadata["costs"]
         }
         

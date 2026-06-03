@@ -33,4 +33,12 @@ class Settings:
     
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
 
+    # JWT Security
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "4f7a3d9e8b7c6a5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
+
+    # Database Configuration
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://sinhronizuj_user:sinhronizuj_pass_2026@localhost:5432/sinhronizuj_db")
+
 settings = Settings()

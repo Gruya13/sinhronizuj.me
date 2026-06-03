@@ -13,11 +13,13 @@ import ProjectList from './components/Dashboard/ProjectList';
 import Timeline from './components/Studio/Timeline';
 import SegmentRow from './components/Studio/SegmentRow';
 import MixerPanel from './components/Studio/MixerPanel';
+import LoginRegister from './components/Auth/LoginRegister';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
 function App() {
   const {
+    user,
     showProjectsList,
     newProjectName, setNewProjectName,
     isCreateModalOpen, setIsCreateModalOpen,
@@ -172,9 +174,9 @@ function App() {
 
     // Izvedena vrednost za putanju dubbed zvuka
     const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
-    const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null;
+    const dubbedAudioUrl = project?.dubbed_audio_url || (dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null);
     const noVocalsFilename = project?.no_vocals_path ? project.no_vocals_path.split('/').pop() : null;
-    const noVocalsAudioUrl = noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null;
+    const noVocalsAudioUrl = project?.no_vocals_url || (noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null);
 
     if (activeAudioSource === "dubbed" && dubbedAudioUrl) {
       video.muted = true;
@@ -346,9 +348,13 @@ function App() {
 
   // Izvedene putanje za video i audio
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
-  const dubbedAudioUrl = dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null;
+  const dubbedAudioUrl = project?.dubbed_audio_url || (dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}` : null);
   const noVocalsFilename = project?.no_vocals_path ? project.no_vocals_path.split('/').pop() : null;
-  const noVocalsAudioUrl = noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null;
+  const noVocalsAudioUrl = project?.no_vocals_url || (noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null);
+
+  if (!user) {
+    return <LoginRegister />;
+  }
 
   return (
     <>
@@ -586,7 +592,7 @@ function App() {
                   <div className="video-frame" style={{ width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
                     <video 
                       ref={videoRef}
-                      src={`${API_BASE_URL}/videos/${project.video_path.split('/').pop()}`}
+                      src={project.video_url || `${API_BASE_URL}/videos/${project.video_path.split('/').pop()}`}
                       className="w-full h-full"
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                       onTimeUpdate={() => {

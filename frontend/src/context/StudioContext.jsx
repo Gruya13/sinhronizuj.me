@@ -6,6 +6,10 @@ const StudioContext = createContext();
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
 export function StudioProvider({ children }) {
+  // Stanja za autentifikaciju
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem('sinhronizuj_me_token'));
+
   // Stanja za listu projekata i pretragu
   const [projects, setProjects] = useState([]);
   const [showProjectsList, setShowProjectsList] = useState(true);
@@ -163,19 +167,67 @@ export function StudioProvider({ children }) {
     }
   };
 
-  // Listanje projekata kod pokretanja
+  const handleLogin = async (email, password) => {
+    try {
+      const data = await api.login(email, password);
+      setToken(data.access_token);
+      setUser(data.user);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Neuspešna prijava");
+      throw err;
+    }
+  };
+
+  const handleRegister = async (email, password) => {
+    try {
+      await api.register(email, password);
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Neuspešna registracija");
+      throw err;
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sinhronizuj_me_token');
+    setToken(null);
+    setUser(null);
+    resetStudio();
+  };
+
+  // Automatska provera sesije
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (token) {
+        try {
+          const userData = await api.getMe();
+          setUser(userData);
+          fetchProjects();
+        } catch (err) {
+          console.error("Greška pri verifikaciji sesije:", err);
+          handleLogout();
+        }
+      } else {
+        setUser(null);
+      }
+    };
+    checkAuth();
+  }, [token]);
+
+  // Listanje projekata
   const fetchProjects = async () => {
+    if (!localStorage.getItem('sinhronizuj_me_token')) return;
     try {
       const data = await api.getProjects();
       setProjects(data);
     } catch (err) {
       console.error("Greška pri listanju projekata:", err);
+      if (err.status === 401) {
+        handleLogout();
+      }
     }
   };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
 
   // Monitor resursa
   useEffect(() => {
@@ -259,8 +311,12 @@ export function StudioProvider({ children }) {
       const audios = {};
       data.segments.forEach(s => {
         if (s.tts_path) {
-          const filename = s.tts_path.split('/').pop();
-          audios[s.id] = `${API_BASE_URL}/videos/${filename}`;
+          if (s.tts_path.startsWith('http://') || s.tts_path.startsWith('https://')) {
+            audios[s.id] = s.tts_path;
+          } else {
+            const filename = s.tts_path.split('/').pop();
+            audios[s.id] = `${API_BASE_URL}/videos/${filename}`;
+          }
         }
       });
       setProbniAudios(audios);
@@ -553,8 +609,12 @@ export function StudioProvider({ children }) {
       const audios = {};
       data.segments.forEach(s => {
         if (s.tts_path) {
-          const filename = s.tts_path.split('/').pop();
-          audios[s.id] = `${API_BASE_URL}/videos/${filename}?cb=${Date.now()}`;
+          if (s.tts_path.startsWith('http://') || s.tts_path.startsWith('https://')) {
+            audios[s.id] = s.tts_path;
+          } else {
+            const filename = s.tts_path.split('/').pop();
+            audios[s.id] = `${API_BASE_URL}/videos/${filename}?cb=${Date.now()}`;
+          }
         }
       });
       setProbniAudios(audios);
@@ -609,6 +669,9 @@ export function StudioProvider({ children }) {
 
   return (
     <StudioContext.Provider value={{
+      user, setUser,
+      token, setToken,
+      handleLogin, handleRegister, handleLogout,
       projects, setProjects,
       showProjectsList, setShowProjectsList,
       newProjectName, setNewProjectName,
