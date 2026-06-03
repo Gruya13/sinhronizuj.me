@@ -283,8 +283,9 @@ function App() {
   return (
     <>
       <div className="aurora-bg">
-        <div className="aurora-blob" style={{ top: '10%', left: '10%' }}></div>
-        <div className="aurora-blob" style={{ bottom: '10%', right: '10%', background: 'radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, transparent 70%)' }}></div>
+        <div className="aurora-blob aurora-blob-1"></div>
+        <div className="aurora-blob aurora-blob-2"></div>
+        <div className="aurora-blob aurora-blob-3"></div>
       </div>
 
       <div className="glass-container studio-layout" style={{ maxWidth: project ? '1400px' : '1200px' }}>
@@ -307,328 +308,372 @@ function App() {
           </div>
         )}
 
-        {/* DASHBOARD: LISTA PROJEKATA */}
-        {!loading && !videoUrl && !previewFile && !project && showProjectsList && (
-          <ProjectList />
-        )}
+        <AnimatePresence mode="wait">
+          {/* DASHBOARD: LISTA PROJEKATA */}
+          {!loading && !videoUrl && !previewFile && !project && showProjectsList && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              <ProjectList />
+            </motion.div>
+          )}
 
-        {/* FAZA 0: UNOS VIDEA */}
-        {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
-          <div className="input-area" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <span style={{ fontSize: '0.95rem', color: '#94a3b8', fontWeight: '600' }}>Učitaj video za obradu</span>
-               <button onClick={resetStudio} className="back-btn" style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer' }}>
-                 Nazad na projekte
-               </button>
-             </div>
-             <form onSubmit={handleLoadUrl} className="input-group main-input">
-                <div className="input-wrapper">
-                <input 
-                    type="url" placeholder="Zalepite YouTube ili S3 link..." 
-                    value={url} onChange={(e) => setUrl(e.target.value)}
-                    disabled={loading} required
-                />
-                <button 
-                    type="button" 
-                    className="icon-btn" 
-                    onClick={() => fileInputRef.current.click()}
-                    title="Uploaduj lokalni video"
-                >
-                    <Paperclip size={20} />
-                </button>
-                <button type="submit" disabled={loading || !url} className="glow-button">
-                    <ArrowRight size={20} /> Učitaj video
-                </button>
-                </div>
-            </form>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                style={{ display: 'none' }} 
-                accept="video/*" 
-                onChange={handleFileUpload}
-            />
-            <p className="upload-hint">Podržani formati: MP4, WebM, MKV. Maksimalno 500MB.</p>
-          </div>
-        )}
-
-        {/* PREVIEW NAKON UČITAVANJA PRE ANALIZE */}
-        {!loading && !videoUrl && previewFile && !project && (
-          <div className="preview-pane-container">
-            <div className="preview-video-wrapper">
-              {previewFile.type === "youtube" ? (
-                <iframe src={previewFile.url} className="preview-media" allowFullScreen title="YouTube Preview"/>
-              ) : (
-                <video src={previewFile.url} controls className="preview-media" />
-              )}
-            </div>
-
-            <div className="preview-details-panel">
-              <div>
-                <h3 className="preview-title" style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '8px' }}>Priprema za Analizu (Faza 1)</h3>
-                <p className="text-sm text-slate-400 mb-6" style={{ marginBottom: '24px', color: '#94a3b8', fontSize: '0.9rem' }}>
-                  Video je uspešno učitan. Prvi korak će analizirati video, izdvojiti audio trake, transkribovati govor na engleskom i kreirati prvi prevod.
-                </p>
-                
-                <div className="file-info-list" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                  <div className="file-info-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#64748b' }}>Naziv:</span>
-                    <span style={{ fontWeight: '600' }}>{previewFile.name}</span>
+          {/* FAZA 0: UNOS VIDEA */}
+          {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
+            <motion.div
+              key="input-area"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="input-area" 
+              style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+            >
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <span style={{ fontSize: '0.95rem', color: '#94a3b8', fontWeight: '600' }}>Učitaj video za obradu</span>
+                 <button onClick={resetStudio} className="back-btn" style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer' }}>
+                   Nazad na projekte
+                 </button>
+               </div>
+               <form onSubmit={handleLoadUrl} className="input-group main-input">
+                  <div className="input-wrapper">
+                  <input 
+                      type="url" placeholder="Zalepite YouTube ili S3 link..." 
+                      value={url} onChange={(e) => setUrl(e.target.value)}
+                      disabled={loading} required
+                  />
+                  <button 
+                      type="button" 
+                      className="icon-btn" 
+                      onClick={() => fileInputRef.current.click()}
+                      title="Uploaduj lokalni video"
+                  >
+                      <Paperclip size={20} />
+                  </button>
+                  <button type="submit" disabled={loading || !url} className="glow-button">
+                      <ArrowRight size={20} /> Učitaj video
+                  </button>
                   </div>
-                  <div className="file-info-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: '#64748b' }}>Izvor:</span>
-                    <span style={{ fontWeight: '600' }}>{previewFile.type === "local" ? "Lokalni Upload" : "Mrežni URL"}</span>
+              </form>
+              <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  style={{ display: 'none' }} 
+                  accept="video/*" 
+                  onChange={handleFileUpload}
+              />
+              <p className="upload-hint">Podržani formati: MP4, WebM, MKV. Maksimalno 500MB.</p>
+            </motion.div>
+          )}
+
+          {/* PREVIEW NAKON UČITAVANJA PRE ANALIZE */}
+          {!loading && !videoUrl && previewFile && !project && (
+            <motion.div
+              key="preview-pane"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.25 }}
+              className="preview-pane-container"
+            >
+              <div className="preview-video-wrapper">
+                {previewFile.type === "youtube" ? (
+                  <iframe src={previewFile.url} className="preview-media" allowFullScreen title="YouTube Preview"/>
+                ) : (
+                  <video src={previewFile.url} controls className="preview-media" />
+                )}
+              </div>
+
+              <div className="preview-details-panel">
+                <div>
+                  <h3 className="preview-title" style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '8px' }}>Priprema za Analizu (Faza 1)</h3>
+                  <p className="text-sm text-slate-400 mb-6" style={{ marginBottom: '24px', color: '#94a3b8', fontSize: '0.9rem' }}>
+                    Video je uspešno učitan. Prvi korak će analizirati video, izdvojiti audio trake, transkribovati govor na engleskom i kreirati prvi prevod.
+                  </p>
+                  
+                  <div className="file-info-list" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '12px', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                    <div className="file-info-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#64748b' }}>Naziv:</span>
+                      <span style={{ fontWeight: '600' }}>{previewFile.name}</span>
+                    </div>
+                    <div className="file-info-item" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span style={{ color: '#64748b' }}>Izvor:</span>
+                      <span style={{ fontWeight: '600' }}>{previewFile.type === "local" ? "Lokalni Upload" : "Mrežni URL"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {previewFile.type === "local" && (
+                  <div className="upload-status-box" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
+                    <div className="status-text-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                      <span>S3 Transfer:</span>
+                      <span style={{ color: uploadState === 'completed' ? '#4ade80' : '#38bdf8', fontWeight: 'bold' }}>
+                        {uploadState === 'uploading' ? `Slanje (${uploadProgress}%)` : 'Završeno'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="preview-actions-row" style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
+                  <button onClick={resetStudio} className="back-btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}>
+                    Nazad
+                  </button>
+                  <button 
+                    onClick={handleSubmit} 
+                    disabled={previewFile.type === "local" && uploadState !== "completed"} 
+                    className="glow-button"
+                    style={{ flex: 2, justifyContent: 'center' }}
+                  >
+                    <Play size={18} /> Započni Analizu
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ASINHRONI PROGRES EKRAN (FAZA 1 ILI FAZA 2 RENDER) */}
+          {loading && !videoUrl && !project && (
+            <motion.div
+              key="progress-screen"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="studio-interface"
+            >
+              <div className="studio-content" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                <div className="progress-section">
+                  <div className="progress-header">
+                    <span className="current-step-text" style={{ fontSize: '1.2rem', fontWeight: '700' }}>
+                      {status.includes("RENDERING") ? "🎨 Rendering sinhronizacije (Faza 2)" : "🔍 Analiza videa (Faza 1)"}
+                    </span>
+                    <span className="percent-text">{progressData?.percent || 0}%</span>
+                  </div>
+                  
+                  <div className="progress-bar-container" style={{ margin: '15px 0' }}>
+                    <div className="progress-bar-fill" style={{ width: `${progressData?.percent || 0}%` }}></div>
+                  </div>
+
+                  <div className="sub-status-detail" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+                    <Loader2 size={16} className="spinner-icon pulse-icon" />
+                    <span>{status || "Inicijalizacija..."}</span>
+                  </div>
+
+                  {progressData?.detail && (
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', marginTop: '10px' }}>
+                      {progressData.detail}
+                    </p>
+                  )}
+
+                  <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Proteklo vreme: {formatTime(elapsed)}</span>
+                    <button 
+                      onClick={resetStudio} 
+                      className="back-btn" 
+                      style={{ 
+                        padding: '8px 16px', 
+                        borderRadius: '8px', 
+                        fontSize: '0.85rem', 
+                        background: 'rgba(239, 68, 68, 0.1)', 
+                        border: '1px solid rgba(239, 68, 68, 0.2)', 
+                        color: '#f87171', 
+                        cursor: 'pointer', 
+                        transition: 'all 0.2s',
+                        marginTop: '5px'
+                      }}
+                    >
+                      Prekini i nazad na projekte
+                    </button>
                   </div>
                 </div>
               </div>
+            </motion.div>
+          )}
 
-              {previewFile.type === "local" && (
-                <div className="upload-status-box" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
-                  <div className="status-text-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span>S3 Transfer:</span>
-                    <span style={{ color: uploadState === 'completed' ? '#4ade80' : '#38bdf8', fontWeight: 'bold' }}>
-                      {uploadState === 'uploading' ? `Slanje (${uploadProgress}%)` : 'Završeno'}
+          {/* FAZA 1.5: INTERAKTIVNI STUDIO EDITOR (DRAFT MOD STATUS) */}
+          {project && !loading && !videoUrl && (
+            <motion.div
+              key="studio-editor"
+              initial={{ opacity: 0, scale: 0.99 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.99 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="studio-v2-container" 
+              style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+            >
+              
+              {/* STUDIO HEADER SA DUGMETOM NAZAD */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#f1f5f9' }}>📁 Projekat: {project.name || "Bez naziva"}</span>
+                  <span className="status-badge active" style={{ fontSize: '10px' }}>Aktivan radni prostor</span>
+                </div>
+                <button onClick={resetStudio} className="back-btn" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}>
+                  Nazad na projekte
+                </button>
+              </div>
+              
+              {/* Gornji radni blok: Video i Forma */}
+              <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+                
+                {/* Leva strana: Preview Player */}
+                <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="video-frame" style={{ width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+                    <video 
+                      ref={videoRef}
+                      src={`${API_BASE_URL}/videos/${project.video_path.split('/').pop()}`}
+                      className="w-full h-full"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      onTimeUpdate={() => {
+                        if (videoRef.current && !isPlaying) {
+                          setCurrentTime(videoRef.current.currentTime);
+                        }
+                      }}
+                    />
+                    {dubbedAudioUrl && (
+                      <audio 
+                        ref={dubbedAudioRef} 
+                        src={dubbedAudioUrl} 
+                        style={{ display: 'none' }} 
+                      />
+                    )}
+                    {noVocalsAudioUrl && (
+                      <audio 
+                        ref={bgAudioRef} 
+                        src={noVocalsAudioUrl} 
+                        style={{ display: 'none' }} 
+                      />
+                    )}
+                  </div>
+                  
+                  {/* Kontrole plejera */}
+                  <div className="video-player-controls" style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '5px 10px' }}>
+                    <button 
+                      onClick={togglePlay} 
+                      className="play-pause-btn"
+                      style={{ background: 'var(--primary)', color: '#fff', border: 'none', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                    >
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
+                    </button>
+                    
+                    <div className="time-display" style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#94a3b8' }}>
+                      {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || getVideoDuration())}
+                    </div>
+
+                    {/* Biranje primarnog audia za preslušavanje */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '8px', marginLeft: '12px' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600' }}>Primarni zvuk:</span>
+                      <button
+                        onClick={() => setActiveAudioSource("original")}
+                        style={{
+                          background: activeAudioSource === "original" ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
+                          border: activeAudioSource === "original" ? '1px solid #8b5cf6' : '1px solid transparent',
+                          color: activeAudioSource === "original" ? '#c084fc' : '#94a3b8',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        Original (ENG)
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!dubbedAudioUrl) {
+                            alert("Molimo vas da prvo generišete glas za ceo video klikom na 'Generiši Glas za Ceo Video' na dnu desnog panela.");
+                            return;
+                          }
+                          setActiveAudioSource("dubbed");
+                        }}
+                        style={{
+                          background: activeAudioSource === "dubbed" ? 'rgba(34, 197, 94, 0.25)' : 'transparent',
+                          border: activeAudioSource === "dubbed" ? '1px solid #22c55e' : '1px solid transparent',
+                          color: activeAudioSource === "dubbed" ? '#4ade80' : '#94a3b8',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        AI Sinhronizovano (SR)
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '6px', marginLeft: 'auto', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      💡 Klikni na vremensku osu ispod da premotaš
                     </span>
                   </div>
                 </div>
+
+                {/* Desna strana: Detaljan Editor Selektovanog Segmenta */}
+                <SegmentRow />
+              </div>
+
+              {/* TIMELINE (VREMENSKA LINIJA SA TRAKAMA) */}
+              <Timeline />
+
+              {/* Donji kontrolni blok: Mikser i Podešavanje glasa + Render dugme */}
+              <MixerPanel />
+
+            </motion.div>
+          )}
+
+          {/* REZULTAT (ZAVRŠENO) */}
+          {videoUrl && !loading && (
+            <motion.div
+              key="final-result"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="final-result"
+            >
+              <div className="success-banner">
+                <CheckCircle2 size={24} /> SINHRONIZACIJA USPEŠNO ZAVRŠENA!
+              </div>
+              
+              <div className="video-player-wrapper">
+                <video src={videoUrl} controls autoPlay />
+              </div>
+
+              {/* Prikaz troškova */}
+              {costs && (
+                <div className="costs-report" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '24px', maxWidth: '600px', margin: '0 auto', textAlign: 'left' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                    📊 Izveštaj o GPU potrošnji i troškovima
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {Object.entries(costs.phases || {}).map(([key, value]) => (
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                        <span style={{ color: '#cbd5e1' }}>{value.name} ({value.gpu}):</span>
+                        <span style={{ fontFamily: 'monospace' }}>{value.duration_sec}s / ${value.cost_usd.toFixed(4)}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px', marginTop: '10px', color: '#4ade80' }}>
+                      <span>Ukupni troškovi obrade:</span>
+                      <span>${costs.total_usd?.toFixed(4)} USD</span>
+                    </div>
+                  </div>
+                </div>
               )}
 
-              <div className="preview-actions-row" style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
-                <button onClick={resetStudio} className="back-btn" style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '12px', borderRadius: '12px', cursor: 'pointer' }}>
-                  Nazad
+              <div className="result-actions">
+                <button onClick={resetStudio} className="new-task-btn">
+                  Učitaj novi video
                 </button>
-                <button 
-                  onClick={handleSubmit} 
-                  disabled={previewFile.type === "local" && uploadState !== "completed"} 
-                  className="glow-button"
-                  style={{ flex: 2, justifyContent: 'center' }}
-                >
-                  <Play size={18} /> Započni Analizu
-                </button>
+                <a href={videoUrl} download className="download-btn">
+                  Preuzmi video
+                </a>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ASINHRONI PROGRES EKRAN (FAZA 1 ILI FAZA 2 RENDER) */}
-        {loading && !videoUrl && !project && (
-          <div className="studio-interface">
-            <div className="studio-content" style={{ maxWidth: '600px', margin: '0 auto' }}>
-              <div className="progress-section">
-                <div className="progress-header">
-                  <span className="current-step-text" style={{ fontSize: '1.2rem', fontWeight: '700' }}>
-                    {status.includes("RENDERING") ? "🎨 Rendering sinhronizacije (Faza 2)" : "🔍 Analiza videa (Faza 1)"}
-                  </span>
-                  <span className="percent-text">{progressData?.percent || 0}%</span>
-                </div>
-                
-                <div className="progress-bar-container" style={{ margin: '15px 0' }}>
-                  <div className="progress-bar-fill" style={{ width: `${progressData?.percent || 0}%` }}></div>
-                </div>
-
-                <div className="sub-status-detail" style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
-                  <Loader2 size={16} className="spinner-icon pulse-icon" />
-                  <span>{status || "Inicijalizacija..."}</span>
-                </div>
-
-                {progressData?.detail && (
-                  <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', marginTop: '10px' }}>
-                    {progressData.detail}
-                  </p>
-                )}
-
-                <div style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Proteklo vreme: {formatTime(elapsed)}</span>
-                  <button 
-                    onClick={resetStudio} 
-                    className="back-btn" 
-                    style={{ 
-                      padding: '8px 16px', 
-                      borderRadius: '8px', 
-                      fontSize: '0.85rem', 
-                      background: 'rgba(239, 68, 68, 0.1)', 
-                      border: '1px solid rgba(239, 68, 68, 0.2)', 
-                      color: '#f87171', 
-                      cursor: 'pointer', 
-                      transition: 'all 0.2s',
-                      marginTop: '5px'
-                    }}
-                  >
-                    Prekini i nazad na projekte
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* FAZA 1.5: INTERAKTIVNI STUDIO EDITOR (DRAFT MOD STATUS) */}
-        {project && !loading && !videoUrl && (
-          <div className="studio-v2-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* STUDIO HEADER SA DUGMETOM NAZAD */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#f1f5f9' }}>📁 Projekat: {project.name || "Bez naziva"}</span>
-                <span className="status-badge active" style={{ fontSize: '10px' }}>Aktivan radni prostor</span>
-              </div>
-              <button onClick={resetStudio} className="back-btn" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}>
-                Nazad na projekte
-              </button>
-            </div>
-            
-            {/* Gornji radni blok: Video i Forma */}
-            <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
-              
-              {/* Leva strana: Preview Player */}
-              <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="video-frame" style={{ width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
-                  <video 
-                    ref={videoRef}
-                    src={`${API_BASE_URL}/videos/${project.video_path.split('/').pop()}`}
-                    className="w-full h-full"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    onTimeUpdate={() => {
-                      if (videoRef.current && !isPlaying) {
-                        setCurrentTime(videoRef.current.currentTime);
-                      }
-                    }}
-                  />
-                  {dubbedAudioUrl && (
-                    <audio 
-                      ref={dubbedAudioRef} 
-                      src={dubbedAudioUrl} 
-                      style={{ display: 'none' }} 
-                    />
-                  )}
-                  {noVocalsAudioUrl && (
-                    <audio 
-                      ref={bgAudioRef} 
-                      src={noVocalsAudioUrl} 
-                      style={{ display: 'none' }} 
-                    />
-                  )}
-                </div>
-                
-                {/* Kontrole plejera */}
-                <div className="video-player-controls" style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '5px 10px' }}>
-                  <button 
-                    onClick={togglePlay} 
-                    className="play-pause-btn"
-                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '2px' }} />}
-                  </button>
-                  
-                  <div className="time-display" style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#94a3b8' }}>
-                    {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || getVideoDuration())}
-                  </div>
-
-                  {/* Biranje primarnog audia za preslušavanje */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '8px', marginLeft: '12px' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600' }}>Primarni zvuk:</span>
-                    <button
-                      onClick={() => setActiveAudioSource("original")}
-                      style={{
-                        background: activeAudioSource === "original" ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
-                        border: activeAudioSource === "original" ? '1px solid #8b5cf6' : '1px solid transparent',
-                        color: activeAudioSource === "original" ? '#c084fc' : '#94a3b8',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      Original (ENG)
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!dubbedAudioUrl) {
-                          alert("Molimo vas da prvo generišete glas za ceo video klikom na 'Generiši Glas za Ceo Video' na dnu desnog panela.");
-                          return;
-                        }
-                        setActiveAudioSource("dubbed");
-                      }}
-                      style={{
-                        background: activeAudioSource === "dubbed" ? 'rgba(34, 197, 94, 0.25)' : 'transparent',
-                        border: activeAudioSource === "dubbed" ? '1px solid #22c55e' : '1px solid transparent',
-                        color: activeAudioSource === "dubbed" ? '#4ade80' : '#94a3b8',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      AI Sinhronizovano (SR)
-                    </button>
-                  </div>
-
-                  <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '6px', marginLeft: 'auto', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    💡 Klikni na vremensku osu ispod da premotaš
-                  </span>
-                </div>
-              </div>
-
-              {/* Desna strana: Detaljan Editor Selektovanog Segmenta */}
-              <SegmentRow />
-            </div>
-
-            {/* TIMELINE (VREMENSKA LINIJA SA TRAKAMA) */}
-            <Timeline />
-
-            {/* Donji kontrolni blok: Mikser i Podešavanje glasa + Render dugme */}
-            <MixerPanel />
-
-          </div>
-        )}
-
-        {/* REZULTAT (ZAVRŠENO) */}
-        {videoUrl && !loading && (
-          <div className="final-result">
-            <div className="success-banner">
-              <CheckCircle2 size={24} /> SINHRONIZACIJA USPEŠNO ZAVRŠENA!
-            </div>
-            
-            <div className="video-player-wrapper">
-              <video src={videoUrl} controls autoPlay />
-            </div>
-
-            {/* Prikaz troškova */}
-            {costs && (
-              <div className="costs-report" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '24px', maxWidth: '600px', margin: '0 auto', textAlign: 'left' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-                  📊 Izveštaj o GPU potrošnji i troškovima
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {Object.entries(costs.phases || {}).map(([key, value]) => (
-                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                      <span style={{ color: '#cbd5e1' }}>{value.name} ({value.gpu}):</span>
-                      <span style={{ fontFamily: 'monospace' }}>{value.duration_sec}s / ${value.cost_usd.toFixed(4)}</span>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px', marginTop: '10px', color: '#4ade80' }}>
-                    <span>Ukupni troškovi obrade:</span>
-                    <span>${costs.total_usd?.toFixed(4)} USD</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="result-actions">
-              <button onClick={resetStudio} className="new-task-btn">
-                Učitaj novi video
-              </button>
-              <a href={videoUrl} download className="download-btn">
-                Preuzmi video
-              </a>
-            </div>
-          </div>
-        )}
-
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* MODAL ZA KREIRANJE PROJEKTA */}
