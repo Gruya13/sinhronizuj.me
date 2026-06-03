@@ -1,3 +1,11 @@
+## [2026-06-03 10:25:00] Implementacija globalnog Header-a sa dropdown menijem za projekte
+- **Opis:**
+  Dodata je nova globalna navigaciona komponenta na vrhu aplikacije:
+  1. **Novi Header ([Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx)):** Kreiran je stakleni nav bar na samom vrhu `.glass-container` koji sadrži logotip "sinhronizuj.me", suptilno integrisanu statusnu traku (`HardwareMonitor`) za Hetzner VPS i Modal GPU, kao i dropdown meni za brzu navigaciju.
+  2. **Dropdown za projekte:** Dropdown se otvara i zatvara sa glatkim animacijama (Framer Motion) i automatski detektuje klikove van njega. Prikazuje trenutno aktivni projekat i listu svih projekata sa njihovim statusnim indikatorima (zelena, ljubičasta, plava tačka). Sadrži i brze linkove za povratak na Dashboard i kreiranje novog projekta.
+  3. **Integracija u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx):** Zamenjen je stari statički logotip i premešten HardwareMonitor u novi Header radi čistijeg, kompaktnijeg i profesionalnijeg DAW rasporeda.
+  4. **Verifikacija:** Aplikacija se uspešno bilda za 522ms i omogućava tečnu navigaciju između projekata sa bilo kog ekrana.
+
 ## [2026-06-03 10:21:00] Ispravka baga sa renderovanjem kartica projekata na Dashboard-u
 - **Opis:**
   Rešen problem nevidljivosti kartica projekata na Dashboard-u:

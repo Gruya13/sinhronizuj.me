@@ -7,6 +7,7 @@ import { useStudio } from './context/StudioContext';
 import './index.css';
 
 // Uvoz modularnih komponenti
+import Header from './components/Common/Header';
 import HardwareMonitor from './components/Common/HardwareMonitor';
 import ProjectList from './components/Dashboard/ProjectList';
 import Timeline from './components/Studio/Timeline';
@@ -359,16 +360,8 @@ function App() {
 
       <div className="glass-container studio-layout" style={{ maxWidth: project ? '1400px' : '1200px' }}>
         
-        {/* TOP STATUS BAR */}
-        <HardwareMonitor />
-
-        {/* LOGO */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="logo-section">
-            <h1>Sinhronizuj.me <span className="version-badge">STUDIO V2</span></h1>
-            <p className="subtitle">Inteligentna sinhronizacija na srpski jezik uz dvofazni pipeline i timeline kontrolu</p>
-          </div>
-        </motion.div>
+        {/* GLOBALNI HEADER (NAVBAR) */}
+        <Header />
 
         {/* GREŠKA */}
         {error && (
