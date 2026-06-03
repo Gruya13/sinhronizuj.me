@@ -1,3 +1,10 @@
+## [2026-06-03 20:30:00] Rešavanje problema sa pokretanjem Docker kontejnera i uvozom paketa
+- **Opis:**
+  Otklonjen je bag gde su `sinhronizuj-api` i `sinhronizuj-worker` kontejneri padali prilikom pokretanja sa greškom `ModuleNotFoundError: No module named 'sqlalchemy'`.
+  1. **Uzrok:** Prethodni restart kontejnera (`docker-compose restart`) nije re-kreirao same kontejnere sa novim Docker imidžima izgrađenim nakon uvođenja SQLAlchemy i JWT zavisnosti, već je samo pokrenuo stare kontejnere u kojima ovi paketi nisu postojali.
+  2. **Rešenje:** Izvršena je komanda `docker-compose up -d` koja je uspešno re-kreirala i pokrenula sve kontejnere (`sinhronizuj-api`, `sinhronizuj-worker`, `sinhronizuj-beat`) sa novim, osveženim imidžima gde su svi paketi instalirani.
+  3. **Verifikacija:** Logovi kontejnera potvrđuju uspešno pokretanje Uvicorn servera na portu 8000 ("Application startup complete").
+
 ## [2026-06-03 15:45:00] Implementacija P0 i P1 Faze Arhitekture (Stateless S3 radnici, Postgres perzistencija i Backup)
 - **Opis:**
   Uspešno je završena i verifikovana integracija P0 i P1 faza arhitekture aplikacije Sinhronizuj.me:
