@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './index.css';
+import { api } from './services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
@@ -60,11 +61,8 @@ function App() {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/projects`);
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data);
-      }
+      const data = await api.getProjects();
+      setProjects(data);
     } catch (err) {
       console.error("Greška pri listanju projekata:", err);
     }
@@ -90,20 +88,14 @@ function App() {
   useEffect(() => {
     const fetchHw = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/hw-stats`);
-        if (res.ok) {
-          const data = await res.json();
-          setHwStats(data);
-        }
+        const data = await api.getHwStats();
+        setHwStats(data);
       } catch (err) { /* Silent fail */ }
     };
     const fetchModal = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/modal-status`);
-        if (res.ok) {
-          const data = await res.json();
-          setModalStatus(data);
-        }
+        const data = await api.getModalStatus();
+        setModalStatus(data);
       } catch (err) { /* Silent fail */ }
     };
     fetchHw();
@@ -144,15 +136,7 @@ function App() {
     if (currentTask && !videoUrl && !error) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/api/v1/status/${currentTask}`);
-          if (res.status === 404) {
-            console.warn("Zadatak nije pronađen (404).");
-            resetStudio();
-            return;
-          }
-          if (!res.ok) throw new Error("Server error");
-          
-          const data = await res.json();
+          const data = await api.getTaskStatus(currentTask);
           consecutiveErrorsRef.current = 0;
           
           if (data.status === 'SUCCESS') {
@@ -195,6 +179,11 @@ function App() {
             if (data.costs) setCosts(data.costs);
           }
         } catch (err) {
+          if (err.name === "ApiError" && err.status === 404) {
+            console.warn("Zadatak nije pronađen (404).");
+            resetStudio();
+            return;
+          }
           consecutiveErrorsRef.current += 1;
           if (consecutiveErrorsRef.current >= 5) {
             setError("Veza sa serverom je izgubljena. Zadatak je verovatno prekinut.");
@@ -210,9 +199,7 @@ function App() {
   const loadProjectData = async (projId) => {
     try {
       setStatus('Učitavam radni prostor...');
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${projId}`);
-      if (!res.ok) throw new Error("Neuspešno učitavanje projekta.");
-      const data = await res.json();
+      const data = await api.getProject(projId);
       if (data.segments) {
         data.segments = data.segments.map(s => ({
           ...s,
@@ -250,16 +237,11 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/redis/flush`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.message || "Redis baza je uspešno očišćena.");
-        resetStudio();
-      } else {
-        alert("Greška: " + (data.detail || "Neuspešno čišćenje."));
-      }
+      const data = await api.flushRedis();
+      alert(data.message || "Redis baza je uspešno očišćena.");
+      resetStudio();
     } catch (err) {
-      alert("Mrežna greška: " + err.message);
+      alert("Greška: " + err.message);
     }
   };
 
@@ -315,22 +297,13 @@ function App() {
     if (!newProjectName.trim()) return;
     setCreatingProject(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/project`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newProjectName })
-      });
-      if (res.ok) {
-        const newProj = await res.json();
-        setProjects(prev => [newProj, ...prev]);
-        setNewProjectName('');
-        setIsCreateModalOpen(false);
-        handleSelectProject(newProj);
-      } else {
-        alert("Greška pri kreiranju projekta.");
-      }
+      const newProj = await api.createProject(newProjectName);
+      setProjects(prev => [newProj, ...prev]);
+      setNewProjectName('');
+      setIsCreateModalOpen(false);
+      handleSelectProject(newProj);
     } catch (err) {
-      alert("Mrežna greška pri kreiranju projekta: " + err.message);
+      alert("Greška pri kreiranju projekta: " + err.message);
     } finally {
       setCreatingProject(false);
     }
@@ -342,19 +315,13 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${projId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        setProjects(prev => prev.filter(p => p.id !== projId));
-        if (currentProjectId === projId) {
-          resetStudio();
-        }
-      } else {
-        alert("Greška pri brisanju projekta.");
+      await api.deleteProject(projId);
+      setProjects(prev => prev.filter(p => p.id !== projId));
+      if (currentProjectId === projId) {
+        resetStudio();
       }
     } catch (err) {
-      alert("Mrežna greška pri brisanju projekta: " + err.message);
+      alert("Greška pri brisanju projekta: " + err.message);
     }
   };
 
@@ -414,25 +381,11 @@ function App() {
     setStatus('POKRETANJE ANALIZE VIDEA...');
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/process-video`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          url: targetUrl, 
-          debug: false,
-          project_id: currentProjectId
-        })
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setTaskId(data.task_id);
-        localStorage.setItem('sinhronizuj_me_task_id', data.task_id);
-      } else {
-        setError(data.message);
-        setLoading(false);
-      }
+      const data = await api.processVideo(targetUrl, currentProjectId);
+      setTaskId(data.task_id);
+      localStorage.setItem('sinhronizuj_me_task_id', data.task_id);
     } catch (err) {
-      setError('Mrežna greška pri pokretanju analize.');
+      setError('Greška pri pokretanju analize: ' + err.message);
       setLoading(false);
     }
   };
@@ -455,9 +408,7 @@ function App() {
     setError(null);
 
     try {
-      const urlRes = await fetch(`${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`);
-      if (!urlRes.ok) throw new Error("Neuspešno dobavljanje upload URL-a.");
-      const { upload_url, s3_url } = await urlRes.json();
+      const { upload_url, s3_url } = await api.getUploadUrl(file.name, file.type);
 
       const xhr = new XMLHttpRequest();
       xhr.upload.onprogress = (event) => {
@@ -502,22 +453,7 @@ function App() {
       // Prvo sačuvamo trenutno stanje da backend ima najnoviji tekst
       await handleSaveDraft();
       
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/segment/${segId}/shorten`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: seg.translated || "" })
-      });
-      
-      if (!res.ok) {
-        let errorMsg = "Neuspešno skraćivanje prevoda.";
-        try {
-          const errData = await res.json();
-          if (errData && errData.detail) errorMsg = errData.detail;
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-      
-      const data = await res.json();
+      const data = await api.shortenSegment(project.project_id, segId, seg.translated || "");
       
       // Ažuriramo tekst prevoda lokalno u projektu i postavljamo ga u status "edited" kako bi se regenerisao glas
       const updatedSegments = project.segments.map(s => {
@@ -544,12 +480,7 @@ function App() {
     if (!project) return;
     setSavingProject(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/save`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segments: project.segments })
-      });
-      if (!res.ok) throw new Error();
+      await api.saveProjectDraft(project.project_id, project.segments);
       console.log("[STUDIO] Draft uspešno sačuvan.");
     } catch (err) {
       console.error("Greška pri čuvanju nacrta:", err);
@@ -563,29 +494,16 @@ function App() {
     if (!project) return;
     setLoadingSegmentTTS(prev => ({ ...prev, [segId]: true }));
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/segment/${segId}/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text, 
-          voice_type: voiceType || "clone",
-          volume: volume !== undefined ? volume : 0.0,
-          speed: speed !== undefined ? speed : 1.0,
-          pitch: pitch !== undefined ? pitch : 0.0,
-          bg_volume: bgVolume !== undefined ? bgVolume : 0.0
-        })
-      });
-      if (!res.ok) {
-        let errorMsg = "TTS failed";
-        try {
-          const errData = await res.json();
-          if (errData && errData.detail) {
-            errorMsg = errData.detail;
-          }
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-      const data = await res.json();
+      const data = await api.generateSegmentTTS(
+        project.project_id,
+        segId,
+        text,
+        voiceType || "clone",
+        volume !== undefined ? volume : 0.0,
+        speed !== undefined ? speed : 1.0,
+        pitch !== undefined ? pitch : 0.0,
+        bgVolume !== undefined ? bgVolume : 0.0
+      );
       
       // Ažuriramo zvučni fajl za preslušavanje sa cache buster-om
       const fullAudioUrl = `${API_BASE_URL}${data.audio_url}?cb=${Date.now()}`;
@@ -634,22 +552,7 @@ function App() {
       // Prvo sačuvamo nacrt
       await handleSaveDraft();
       
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/generate-all-tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voice_type: selectedVoice })
-      });
-      if (!res.ok) {
-        let errorMsg = "Sinteza celog videa nije uspela";
-        try {
-          const errData = await res.json();
-          if (errData && errData.detail) {
-            errorMsg = errData.detail;
-          }
-        } catch (_) {}
-        throw new Error(errorMsg);
-      }
-      const data = await res.json();
+      const data = await api.generateAllTTS(project.project_id, selectedVoice);
       
       // Ažuriramo segmente i putanju za dubbed audio
       const mappedSegs = data.segments.map(s => ({
@@ -696,17 +599,12 @@ function App() {
     await handleSaveDraft();
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/project/${project.project_id}/render`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          voice_type: selectedVoice,
-          background_volume: bgVolume,
-          dubbed_volume: dubVolume
-        })
-      });
-      if (!res.ok) throw new Error("Render request failed");
-      const data = await res.json();
+      const data = await api.renderProject(
+        project.project_id,
+        selectedVoice,
+        bgVolume,
+        dubVolume
+      );
       setRenderTaskId(data.task_id);
       setProject(null); // Zatvaramo studio editor
     } catch (err) {

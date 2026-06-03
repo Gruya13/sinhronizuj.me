@@ -1556,4 +1556,11 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         6. Integraciju wavesurfer.js sa dinamičkim širenjem/skupljanjem blokova na vremenskoj liniji.
 - **Status:** Novi modularizacioni i redizajn plan je postavljen kao zvanični artifakt sesije sa zahtevom za korisnikovu proveru.
 
+### 03.06.2026. 10:05 — Izdvajanje API Poziva u Zaseban Servis (Modularizacija)
+- **Zahtev:** Započeti modularizaciju frontenda i izdvojiti sve mrežne API pozive iz App.jsx u poseban servis.
+- **Urađeno:**
+    - **API Servis:** Kreiran je fajl [api.js](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/services/api.js) koji enkapsulira sve mrežne pozive ka FastAPI bekendu (14 različitih endpoints). Implementirana je i custom klasa `ApiError` koja zadržava informaciju o HTTP statusu za potrebe polling mehanizma i rukovanja 404 greškama.
+    - **Integracija:** U datoteci [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) uvezen je novi api servis i zamenjeni su svi direktni fetch pozivi. Prilagođena je logika hvatanja grešaka i polling za task status.
+- **Status:** Prvi korak modularizacije uspešno završen, testiran i push-ovan na GitHub.
+
 
