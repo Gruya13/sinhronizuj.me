@@ -1544,10 +1544,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Kreiranje izveštaja i artifakata:** Izveštaj o auditu je napisan i sačuvan kao [audit_izvestaj.md](file:///home/gruya/Projektri/sinhronizuj.me/audit_izvestaj.md) u korenu projekta, i kreiran je kao zvanični artifakt sesije.
 - **Status:** Audit uspešno završen, izveštaji kreirani i sačuvani.
 
-### 03.06.2026. 10:00 — Izrada UI/Frontend Plana Radova (Roadmap)
-- **Zahtev:** Na osnovu audita i naknadnih smernica korisnika, izraditi novi plan radova (Roadmap) fokusiran isključivo na UI i frontend poboljšanja.
+### 03.06.2026. 10:00 — Izrada UI/Frontend Plana Radova (Modularizacija & Redizajn)
+- **Zahtev:** Na osnovu audita i smernica korisnika, izraditi novi plan radova fokusiran na modularizaciju frontenda (App.jsx), kompletan vizuelni redizajn korisničkog interfejsa (Aesthetics v3) i uvođenje modernih audio/video DAW alata za manipulaciju podacima u Studiju.
 - **Urađeno:**
-    - **Izrada plana:** Kreiran je novi planski dokument u obliku [implementation_plan.md](file:///home/gruya/.gemini/antigravity/brain/febdf33c-3310-4470-b649-b397923aab4b/implementation_plan.md) koji pokriva isključivo UI i frontend unapređenja: modularizaciju monolitnog frontenda (App.jsx), integraciju drag-and-drop vremenske linije preko wavesurfer.js, poliranje Studio Editora (UI v3), optimizaciju performansi klijentskog miksera (debouncing/throttling) i izgradnju panela za upravljanje korisničkim rečnikom (Glossary).
-- **Status:** Novi UI/Frontend plan je uspešno postavljen kao zvanični artifakt sesije sa zahtevom za korisnikovu proveru.
+    - **Izrada plana:** Kreiran je novi planski dokument u obliku [implementation_plan.md](file:///home/gruya/.gemini/antigravity/brain/febdf33c-3310-4470-b649-b397923aab4b/implementation_plan.md) koji pored modularizacije pokriva:
+        1. Kompletan vizuelni redizajn (sleek tamni režim, Google font Outfit, napredni stakleni efekti i Framer Motion animacije).
+        2. DAW kružne kontrole (knobs) za Volume/Tempo/Pitch.
+        3. Globalne prečice na tastaturi za navigaciju i rad.
+        4. Grupne akcije (Bulk Operations) nad više selektovanih segmenata.
+        5. Undo/Redo istoriju izmena na klijentu.
+        6. Integraciju wavesurfer.js sa dinamičkim širenjem/skupljanjem blokova na vremenskoj liniji.
+- **Status:** Novi modularizacioni i redizajn plan je postavljen kao zvanični artifakt sesije sa zahtevom za korisnikovu proveru.
 
 
