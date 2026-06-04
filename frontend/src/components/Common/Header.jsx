@@ -58,7 +58,8 @@ export default function Header() {
           alignItems: 'center', 
           gap: '8px', 
           cursor: 'pointer',
-          userSelect: 'none'
+          userSelect: 'none',
+          flexShrink: 0
         }}
       >
         <span 
@@ -97,7 +98,7 @@ export default function Header() {
       </div>
 
       {/* DESNI DEO: DROPDOWN I PROFIL */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
         <div ref={dropdownRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setIsOpen(!isOpen)}

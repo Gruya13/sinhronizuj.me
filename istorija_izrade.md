@@ -1651,3 +1651,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Izmenjene arrow funkcije `fetchProjects` i `resetStudio` u standardne `function` deklaracije u [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) da bi se rešio problem sa hoisting-om.
         * Dodat eslint-disable komentar za `react-refresh/only-export-components` u kontekstu kako bi Fast Refresh dozvolio izvoz hook-a.
 - **Status:** Završeno. Svi linteri (Ruff za python, ESLint za frontend) i Vite build sada prolaze bez ijedne greške lokalno.
+
+### 04.06.2026. 10:26 — Rešavanje 401 Unauthorized grešaka pre autentifikacije
+- **Problem:** Dok je korisnik na Login/Register ekranu, frontend je i dalje pokušavao periodično da osvežava informacije o statusu resursa i modal okruženja (`hw-stats` i `modal-status`). Pošto korisnik nije ulogovan, ovi pozivi nisu imali JWT token, što je uzrokovalo da API server opravdano vraća `401 Unauthorized` greške i puni konzolu.
+- **Urađeno:** Modifikovan je `useEffect` hook u [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) tako da se polling intervali postavljaju isključivo kada `token` postoji. Ukoliko tokena nema, intervali se čiste i stanje resursa se resetuje na `null`.
+- **Status:** Završeno. Konzola je sada čista i nema 401 grešaka pre prijave.
+
+### 04.06.2026. 10:32 — Otklanjanje preklapanja i fiksiranje layout-a u Headeru
+- **Problem:** Nakon prijave, elementi u Headeru (brending, monitor VPS/GPU i profil sa odjavom) su se preklapali horizontalno i vertikalno ukoliko je širina prozora pretraživača bila manja, jer unutrašnji elementi monitora nisu imali stabilnu strukturu i zavisili su od keširanog eksternog CSS-a, a susedne flex stavke u headeru nisu imale definisan `flexShrink`.
+- **Urađeno:**
+    * **HardwareMonitor:** Rekonstruisana je komponenta [HardwareMonitor.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/HardwareMonitor.jsx) sa 100% robusnim inline stilovima za flex raspored, čime je eliminisana zavisnost od eventualnog CSS keširanja i rešeno vertikalno preklapanje tekstova na VPS i GPU sekcijama.
+    * **Header:** Dodato je `flexShrink: 0` svojstvo na branding div (logo) i desni kontejner (profil i dropdown) u [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx), čime se sprečava njihovo horizontalno stiskanje i preklapanje sa monitorom u sredini.
+- **Status:** Završeno. UI Header-a je sada potpuno stabilan, responzivan i bez ikakvih preklapanja.

@@ -5,40 +5,63 @@ export default function HardwareMonitor() {
   const { hwStats, modalStatus, status, handleFlushRedis } = useStudio();
 
   return (
-    <div className="hybrid-monitor">
-      <div className="monitor-section">
-        <div className="monitor-label">
-          <ShieldCheck size={14} /> Hetzner VPS
+    <div 
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '20px',
+        background: 'rgba(0, 0, 0, 0.3)',
+        padding: '10px 20px',
+        borderRadius: '100px',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        width: 'fit-content',
+        margin: '0 auto',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+          <ShieldCheck size={12} style={{ color: '#10b981' }} /> Hetzner VPS
         </div>
-        <div className="monitor-stats">
+        <div style={{ fontSize: '0.8rem', fontWeight: '600', display: 'flex', gap: '10px', color: '#f8fafc' }}>
           <span>CPU: {hwStats?.cpu_usage || 0}%</span>
           <span>RAM: {hwStats?.memory?.percent || 0}%</span>
         </div>
       </div>
       
-      <div className="monitor-divider" />
+      <div style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.1)' }} />
       
-      <div className="monitor-section">
-        <div className="monitor-label">
-          <Zap size={14} className={modalStatus?.status === "Spreman" ? "pulse-icon" : ""} /> 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+        <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+          <Zap size={12} className={modalStatus?.status === "Spreman" ? "pulse-icon" : ""} style={{ color: modalStatus?.status === "Spreman" ? '#eab308' : '#64748b' }} /> 
           Modal GPU
-          <span className={`status-badge ${modalStatus?.status === "Spreman" ? 'active' : 'asleep'}`}>
-            {modalStatus?.status === "Spreman" ? `SPREMAN (Auto-scale)` : "SPAVA"}
+          <span 
+            style={{ 
+              fontSize: '8px', 
+              fontWeight: '800', 
+              background: modalStatus?.status === "Spreman" ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)', 
+              color: modalStatus?.status === "Spreman" ? '#34d399' : '#94a3b8', 
+              padding: '1px 5px', 
+              borderRadius: '4px',
+              border: modalStatus?.status === "Spreman" ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(100, 116, 139, 0.2)',
+              marginLeft: '4px',
+              letterSpacing: '0.2px'
+            }}
+          >
+            {modalStatus?.status === "Spreman" ? `SPREMAN` : "SPAVA"}
           </span>
         </div>
-        <div className="monitor-status">
-          <span className={status?.includes("Whisper") ? "active-worker" : ""}>Whisper</span>
-          <span className={status?.includes("Prevođenje") || status?.includes("Lektura") ? "active-worker" : ""}>Qwen</span>
-          <span className={status?.includes("Sinteza") || status?.includes("TTS") ? "active-worker" : ""}>OpenVoice</span>
+        <div style={{ fontSize: '0.8rem', fontWeight: '600', display: 'flex', gap: '10px', color: '#64748b' }}>
+          <span style={{ color: status?.includes("Whisper") ? "#38bdf8" : '#475569', textShadow: status?.includes("Whisper") ? '0 0 10px rgba(56, 189, 248, 0.5)' : 'none', transition: 'all 0.3s' }}>Whisper</span>
+          <span style={{ color: status?.includes("Prevođenje") || status?.includes("Lektura") ? "#38bdf8" : '#475569', textShadow: status?.includes("Prevođenje") || status?.includes("Lektura") ? '0 0 10px rgba(56, 189, 248, 0.5)' : 'none', transition: 'all 0.3s' }}>Qwen</span>
+          <span style={{ color: status?.includes("Sinteza") || status?.includes("TTS") ? "#38bdf8" : '#475569', textShadow: status?.includes("Sinteza") || status?.includes("TTS") ? '0 0 10px rgba(56, 189, 248, 0.5)' : 'none', transition: 'all 0.3s' }}>OpenVoice</span>
         </div>
       </div>
       
-      <div className="monitor-divider" />
+      <div style={{ width: '1px', height: '24px', background: 'rgba(255, 255, 255, 0.1)' }} />
       
-      <div className="monitor-section" style={{ justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <button 
           onClick={handleFlushRedis} 
-          className="flush-redis-btn" 
           style={{ 
             background: 'rgba(239, 68, 68, 0.15)', 
             border: '1px solid rgba(239, 68, 68, 0.3)', 
@@ -53,6 +76,16 @@ export default function HardwareMonitor() {
             gap: '5px', 
             transition: 'all 0.2s', 
             fontFamily: 'inherit' 
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            e.currentTarget.style.color = '#f87171';
           }}
         >
           <Trash2 size={12} /> Očisti Redis
