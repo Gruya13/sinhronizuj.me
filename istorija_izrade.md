@@ -1709,3 +1709,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Kreiranje fajla:** Kreiran je fajl [arhitektura_i_tok_podataka.md](file:///home/gruya/Projektri/sinhronizuj.me/arhitektura_i_tok_podataka.md) u korenu projekta.
     * **Detaljan sadržaj:** Dokument opisuje hibridnu cloud arhitekturu (Hetzner VPS + Modal Serverless GPU), sve komponente sistema (React frontend, FastAPI backend, PostgreSQL, Redis, MinIO S3, Modal radnici), end-to-end tok podataka, detaljan rad svih faza pipeline-a (Analiza, Studio DAW, Renderovanje), sigurnost, mrežnu izolaciju i strategiju automatskog backup-a.
 - **Status:** Završeno. Dokumentacija je kreirana i dostupna u root-u projekta.
+
+### 04.06.2026. 20:33 — Kreiranje dokumentacije o radu glosara
+- **Zahtev:** Kreirati `.md` fajl u kome je u potpunosti opisan rad, korišćenje i lokacija glosara u sistemu.
+- **Urađeno:**
+    * **Kreiranje fajla:** Kreiran je fajl [objasnjenje_glosara.md](file:///home/gruya/Projektri/sinhronizuj.me/objasnjenje_glosara.md) u korenu projekta.
+    * **Sadržaj dokumenta:** Detaljno je opisan način rada glosara, njegova uloga u prevođenju stručne terminologije na standardni srpski (ekavica, latinica), uloga fajla `glossaries.json`, funkcije za detekciju tema i prevođenje nepoznatih pojmova, kao i SQLAlchemy model `Glossary` u bazi podataka za korisničke rečnike.
+- **Status:** Završeno. Dokumentacija o glosaru je spremna i zavedena.
