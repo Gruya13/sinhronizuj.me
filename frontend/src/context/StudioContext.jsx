@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 
@@ -122,7 +123,7 @@ export function StudioProvider({ children }) {
   const [costs, setCosts] = useState(null);
   const [activeAudioSource, setActiveAudioSource] = useState("original"); // original or dubbed
   const [generatingAllTTS, setGeneratingAllTTS] = useState(false);
-  const [dubbedBuster, setDubbedBuster] = useState(Date.now());
+  const [dubbedBuster, setDubbedBuster] = useState(() => Date.now());
   const [segmentEditorTab, setSegmentEditorTab] = useState("text"); // text or audio
   const [activeDubbedAudioUrl, setActiveDubbedAudioUrl] = useState(null);
   const [applyAudioToAll, setApplyAudioToAll] = useState(false);
@@ -216,7 +217,7 @@ export function StudioProvider({ children }) {
   }, [token]);
 
   // Listanje projekata
-  const fetchProjects = async () => {
+  async function fetchProjects() {
     if (!localStorage.getItem('sinhronizuj_me_token')) return;
     try {
       const data = await api.getProjects();
@@ -254,7 +255,7 @@ export function StudioProvider({ children }) {
   }, []);
 
   // Resetovanje studija
-  const resetStudio = () => {
+  function resetStudio() {
     setTaskId(null);
     setRenderTaskId(null);
     setLoading(false);

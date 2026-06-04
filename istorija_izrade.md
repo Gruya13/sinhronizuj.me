@@ -1631,4 +1631,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     - **Integracija:** U datoteci [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) uvezen je novi api servis i zamenjeni su svi direktni fetch pozivi. Prilagođena je logika hvatanja grešaka i polling za task status.
 - **Status:** Prvi korak modularizacije uspešno završen, testiran i push-ovan na GitHub.
 
+### 04.06.2026. 09:59 — Vraćanje prave VPS IP adrese (178.104.214.78) i ispravka konfiguracije
+- **Problem:** Prethodni agent je pogrešno zamenio VPS IP adresu sa IP adresom korisnikovog lokalnog rutera/mreže (`87.116.167.0`), što je dovelo do toga da frontend visi prilikom slanja zahteva i ne može da kreira nalog. Pored toga, postavljanje localhost preusmeravanja je rezultiralo 401 Unauthorized greškama sa drugog lokalnog projekta koji koristi port 8000.
+- **Urađeno:** Vraćena je ispravna Hetzner VPS IP adresa `178.104.214.78` u svim konfiguracionim fajlovima:
+    * [frontend/.env](file:///home/gruya/Projektri/sinhronizuj.me/frontend/.env)
+    * [.env](file:///home/gruya/Projektri/sinhronizuj.me/.env) u korenu projekta (REDIS_URL, MINIO_ENDPOINT)
+    * [backend/core/config.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/core/config.py) (MINIO_PUBLIC_ENDPOINT)
+    * Frontend fallback konfiguracije u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx), [Timeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/Timeline.jsx), [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) i [api.js](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/services/api.js).
+- **Status:** Završeno.
 
+### 04.06.2026. 10:04 — Popravka linter i build grešaka za GitHub Actions CI
+- **Problem:** GitHub Actions CI buildovi su fejlovali na obe strane (backend i frontend) zbog sintaksnih i linter grešaka u kodu.
+- **Urađeno:**
+    - **Backend:** Uklonjen je mrtav i nedefinisan return blok sa promenljivom `segments` u [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) na liniji 875, što je rušilo Ruff CI provere (F821).
+    - **Frontend:**
+        * Popravljeni svi prazni `catch` blokovi koji su kršili `no-empty` pravilo u [api.js](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/services/api.js) i [Timeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/Timeline.jsx).
+        * Rešena greška `react-hooks/refs` u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) (linija 631) prebacivanjem sa direktnog pristupa `videoRef.current?.duration` tokom renderovanja na namensku `videoDuration` promenljivu stanja.
+        * Uvedena lazy `useState(() => Date.now())` inicijalizacija u [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) radi uklanjanja impurity grešaka pri renderu.
+        * Izmenjene arrow funkcije `fetchProjects` i `resetStudio` u standardne `function` deklaracije u [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) da bi se rešio problem sa hoisting-om.
+        * Dodat eslint-disable komentar za `react-refresh/only-export-components` u kontekstu kako bi Fast Refresh dozvolio izvoz hook-a.
+- **Status:** Završeno. Svi linteri (Ruff za python, ESLint za frontend) i Vite build sada prolaze bez ijedne greške lokalno.

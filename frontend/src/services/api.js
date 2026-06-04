@@ -21,7 +21,9 @@ async function handleResponse(response) {
       } else if (data && data.message) {
         errorDetail = data.message;
       }
-    } catch (_) {}
+    } catch (_) {
+      // ignorisi gresku parsiranja JSON-a
+    }
     throw new ApiError(errorDetail, response.status);
   }
   return response.json();

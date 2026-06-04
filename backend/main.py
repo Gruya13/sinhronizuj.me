@@ -868,12 +868,6 @@ def generate_all_tts(request: Request, project_id: str, data: GenerateAllTTSRequ
         "audio_url": presigned_dubbed_url,
         "segments": [{"id": s.segment_id, "tts_path": get_presigned_download_url(settings.MINIO_BUCKET, s.tts_s3_key)} for s in db_segments if s.tts_s3_key]
     }
-        
-    return {
-        "status": "success",
-        "dubbed_audio_url": f"/videos/{dubbed_filename}",
-        "segments": segments
-    }
 
 @app.post("/api/v1/project/{project_id}/render")
 @limiter.limit("2/hour")

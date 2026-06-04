@@ -70,7 +70,9 @@ export default function Timeline() {
       if (musicWavesurfer.current) {
         try {
           musicWavesurfer.current.destroy();
-        } catch (e) {}
+        } catch (_) {
+          // ignore
+        }
       }
     };
   }, [noVocalsAudioUrl]);
@@ -103,7 +105,9 @@ export default function Timeline() {
       if (dubbedWavesurfer.current) {
         try {
           dubbedWavesurfer.current.destroy();
-        } catch (e) {}
+        } catch (_) {
+          // ignore
+        }
       }
     };
   }, [dubbedAudioUrl]);
@@ -113,12 +117,16 @@ export default function Timeline() {
     if (musicWavesurfer.current && typeof musicWavesurfer.current.setTime === 'function') {
       try {
         musicWavesurfer.current.setTime(currentTime);
-      } catch (e) {}
+      } catch (_) {
+        // ignore
+      }
     }
     if (dubbedWavesurfer.current && typeof dubbedWavesurfer.current.setTime === 'function') {
       try {
         dubbedWavesurfer.current.setTime(currentTime);
-      } catch (e) {}
+      } catch (_) {
+        // ignore
+      }
     }
   }, [currentTime]);
 

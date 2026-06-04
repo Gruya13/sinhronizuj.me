@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Play, Pause, Loader2, CheckCircle2, Paperclip, ArrowRight, Video
 } from 'lucide-react';
@@ -63,6 +63,7 @@ function App() {
 
   // Lokalna klijentska stanja za pretragu/unos URL-a
   const { url, setUrl } = useStudio();
+  const [videoDuration, setVideoDuration] = useState(0);
 
   // Praćenje vremena video reprodukcije i sinhronizacija zvuka
   useEffect(() => {
@@ -600,6 +601,7 @@ function App() {
                           setCurrentTime(videoRef.current.currentTime);
                         }
                       }}
+                      onDurationChange={(e) => setVideoDuration(e.target.duration)}
                     />
                     {dubbedAudioUrl && (
                       <audio 
@@ -628,7 +630,7 @@ function App() {
                     </button>
                     
                     <div className="time-display" style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: '#94a3b8' }}>
-                      {formatTime(currentTime)} / {formatTime(videoRef.current?.duration || getVideoDuration())}
+                      {formatTime(currentTime)} / {formatTime(videoDuration || getVideoDuration())}
                     </div>
 
                     {/* Biranje primarnog audia za preslušavanje */}
