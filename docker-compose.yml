@@ -66,8 +66,6 @@ services:
       POSTGRES_USER: sinhronizuj_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:-sinhronizuj_pass_2026}
       POSTGRES_DB: sinhronizuj_db
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
