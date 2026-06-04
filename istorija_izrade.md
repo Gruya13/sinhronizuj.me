@@ -1688,3 +1688,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Modal logovi su potvrdili da se vLLM server uspešno podigao na A100-40GB i uspešno učitao 32B model (zauzeto 18.24 GiB VRAM-a, ostalo sasvim dovoljno memorije za KV keš). Modeli su uspešno izlistani preko curl-a na `/v1/models` (`root` model je `Qwen/Qwen3-32B-AWQ`).
     * **VPS Restart:** Ponovo smo restartovali docker compose servise na Hetzner VPS-u kako bi Celery radnik i API server čisto započeli komunikaciju sa novim endpointom.
 - **Status:** Završeno i verifikovano. Lektor servis je spreman i radi sa originalnim 32B modelom na A100 hardveru.
+
+### 04.06.2026. 11:10 — Popravka pollinga i tajmera analize videa na frontendu
+- **Problem:** Nakon započinjanja analize videa, klijent je stajao zamrznut na statusu `POKRETANJE ANALIZE VIDEA...` (0%) i proteklo vreme je stajalo na `0:00.0`. Utvrđeno je da su tokom prethodne modularizacije koda iz `App.jsx` izbrisana dva `useEffect` hook-a za periodični status polling (`getTaskStatus`) i ažuriranje tajmera proteklog vremena.
+- **Urađeno:**
+    * **Ispravka u Context-u:** Vratili smo oba nedostajuća `useEffect` hook-a unutar [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx). Prvi hook sada pravilno ažurira sekunder (`setElapsed`), a drugi na svake 2 sekunde šalje zahteve endpointu `/api/v1/status/{taskId}` radi ažuriranja napretka.
+    * **Verifikacija build-a:** Pokrenut je produkcioni build klijenta (`npm run build`) koji je prošao bez ikakvih sintaksnih ili linter grešaka za 432ms.
+- **Status:** Završeno. Polling i tajmer na frontendu su u potpunosti operativni.

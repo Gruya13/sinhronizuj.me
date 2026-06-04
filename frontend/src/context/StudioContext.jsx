@@ -260,6 +260,83 @@ export function StudioProvider({ children }) {
     };
   }, [token]);
 
+  // Tajmer za trajanje obrade (sat)
+  useEffect(() => {
+    let timer;
+    if (loading && !videoUrl) {
+      timer = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - (startTime || Date.now())) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [loading, videoUrl, startTime]);
+
+  // Polling za Fazu 1 (Analiza) ili Fazu 2 (Render)
+  useEffect(() => {
+    let interval;
+    const currentTask = renderTaskId || taskId;
+    if (currentTask && !videoUrl && !error) {
+      interval = setInterval(async () => {
+        try {
+          const data = await api.getTaskStatus(currentTask);
+          consecutiveErrorsRef.current = 0;
+
+          if (data.status === 'SUCCESS') {
+            if (renderTaskId) {
+              // Faza 2 završena
+              setVideoUrl(`${API_BASE_URL}${data.video_url}`);
+              setRendering(false);
+              setLoading(false);
+              if (data.costs) setCosts(data.costs);
+              localStorage.removeItem('sinhronizuj_me_task_id');
+              setRenderTaskId(null);
+              clearInterval(interval);
+              fetchProjects();
+            } else {
+              // Faza 1 završena, prelazimo u Studio mod
+              setProgressData(null);
+              setLoading(false);
+              const targetProjId = data.project_id || taskId;
+              setCurrentProjectId(targetProjId);
+              loadProjectData(targetProjId);
+              clearInterval(interval);
+              fetchProjects();
+            }
+          } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
+            setError(data.error || 'Greška pri obradi.');
+            setLoading(false);
+            setRendering(false);
+            localStorage.removeItem('sinhronizuj_me_task_id');
+            setRenderTaskId(null);
+            clearInterval(interval);
+            fetchProjects();
+          } else {
+            // PROGRESS status
+            if (data.progress_data) {
+              setProgressData(data.progress_data);
+              setStatus(data.progress_data.current_step);
+            } else {
+              setStatus(data.status || 'OBRADA...');
+            }
+            if (data.costs) setCosts(data.costs);
+          }
+        } catch (err) {
+          if (err.name === "ApiError" && err.status === 404) {
+            console.warn("Zadatak nije pronađen (404).");
+            resetStudio();
+            return;
+          }
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 5) {
+            setError("Veza sa serverom je izgubljena. Zadatak je verovatno prekinut.");
+            setTimeout(resetStudio, 3000);
+          }
+        }
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [taskId, renderTaskId, videoUrl, error]);
+
   // Resetovanje studija
   function resetStudio() {
     setTaskId(null);
