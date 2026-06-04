@@ -230,19 +230,25 @@ export function StudioProvider({ children }) {
     }
   };
 
-  // Monitor resursa
+  // Monitor resursa (samo kada je korisnik autentifikovan)
   useEffect(() => {
+    if (!token) {
+      setHwStats(null);
+      setModalStatus(null);
+      return;
+    }
+
     const fetchHw = async () => {
       try {
         const data = await api.getHwStats();
         setHwStats(data);
-      } catch (err) { /* Silent fail */ }
+      } catch (_) { /* Silent fail */ }
     };
     const fetchModal = async () => {
       try {
         const data = await api.getModalStatus();
         setModalStatus(data);
-      } catch (err) { /* Silent fail */ }
+      } catch (_) { /* Silent fail */ }
     };
     fetchHw();
     fetchModal();
@@ -252,7 +258,7 @@ export function StudioProvider({ children }) {
       clearInterval(intervalHw);
       clearInterval(intervalMd);
     };
-  }, []);
+  }, [token]);
 
   // Resetovanje studija
   function resetStudio() {
