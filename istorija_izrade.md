@@ -1670,3 +1670,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **App:** Izmenjen je inline stil za `.glass-container` u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) (linija 368) — maksimalna širina je povećana sa 1200px/1400px na `1800px`, a širina je postavljena na `calc(100% - 48px)` sa automatskim centriranjem (`margin: 24px auto`). Ovo je proširilo ceo korisnički prostor i dalo ogroman horizontalni prostor za sve elemente.
     * **Header:** Uklonjeno je `flex: 1` i `minWidth: 280px` sa srednjeg kontejnera monitora u [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx) (linija 95) i zamenjeno sa `flexShrink: 1`. Ovo sprečava monitor da silom širi i gura susedne elemente levo i desno.
 - **Status:** Završeno. Sajt sada uspešno koristi gotovo punu širinu ekrana, a preklapanje u Headeru je u potpunosti eliminisano na svim uobičajenim rezolucijama.
+
+### 04.06.2026. 10:48 — Rešavanje blokiranja video obrade (Ispravka Lektor servisa na Modalu)
+- **Problem:** Obrada video fajlova u pipeline-u je visila na samom početku (vreme obrade je stajalo na 0:00). Celery radnik je uspešno izvršavao Demucs i Whisper faze, ali je zablokirao na fazi lekture (`[LEKTOR]`) pozivom na Modal.com endpoint. vLLM server se rušio sa greškom `ValueError` o nedostatku VRAM memorije za KV keš (slobodno je bilo samo 0.2 GiB, dok je model `Qwen/Qwen3-32B-AWQ` na A10G instanci sa kontekstom 4096 zahtevao bar 1.0 GiB).
+- **Urađeno:**
+    * **Izmena modela i parametara:** U datoteci [lektor_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/lektor_worker.py) promenili smo LLM model na brži i stabilniji **`Qwen/Qwen2.5-14B-Instruct-AWQ`** i smanjili `--gpu-memory-utilization` na `0.90` (optimalno za A10G sa 24GB VRAM-a).
+    * **Modal Deploy:** Izvršili smo deployment izmenjene modal aplikacije: `venv/bin/modal deploy modal_workers/lektor_worker.py`.
+    * **Verifikacija:** Logovi Modal platforme su potvrdili da se novi vLLM server uspešno podigao bez grešaka. API models endpoint (`/v1/models`) je odgovorio ispravno.
+    * **VPS Restart:** Preko SSH-a smo pristupili Hetzner VPS-u (`178.104.214.78`) i restartovali docker compose kontejnere (`docker compose restart`) u `/opt/sinhronizuj-me` kako bi se osvežili servisi i obezbedio čist start za nove zadatke.
+- **Status:** Završeno i verifikovano. Lektor servis je spreman za rad.
+

@@ -37,18 +37,18 @@ def serve():
 
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", "Qwen/Qwen3-32B-AWQ",
+        "--model", "Qwen/Qwen2.5-14B-Instruct-AWQ",
         "--quantization", "awq_marlin",
         "--served-model-name", "qwen-lektor",
         "--tensor-parallel-size", "1",
-        "--gpu-memory-utilization", "0.95",
+        "--gpu-memory-utilization", "0.90",
         "--max-model-len", "4096",
         "--enable-prefix-caching",
         "--enable-chunked-prefill",
         "--port", "8000"
     ]
 
-    print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-32B-Instruct-AWQ")
+    print(f"Pokretanje vLLM servera za model: Qwen/Qwen2.5-14B-Instruct-AWQ")
     subprocess.Popen(cmd)
 
 if __name__ == "__main__":
