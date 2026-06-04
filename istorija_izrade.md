@@ -1702,3 +1702,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ispravka workflow-a:** U datoteci [.github/workflows/backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml) na liniji 31 izbacili smo argument `test` iz komande `ruff check`, ostavljajući provere samo za postojeće direktorijume `backend` i `modal_workers`.
     * **Lokalna verifikacija:** Proverili smo rad Ruff provere lokalno sa ispravljenim argumentima i potvrdili da linter uspešno prolazi bez ikakvih grešaka.
 - **Status:** Završeno. Backend CI konfiguracija je ispravljena.
+
+### 04.06.2026. 15:10 — Kreiranje dokumentacije o arhitekturi i toku podataka
+- **Zahtev:** Kreirati `.md` fajl u korenu projekta koji detaljno opisuje celokupan tok podataka kroz sistem i funkcionisanje svih njegovih delova.
+- **Urađeno:**
+    * **Kreiranje fajla:** Kreiran je fajl [arhitektura_i_tok_podataka.md](file:///home/gruya/Projektri/sinhronizuj.me/arhitektura_i_tok_podataka.md) u korenu projekta.
+    * **Detaljan sadržaj:** Dokument opisuje hibridnu cloud arhitekturu (Hetzner VPS + Modal Serverless GPU), sve komponente sistema (React frontend, FastAPI backend, PostgreSQL, Redis, MinIO S3, Modal radnici), end-to-end tok podataka, detaljan rad svih faza pipeline-a (Analiza, Studio DAW, Renderovanje), sigurnost, mrežnu izolaciju i strategiju automatskog backup-a.
+- **Status:** Završeno. Dokumentacija je kreirana i dostupna u root-u projekta.
