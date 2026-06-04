@@ -27,6 +27,5 @@ jobs:
 
     - name: Provera sintakse koda (Ruff Linter)
       # Ruff proverava samo kritične greške (sintaksa, nedefinisana imena itd.)
-      # kako stilski propusti ne bi blokirali build.
       run: |
-        ruff check --select=E9,F63,F7,F82 backend modal_workers test
+        ruff check --select=E9,F63,F7,F82 backend modal_workers

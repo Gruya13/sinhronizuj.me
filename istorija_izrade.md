@@ -1695,3 +1695,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ispravka u Context-u:** Vratili smo oba nedostajuća `useEffect` hook-a unutar [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx). Prvi hook sada pravilno ažurira sekunder (`setElapsed`), a drugi na svake 2 sekunde šalje zahteve endpointu `/api/v1/status/{taskId}` radi ažuriranja napretka.
     * **Verifikacija build-a:** Pokrenut je produkcioni build klijenta (`npm run build`) koji je prošao bez ikakvih sintaksnih ili linter grešaka za 432ms.
 - **Status:** Završeno. Polling i tajmer na frontendu su u potpunosti operativni.
+
+### 04.06.2026. 15:06 — Ispravka GitHub Actions Backend CI-a
+- **Problem:** GitHub Actions za Backend CI su konstantno fejlovali u koraku provere sintakse koda. Ruff linter je u workflow fajlu dobijao nepostojeći direktorijum `test` kao argument, što je uzrokovalo fatalnu grešku lintera i pad celog CI pipeline-a.
+- **Urađeno:**
+    * **Ispravka workflow-a:** U datoteci [.github/workflows/backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml) na liniji 31 izbacili smo argument `test` iz komande `ruff check`, ostavljajući provere samo za postojeće direktorijume `backend` i `modal_workers`.
+    * **Lokalna verifikacija:** Proverili smo rad Ruff provere lokalno sa ispravljenim argumentima i potvrdili da linter uspešno prolazi bez ikakvih grešaka.
+- **Status:** Završeno. Backend CI konfiguracija je ispravljena.
