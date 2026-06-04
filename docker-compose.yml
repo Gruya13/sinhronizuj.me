@@ -11,6 +11,7 @@ services:
       - .env
     environment:
       - DATABASE_URL=postgresql://sinhronizuj_user:${DB_PASSWORD:-sinhronizuj_pass_2026}@db:5432/sinhronizuj_db
+    restart: always
     depends_on:
       - redis
       - db
@@ -30,6 +31,7 @@ services:
       - RUNPOD_TRANSLATOR_ID=${RUNPOD_TRANSLATOR_ID}
       - RUNPOD_TTS_ID=${RUNPOD_TTS_ID}
       - DATABASE_URL=postgresql://sinhronizuj_user:${DB_PASSWORD:-sinhronizuj_pass_2026}@db:5432/sinhronizuj_db
+    restart: always
     depends_on:
       - redis
       - db
@@ -45,6 +47,7 @@ services:
       - .env
     environment:
       - DATABASE_URL=postgresql://sinhronizuj_user:${DB_PASSWORD:-sinhronizuj_pass_2026}@db:5432/sinhronizuj_db
+    restart: always
     depends_on:
       - redis
       - db
