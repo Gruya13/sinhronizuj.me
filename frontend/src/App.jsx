@@ -365,7 +365,7 @@ function App() {
         <div className="aurora-blob aurora-blob-3"></div>
       </div>
 
-      <div className="glass-container studio-layout" style={{ maxWidth: project ? '1400px' : '1200px' }}>
+      <div className="glass-container studio-layout" style={{ maxWidth: '1800px', width: 'calc(100% - 48px)', margin: '24px auto' }}>
         
         {/* GLOBALNI HEADER (NAVBAR) */}
         <Header />

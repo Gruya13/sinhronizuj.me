@@ -1663,3 +1663,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **HardwareMonitor:** Rekonstruisana je komponenta [HardwareMonitor.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/HardwareMonitor.jsx) sa 100% robusnim inline stilovima za flex raspored, čime je eliminisana zavisnost od eventualnog CSS keširanja i rešeno vertikalno preklapanje tekstova na VPS i GPU sekcijama.
     * **Header:** Dodato je `flexShrink: 0` svojstvo na branding div (logo) i desni kontejner (profil i dropdown) u [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx), čime se sprečava njihovo horizontalno stiskanje i preklapanje sa monitorom u sredini.
 - **Status:** Završeno. UI Header-a je sada potpuno stabilan, responzivan i bez ikakvih preklapanja.
+
+### 04.06.2026. 10:34 — Proširivanje širine kontejnera (layout) i optimizacija flex monitora
+- **Problem:** Korisnik je prijavio da se elementi u Headeru i dalje preklapaju i da ima dosta slobodnog i neiskorišćenog prostora sa strane. Želeo je da se forma/sajt proširi na punu širinu ekrana.
+- **Urađeno:**
+    * **App:** Izmenjen je inline stil za `.glass-container` u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) (linija 368) — maksimalna širina je povećana sa 1200px/1400px na `1800px`, a širina je postavljena na `calc(100% - 48px)` sa automatskim centriranjem (`margin: 24px auto`). Ovo je proširilo ceo korisnički prostor i dalo ogroman horizontalni prostor za sve elemente.
+    * **Header:** Uklonjeno je `flex: 1` i `minWidth: 280px` sa srednjeg kontejnera monitora u [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx) (linija 95) i zamenjeno sa `flexShrink: 1`. Ovo sprečava monitor da silom širi i gura susedne elemente levo i desno.
+- **Status:** Završeno. Sajt sada uspešno koristi gotovo punu širinu ekrana, a preklapanje u Headeru je u potpunosti eliminisano na svim uobičajenim rezolucijama.

@@ -93,7 +93,7 @@ export default function Header() {
       </div>
 
       {/* MONITOR STATUSA U SREDINI */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: '280px' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 1 }}>
         <HardwareMonitor />
       </div>
 
