@@ -1678,5 +1678,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Modal Deploy:** Izvršili smo deployment izmenjene modal aplikacije: `venv/bin/modal deploy modal_workers/lektor_worker.py`.
     * **Verifikacija:** Logovi Modal platforme su potvrdili da se novi vLLM server uspešno podigao bez grešaka. API models endpoint (`/v1/models`) je odgovorio ispravno.
     * **VPS Restart:** Preko SSH-a smo pristupili Hetzner VPS-u (`178.104.214.78`) i restartovali docker compose kontejnere (`docker compose restart`) u `/opt/sinhronizuj-me` kako bi se osvežili servisi i obezbedio čist start za nove zadatke.
-- **Status:** Završeno i verifikovano. Lektor servis je spreman za rad.
+- **Status:** Završeno.
 
+### 04.06.2026. 11:04 — Vraćanje originalnog Lektor modela i prelazak na NVIDIA A100-40GB GPU na Modalu
+- **Zahtev:** Vratiti originalni Lektor model koji je bio konfigurisan (`Qwen/Qwen3-32B-AWQ`) i prebaciti hardverske resurse na jaču grafičku karticu NVIDIA A100 sa 40GB VRAM-a na Modalu kako bi model imao dovoljno memorije za KV keš i nesmetan rad.
+- **Urađeno:**
+    * **Izmena resursa i modela:** U datoteci [lektor_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/lektor_worker.py) promenili smo GPU parametar na `"A100-40GB"`, vratili model na `"Qwen/Qwen3-32B-AWQ"`, i vratili `--gpu-memory-utilization` na `0.95` uz podešavanje log ispisa.
+    * **Modal Deploy:** Najpre smo ručno zaustavili staru aplikaciju (`modal app stop`) kako bi se uklonili svi aktivni kontejneri na starom hardveru, a potom ponovo deploy-ovali Lektora na Modal.
+    * **Verifikacija:** Modal logovi su potvrdili da se vLLM server uspešno podigao na A100-40GB i uspešno učitao 32B model (zauzeto 18.24 GiB VRAM-a, ostalo sasvim dovoljno memorije za KV keš). Modeli su uspešno izlistani preko curl-a na `/v1/models` (`root` model je `Qwen/Qwen3-32B-AWQ`).
+    * **VPS Restart:** Ponovo smo restartovali docker compose servise na Hetzner VPS-u kako bi Celery radnik i API server čisto započeli komunikaciju sa novim endpointom.
+- **Status:** Završeno i verifikovano. Lektor servis je spreman i radi sa originalnim 32B modelom na A100 hardveru.
