@@ -1,3 +1,10 @@
+## [2026-06-04 09:52:00] Rešavanje nekompatibilnosti passlib-a i bcrypt-a 4.x/5.x
+- **Opis:**
+  Rešen problem sa padom backend servera (500 Internal Server Error) prilikom registracije/prijave korisnika.
+  1. **Uzrok:** Passlib interna funkcija `detect_wrap_bug` je nekompatibilna sa bcrypt verzijama >= 4.0.0 (instalirana je verzija 5.0.0), jer novi bcrypt baca `ValueError` ako je lozinka duža od 72 bajta, što ruši passlib-ov interni test na hladnom startu hešovanja lozinke.
+  2. **Rešenje:** Refaktorisan je modul [auth.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/core/auth.py) tako da u potpunosti zaobilazi problematični `passlib` omotač i koristi čistu `bcrypt` biblioteku direktno za hešovanje (`bcrypt.hashpw`) i verifikaciju lozinki (`bcrypt.checkpw`).
+  3. **Verifikacija:** Testirano je ručno preko `curl` zahteva i registracija i prijava sada funkcionišu besprekorno i vraćaju validan JWT token klijentu.
+
 ## [2026-06-03 20:30:00] Rešavanje problema sa pokretanjem Docker kontejnera i uvozom paketa
 - **Opis:**
   Otklonjen je bag gde su `sinhronizuj-api` i `sinhronizuj-worker` kontejneri padali prilikom pokretanja sa greškom `ModuleNotFoundError: No module named 'sqlalchemy'`.
