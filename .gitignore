@@ -26,7 +26,6 @@ brave.txt
 # Markdown fajlovi (osim kljucne dokumentacije)
 *.md
 !README.md
-!audit_izvestaj.md
 !doc/**/*.md
 !doc/*.md
 doc/objasnjenje_glosara.md
