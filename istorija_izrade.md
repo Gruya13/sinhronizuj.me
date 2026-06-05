@@ -1,3 +1,21 @@
+## [2026-06-05 08:36:00] Premeštanje objašnjenja glosara u tajnu dokumentaciju (sicret doc)
+- **Opis:**
+  Uklonjen je javni dokument `objasnjenje_glosara.md` iz korena projekta kako ne bi bio poslat na GitHub, i prebačen u izolovano skladište dokumentacije.
+  1. **Premeštanje fajla:** Premestili smo fajl [objasnjenje_glosara.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/objasnjenje_glosara.md) u tajni direktorijum `sicret doc`.
+  2. **Čišćenje Git-a:** Izvršili smo `git rm objasnjenje_glosara.md` kako bi se uklonio iz praćenja repozitorijuma na GitHub-u.
+  3. **Ažuriranje .gitignore:** Uklonjen je izuzetak `!objasnjenje_glosara.md` iz glavnog [.gitignore](file:///home/gruya/Projektri/sinhronizuj.me/.gitignore) fajla, čime se osigurava da eventualne kopije ili slični fajlovi u root-u ostanu trajno ignorisani.
+
+## [2026-06-04 23:05:00] Kreiranje detaljne tehničke dokumentacije celokupnog sistema (sicret doc)
+- **Opis:**
+  Napravljen je tajni dokumentacioni folder `sicret doc` u korenu projekta koji se ne prati na GitHub-u, sa izuzetno detaljnom tehničkom dokumentacijom za svaki segment sistema Sinhronizuj.me:
+  1. **Uvod i Visokonivojska Arhitektura (`uvod.md`):** Opisan je celokupni sistem, hibridna cloud arhitektura (Control Plane na Hetzner VPS-u i Compute Plane na Modal.com serverless GPU-ovima), tokovi podataka i korišćene tehnologije.
+  2. **Detaljna Dokumentacija Frontenda (`frontend.md`):** Detaljno je opisana struktura klijentskog koda, upravljanje stanjem preko `StudioContext.jsx`, timeline editor (`Timeline.jsx`), wavesurfer.js integracija, napredna drag-and-drop i resize logika sa detekcijom kolizija i crvenim upozorenjima na vremenskoj liniji, kružne Knob kontrole, i grupne operacije u MixerPanel-u.
+  3. **Detaljna Dokumentacija Backenda (`backend.md`):** Dokumentovane su FastAPI rute, autentifikacija i slowapi rate limiting, SQLAlchemy modeli podataka (User, Project, Segment, Glossary), Celery radnici i Redis draft keširanje, kao i mehanizam hot-patching-a i pydub ulepljivanja (splicing) segmenata govora.
+  4. **Detaljna Dokumentacija Compute Plane (`modal_workers.md`):** Detaljno su opisani svi Modal.com serverless radnici i modeli: Demucs (separacija), Whisper i SenseVoice Ensemble (STT), Qwen2-VL (multimodalni prevod sa analizom frejmova), Qwen3-32B (lektura i glosar), Piper & OpenVoice V2 & Resemble Enhance (sinteza i kloniranje glasa sa 44.1kHz poboljšanjem), i Wav2Lip (sinhronizacija usana).
+  5. **Smernice i Plan Testiranja (`testiranje.md`):** Opisani su scenariji za manuelno testiranje Studija i vremenske linije, verifikacija API endpoint-ova, testiranje hladnih startova i OOM grešaka na Modalu, i date su preporuke za buduće automatizovane unit, integracione i E2E testove (pytest, vitest, Playwright).
+  6. **Infrastruktura i Postavljanje (`infrastruktura.md`):** Dokumentovani su Docker Compose servisi na VPS-u, MinIO S3 konfiguracija sa presigned URL-ovima, Nginx reverse proxy i SSL sertifikacija, sigurnost kroz UFW i izolaciju Docker mreže, kao i automatizovani backup sistem (pg_dump + gzip + upload na S3 + rotacija starih bekapa) sa crontab uputstvima.
+  7. **Git izolacija (`.gitignore`):** Dodat je `.gitignore` fajl unutar `sicret doc` foldera sa sadržajem `*` kako bi se osiguralo da dokumentacija nikada ne ode na javni repozitorijum.
+
 ## [2026-06-04 09:52:00] Rešavanje nekompatibilnosti passlib-a i bcrypt-a 4.x/5.x
 - **Opis:**
   Rešen problem sa padom backend servera (500 Internal Server Error) prilikom registracije/prijave korisnika.
