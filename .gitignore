@@ -26,10 +26,9 @@ brave.txt
 # Markdown fajlovi (osim kljucne dokumentacije)
 *.md
 !README.md
-!istorija_izrade.md
-!pipeline_tok.md
 !audit_izvestaj.md
-!arhitektura_i_tok_podataka.md
+!doc/**/*.md
+!doc/*.md
 
 # Brainstorming i lokalni planovi
 brainstorming/
