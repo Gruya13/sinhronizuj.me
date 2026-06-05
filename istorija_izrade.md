@@ -1958,3 +1958,27 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Kreiranje fajla:** Kreiran je fajl [objasnjenje_glosara.md](file:///home/gruya/Projektri/sinhronizuj.me/objasnjenje_glosara.md) u korenu projekta.
     * **Sadržaj dokumenta:** Detaljno je opisan način rada glosara, njegova uloga u prevođenju stručne terminologije na standardni srpski (ekavica, latinica), uloga fajla `glossaries.json`, funkcije za detekciju tema i prevođenje nepoznatih pojmova, kao i SQLAlchemy model `Glossary` u bazi podataka za korisničke rečnike.
 - **Status:** Završeno. Dokumentacija o glosaru je spremna i zavedena.
+
+### 05.06.2026. 10:28 — Fiks za zumiranje vremenske linije u realnom vremenu, otklanjanje S3 URL greške (403 Forbidden) i unutrašnje ispravke tooltip pozicioniranja
+- **Problem:** Vremenska linija se pri zumiranju promenila tek nakon prestanka skrolovanja (nije bilo u realnom vremenu), a preuzimanje audia/videa sa S3 je povremeno vraćalo 403 Forbidden zbog dodatog cache-buster (`cb`) parametra u presigned URL. Tooltip je ispadao iz forme i bio prekriven elementima u pozadini.
+- **Urađeno:**
+    * **Zumiranje:** Prilagođen render talasa (waveform) na vremenskoj liniji kako bi se ažurirao u realnom vremenu tokom interakcije sa zoom klizačem i mišom.
+    * **Cache-buster:** Uklonjen je parametar `cb` sa presigned URL-ova generisanih za MinIO resurse, što je rešilo 403 Forbidden greške jer S3 signature provera ne dozvoljava neautorizovane query parametre.
+    * **Tooltip:** Fiksiran z-index i dodat edge-safe algoritam pozicioniranja tooltipa da uvek bude "always on top" i vidljiv u celosti na ekranu.
+- **Status:** Završeno. Izmene uspešno testirane i push-ovane na granu `development`.
+
+### 05.06.2026. 10:32 — Otklanjanje zastoja u asinhronim zahtevima (Timeout na Redis povezivanju)
+- **Problem:** Korisnik je prijavio neuspeh pri pokretanju asinhronih operacija (generisanje glasa za ceo video, nemogućnost seeks na timeline-u, zamrzavanje). Analizom logova utvrđeno je da su Celery worker (`sinhronizuj-worker`) i beat scheduler (`sinhronizuj-beat`) pali sa kodom 1 jer su se pokušavali povezati na eksterni Hetzner Redis server na IP adresi `87.116.167.0` (koji je davao `TimeoutError`), umesto da koriste lokalni Redis kontejner u istom Docker Compose okruženju. FastAPI backend (`sinhronizuj-api`) je takođe patio od ovog problema.
+- **Urađeno:**
+    * **docker-compose.yml:** Eksplicitno prepisan `REDIS_URL` u environment sekciji za servise `api`, `worker` i `beat` da koriste lokalni Redis servis na adresi `redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0`.
+    * **Pokretanje:** Izvršena komanda `docker compose up -d` za rekonstrukciju i pokretanje kontejnera.
+    * **Verifikacija:** Logovi za `sinhronizuj-worker` i `sinhronizuj-beat` su potvrdili uspešno povezivanje na lokalni Redis i prelazak u status `ready`, a svi kontejneri su u zdravom stanju `Up`.
+- **Status:** Završeno. Svi Docker Compose servisi su potpuno operativni i asinhroni zadaci sada prolaze nesmetano.
+
+### 05.06.2026. 14:06 — Popravka ESLint i CI build grešaka na vremenskoj liniji
+- **Problem:** GitHub Actions CI build za frontend je fejlovao jer su u datoteci `Timeline.jsx` postojala dva prazna `catch` bloka (linije 204 i 209), što krši ESLint `no-empty` pravilo, kao i direktna mutacija globalnog stila kursora (`document.body.style.cursor`) u funkciji za drag-skrolovanje van React životnog ciklusa (`react-hooks/immutability`).
+- **Urađeno:**
+    * **Prazni catch blokovi:** Dodati komentari unutar praznih `catch` blokova u [Timeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/Timeline.jsx) čime se zadovoljava ESLint standardno pravilo.
+    * **Mutacija kursora:** Uvedeno `isGrabbing` React stanje u [Timeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/Timeline.jsx) i odgovarajući `useEffect` hook koji menja kursor miša na celom dokumentu kada je drag-skrolovanje aktivno. Time je u potpunosti eliminisana linter greška o direktnoj mutaciji globalnih objekata.
+    * **Verifikacija:** Lokalno pokrenuti `npm run lint` i `npm run build` i verifikovano da uspešno prolaze sa 0 grešaka.
+- **Status:** Završeno. CI build na GitHub-u je spreman da ponovo prolazi uspešno.

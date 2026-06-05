@@ -48,6 +48,20 @@ export default function Timeline() {
   const [zoomWidth, setZoomWidth] = useState(1000); // Početna širina u pikselima (ekvivalent 100% u DAW modu)
   const containerRef = useRef(null);
 
+  // Praćenje stanja drag-skrolovanja za promenu kursora
+  const [isGrabbing, setIsGrabbing] = useState(false);
+
+  useEffect(() => {
+    if (isGrabbing) {
+      document.body.style.cursor = 'grabbing';
+    } else {
+      document.body.style.cursor = '';
+    }
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, [isGrabbing]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -201,12 +215,16 @@ export default function Timeline() {
     if (musicWavesurfer.current) {
       try {
         musicWavesurfer.current.redraw();
-      } catch (_) {}
+      } catch (_) {
+        // Ignorišemo greške pri brzom ponovnom iscrtavanju talasa
+      }
     }
     if (dubbedWavesurfer.current) {
       try {
         dubbedWavesurfer.current.redraw();
-      } catch (_) {}
+      } catch (_) {
+        // Ignorišemo greške pri brzom ponovnom iscrtavanju talasa
+      }
     }
   }, [zoomWidth]);
 
@@ -232,7 +250,7 @@ export default function Timeline() {
     const startX = e.clientX;
     const startScrollLeft = container.scrollLeft;
 
-    document.body.style.cursor = 'grabbing';
+    setIsGrabbing(true);
 
     const handleMouseMove = (moveEvent) => {
       const deltaX = moveEvent.clientX - startX;
@@ -240,7 +258,7 @@ export default function Timeline() {
     };
 
     const handleMouseUp = () => {
-      document.body.style.cursor = '';
+      setIsGrabbing(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
