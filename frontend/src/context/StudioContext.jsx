@@ -678,16 +678,29 @@ export function StudioProvider({ children }) {
       await handleSaveDraft();
       const data = await api.generateAllTTS(project.project_id, selectedVoice);
       
-      const mappedSegs = data.segments.map(s => ({
-        ...s,
-        last_generated_volume: s.volume !== undefined ? s.volume : 0.0,
-        last_generated_speed: s.speed !== undefined ? s.speed : 1.0
-      }));
-      setProject(prev => ({
-        ...prev,
-        segments: mappedSegs,
-        dubbed_audio_path: data.dubbed_audio_url
-      }));
+      setProject(prev => {
+        if (!prev) return prev;
+        
+        const updatedSegments = prev.segments.map(origSeg => {
+          const newSegData = data.segments.find(ns => ns.id === origSeg.id);
+          if (newSegData) {
+            return {
+              ...origSeg,
+              tts_path: newSegData.tts_path,
+              status: "previewed",
+              last_generated_volume: origSeg.volume !== undefined ? origSeg.volume : 0.0,
+              last_generated_speed: origSeg.speed !== undefined ? origSeg.speed : 1.0
+            };
+          }
+          return origSeg;
+        });
+
+        return {
+          ...prev,
+          segments: updatedSegments,
+          dubbed_audio_path: data.audio_url
+        };
+      });
       setDubbedBuster(Date.now());
       
       const audios = {};

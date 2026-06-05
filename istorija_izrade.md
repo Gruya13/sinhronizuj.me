@@ -1,3 +1,227 @@
+## [2026-06-05 10:27:00] Dinamičko edge-safe pozicioniranje tooltip-a (Sprečavanje odsecanja na ivicama)
+- **Opis:**
+  Rešen je problem sa odsecanjem tooltip-a na ivicama ekrana (npr. na samom početku videa na 0.0s) kada se tooltip centrirao i ispadao sa leve strane kontejnera.
+  1. **Detekcija ivica:**
+     - Uveli smo proveru horizontalne pozicije segmenta (`left` procenat).
+  2. **Dinamičko pomeranje i edge-safe stilovi:**
+     - Ako je segment u prvih 15% dužine vremenske linije, tooltip se poravnava uz levu ivicu segmenta (`left: 0px`), a njegova strelica se pomera ulevo (`left: 15px`), sprečavajući da leva polovina tooltip-a ispadne sa ekrana i bude odsečena.
+     - Ako je segment u poslednjih 15% dužine (left > 85%), tooltip se poravnava uz desnu ivicu (`right: 0px`), a strelica se pomera udesno (`right: 15px`), sprečavajući odsecanje sa desne strane.
+  3. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 532ms bez grešaka.
+
+## [2026-06-05 10:25:00] Rešavanje preklapanja i pozicioniranje tooltip-a (Always on top)
+- **Opis:**
+  Rešen je problem sa preklapanjem i čitljivošću tooltipa za koliziju, jer su preko njega prelazili playhead kursor (crvena linija) i natpisi drugih traka sa vremenske linije.
+  1. **Dinamički zIndex na segmentu:**
+     - Postavili smo dinamički `zIndex: isHovered ? 9999 : 2` na stil segmenata na traci srpskog glasa.
+     - Budući da tooltipovi nasleđuju stacking kontekst svojih roditeljskih segmenata, podizanje zIndex-a samog segmenta na `9999` tokom hover-a stavlja i segment i njegov unutrašnji tooltip na sam vrh čitavog sloja vremenske linije.
+  2. **Vizuelni efekat:**
+     - Tooltip se sada iscrtava besprekorno iznad svih ostalih elemenata (skala, playhead-a, oznaka, itd.) i uvek je potpuno čitljiv i čist, bez ikakvog mešanja sa pozadinskim elementima.
+  3. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 481ms bez grešaka.
+
+## [2026-06-05 10:20:00] Tečno iscrtavanje audio talasa (wavesurfer) pri zumiranju u realnom vremenu
+- **Opis:**
+  Unapredili smo ponašanje audio talasa (wavesurfer) tokom zumiranja vremenske linije, tako da se ponovno iscrtavanje vrši trenutno i u realnom vremenu dok korisnik skroluje.
+  1. **Uklanjanje CSS tranzicije na min-width:**
+     - Uklonili smo CSS pravilo `transition: min-width 0.1s ease-out` sa `timelineRef` kontejnera.
+     - Ova tranzicija je stvarala kašnjenje od 100ms pri promeni veličine, što je usporavalo iscrtavanje i dovodilo do nesklada između React stanja i vizuelne širine kontejnera.
+  2. **Eksplicitni redraw mehanizam:**
+     - Dodali smo novi `useEffect` koji reaguje na promenu stanja `zoomWidth` i u svakom render frejmu trenutno poziva `.redraw()` na obe wavesurfer instance.
+     - Ovo primorava wavesurfer.js da tečno i trenutno ponovo iscrta talase prateći svaku promenu točkića miša, bez ikakvog kašnjenja ili zamrzavanja.
+  3. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 534ms bez grešaka.
+
+## [2026-06-05 10:15:00] Otklanjanje 403 Forbidden greške za S3 audio učitavanje
+- **Opis:**
+  Rešili smo problem sa greškom `403 (Forbidden)` prilikom učitavanja srpskog sinhronizovanog glasa na vremenskoj liniji.
+  1. **Uzrok:**
+     - Na klijentskoj strani, na presigned S3 URL za dubbed audio (`project.dubbed_audio_url`) se nadovezivao cache-buster parametar (`cb=...`).
+     - S3 i MinIO serveri proračunavaju kriptografski potpis nad celokupnim query stringom. Ručna izmena parametara na klijentu narušava potpis, što S3 automatski prepoznaje kao neovlašćenu modifikaciju i odbija zahtev sa statusom `403 Forbidden`.
+  2. **Rešenje:**
+     - Ažurirana je definicija `dubbedAudioUrl` u `Timeline.jsx` tako da se `project.dubbed_audio_url` koristi u svom izvornom obliku bez ikakvog nadovezivanja buster parametara. Cache buster se primenjuje isključivo na lokalni FastAPI statički fallback URL.
+  3. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 499ms bez grešaka.
+
+## [2026-06-05 10:05:00] Otklanjanje grešaka i upozorenja u konzoli pretraživača
+- **Opis:**
+  Istražili smo i otklonili sve zabeležene greške i upozorenja u konzoli pretraživača kako bismo obezbedili stabilnost i čist tok aplikacije.
+  1. **Ispravka 404 Fetch grešaka za audio talase:**
+     - U `Timeline.jsx` su definisane ispravne mrežne putanje `noVocalsAudioUrl` i `dubbedAudioUrl` koje koriste presigned S3 URL-ove (`project.no_vocals_url` i `project.dubbed_audio_url`) umesto statičkih server-side `/videos/` putanja koje nisu postojale u stateless MinIO okruženju.
+  2. **Rukovanje AbortError greškama u wavesurfer.js:**
+     - Dodali smo `.catch()` blokove na funkcije `.load()` za oba wavesurfer objekta u `Timeline.jsx`.
+     - Time se uspešno presreću i prigušuju `AbortError` greške, koje nastaju kada se stara instanca wavesurfer-a uništi metodom `.destroy()` dok je mrežni prenos još uvek u toku.
+  3. **Ispravka React autocomplete upozorenja:**
+     - U `LoginRegister.jsx` smo lowercase atribute `autocomplete` zamenili ispravnim React camelCase formatom `autoComplete`.
+  4. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 506ms bez grešaka.
+
+## [2026-06-05 09:58:00] Premeštanje selektora audio izvora na vrh vremenskog editora (Timeline)
+- **Opis:**
+  Rešen je problem nemogućnosti klika i preklapanja kontrola za izbor audio izvora sa audio segmentima na vremenskim trakama.
+  1. **Pozicioniranje kontrola na vrh vremenske linije:**
+     - Dugmad "Originalni ENG Vokal" i "Srpski glas (TTS)" su premeštena na sam vrh vremenske linije, u zaglavlje odmah pored naslova "Vremenski Editor (Timeline)", organizovana u elegantan flex raspored.
+     - Time je osigurano da su kontrole uvek dostupne za klik i da se nikada ne preklapaju sa segmentima na samim trakama, čak i kada su oni na početnim sekundama.
+  2. **Diskretne oznake traka:**
+     - Na samim audio trakama su dugmad zamenjena statičkim, neklikabilnim oznakama sa odgovarajućim ikonicama (`Mic` za originalnu i `Volume2` za srpsku traku).
+     - Oznake dinamički menjaju boju (svetli ljubičasto za aktivan original, svetli zeleno za aktivan dub, a sivo za neaktivne trake) u skladu sa stanjem `activeAudioSource`, što pruža jasnu vizuelnu indikaciju o aktivnoj reprodukciji.
+  3. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 546ms bez grešaka.
+
+## [2026-06-05 09:55:00] Popravka baga sa zamrzavanjem vremenske linije i gubljenjem segmenata nakon generisanja glasa
+- **Opis:**
+  Rešen je kritičan bag u `StudioContext.jsx` u okviru funkcije `handleGenerateAllTTS` koji je uzrokovao zamrzavanje interfejsa i nestanak segmenata nakon generisanja glasa za ceo video.
+  1. **Očuvanje svojstava segmenata:**
+     - Prethodna implementacija je direktno prepisivala niz `project.segments` nepotpunim objektima iz odgovora API-ja (koji sadrže samo `id` i `tts_path`), čime su se gubila sva ključna svojstva poput `start`, `end`, `translated` i statusa.
+     - Zbog gubitka `start` i `end` vremena, pozicioniranje na vremenskoj liniji je vraćalo `NaN` vrednosti, što je zamrzavalo interfejs i onemogućavalo prevlačenje i reprodukciju.
+     - Sada se podaci o novim `tts_path` vrednostima ispravno mapiraju na postojeće objekte u stanju klijenta, čime se čuvaju sve originalne i preostale vrednosti.
+  2. **Ispravka statusa i vidljivosti segmenata:**
+     - Status uspešno izgenerisanih segmenata se nakon generisanja glasa ažurira na `"previewed"`, čime se oni odmah reaktivno prikazuju na vremenskoj liniji na traci srpskog glasa (pošto se više ne skrivaju po statusima `"edited"` ili `"draft"`).
+  3. **Ispravka dubbed_audio_path rute:**
+     - Ažurirano je mapiranje audio putanje na `data.audio_url` (umesto nepostojećeg `data.dubbed_audio_url` u odgovoru API-ja).
+  4. **Verifikacija:**
+     - Projekat se uspešno bilda za 547ms sa ugrađenim ispravkama.
+
+## [2026-06-05 09:50:00] Otklanjanje problema na vremenskoj liniji (zumiranje, selekcija audia i skrivanje segmenata)
+- **Opis:**
+  Sprovedene su tri ispravke na vremenskoj liniji (`Timeline.jsx`) na osnovu fidbeka korisnika radi poboljšanja stabilnosti i uklanjanja vizuelnih i funkcionalnih grešaka.
+  1. **Filtriranje i skrivanje ne-generisanih ili izmenjenih segmenata:**
+     - Segmenti koji imaju status `"edited"` (korisnik je izmenio prevod ali novi glas još nije izgenerisan) ili `"draft"` (nikada generisan) se više ne prikazuju na traci "Srpski glas (TTS)".
+     - Time je sprečen prikaz neusaglašenih i zastarelih audio segmenata na vremenskoj liniji.
+     - Detekcija kolizija na srpskoj traci je takođe ažurirana da uzima u obzir samo segmente koji se zapravo prikazuju (nemaju `"edited"` ili `"draft"` status).
+  2. **Otključavanje slobodnog izbora audio izvora:**
+     - Uklonjen je alert i blokada na klik dugmeta "Srpski glas (TTS)". Korisnik sada može uvek slobodno da prebacuje audio izvor između originalnog i srpskog na vremenskoj liniji, omogućavajući testiranje probnih tonskih segmenata čak i kada ceo video još nije u potpunosti spojen.
+  3. **Uklanjanje praznog hoda kod Ctrl + Scroll zumiranja:**
+     - Ažurirana je logika zumiranja tako da se stvarna širina kontejnera (`container.clientWidth`) koristi kao polazna baza ukoliko je trenutni `zoomWidth` manji od nje.
+     - Ovo omogućava da zumiranje na širokim ekranima krene trenutno, bez praznog hoda na početnim scroll koracima.
+  4. **Verifikacija:**
+     - Pokrenut je Vite produkcioni build (`npm run build`) koji uspešno prolazi u 513ms bez grešaka.
+
+## [2026-06-05 09:45:00] Stilizacija skrolbara, horizontalni scroll i Shift+Drag za vremensku liniju
+- **Opis:**
+  Dodali smo nova, intuitivnija ponašanja za navigaciju na vremenskoj liniji (`Timeline.jsx` i `index.css`) u skladu sa profesionalnim DAW softverima.
+  1. **Custom skrolbar za vremensku liniju:**
+     - Horizontalni skrolbar na vremenskoj liniji (`.timeline-card`) je stilizovan tako da je visok 6px, ima tamnu stazu i ljubičasti neon klizač, u potpunosti se stapajući sa vizuelnom temom aplikacije.
+  2. **Horizontalno skrolovanje običnim scroll-om:**
+     - Ažuriran je wheel listener tako da ako `Ctrl` nije pritisnut, vertikalni scroll miša direktno pomera vremensku liniju levo-desno (`scrollLeft += e.deltaY`) i sprečava skrolovanje cele stranice.
+  3. **Shift + Drag za panovanje (drag-scroll):**
+     - Držanje tastera `Shift` i klik-prevlačenje miša bilo gde na vremenskoj liniji (uključujući i segmente) aktivira drag-scroll.
+     - Tokom prevlačenja, kursor se menja u šaku (`grabbing`), a vremenska linija se tečno skroluje prateći pomeraj miša.
+  4. **Verifikacija:**
+     - Produkcijski Vite build uspešno prolazi u 535ms bez ikakvih grešaka.
+
+## [2026-06-05 09:40:00] Selektivno prikazivanje i Ctrl+Scroll zumiranje vremenske linije
+- **Opis:**
+  Dodali smo napredna ponašanja na vremenskoj liniji (`Timeline.jsx`) kako bismo poboljšali UX i pružili verniji audio-vizuelni prikaz.
+  1. **Sakrivanje segmenata bez srpskog glasa:**
+     - Na traci "Srpski glas (TTS)" se više ne renderuju segmenti za koje još uvek nije generisan probni ili finalni TTS audio (proverava se `seg.tts_path` i `probniAudios`).
+     - Detekcija kolizija je optimizovana da računa preklapanja samo između vidljivih segmenata sa generisanim glasom, sprečavajući lažne kolizije.
+  2. **Interaktivno zumiranje vremenske linije (Ctrl + Scroll):**
+     - Dodata je podrška za horizontalno zumiranje vremenske linije prevlačenjem točkića miša dok se drži taster `Ctrl`.
+     - Širina vremenske linije se dinamički menja u opsegu od 800px (kompaktan prikaz celog videa) do 6000px (visoka rezolucija za precizno sečenje i pozicioniranje).
+     - Događaj je vezan direktno u `useEffect`-u sa opcijom `passive: false` kako bi se sprečilo podrazumevano zumiranje čitavog pretraživača.
+  3. **Verifikacija:**
+     - Produkcijski Vite build uspešno prolazi u 541ms bez grešaka.
+
+## [2026-06-05 09:35:00] Premeštanje dropdown menija projekata u heder Studija
+- **Opis:**
+  Prema zahtevu korisnika, prebacili smo dropdown za promenu projekata iz globalnog hedera (`Header.jsx`) u heder Studio editora (`App.jsx`), zamenivši statički prikaz naziva projekta.
+  1. **Čišćenje globalnog navbara (Header.jsx):**
+     - Dropdown meni za promenu i kreiranje projekata je u potpunosti uklonjen iz gornjeg desnog dela globalnog navbara.
+     - Uklonjeni su neiskorišćeni uvozi ikonica i hook-ovi vezani za dropdown u `Header.jsx`.
+  2. **Implementacija u hederu Studija (App.jsx):**
+     - Naziv projekta skroz levo u hederu studija je pretvoren u interaktivno dropdown dugme.
+     - Uveden je state `projectDropdownOpen`, `projectDropdownRef` i event listener-i za zatvaranje menija klikom sa strane.
+     - Integrisane su stavke: brzi prelazak na Dashboard, lista svih projekata sa njihovim statusnim indikatorima boja, i dugme za kreiranje novog projekta.
+  3. **Verifikacija:**
+     - Projekat se uspešno bilda za 515ms. Sva stanja i tranzicije između projekata funkcionišu reaktivno i stabilno.
+
+## [2026-06-05 09:30:00] Premeštanje globalnih TTS i akcija čuvanja u tab "Glas & TTS"
+- **Opis:**
+  Radi dodatne vizuelne optimizacije i čišćenja hedera, globalne opcije za podešavanje glasa i čuvanje projekta premeštene su iz hedera u tab `🎙️ Glas & TTS` u segment editoru (`SegmentRow.jsx`).
+  1. **Čišćenje hedera (App.jsx):**
+     - Iz hedera su uklonjeni dropdown "Glas: ...", dugme "Sačuvaj" i dugme "Generiši Ceo Glas".
+     - Heder je sada čist i sadrži samo naziv projekta, statusnu značku, dugme "Renderuj Video" i dugme "Nazad".
+  2. **Integracija u segment editor (SegmentRow.jsx):**
+     - U tab `🎙️ Glas & TTS` ubačena je nova stilizovana sekcija "Globalne opcije projekta".
+     - Sekcija omogućava izbor podrazumevanog glasa za ceo projekat, ručno čuvanje nacrta i generisanje glasa za ceo video, sa reaktivnim loaderima i stanjima učitavanja.
+  3. **Verifikacija:**
+     - Projekat se uspešno bilda za 506ms. Sve funkcionalnosti čuvanja i sinteze glasa su integrisane i stabilne.
+
+## [2026-06-05 09:25:00] Stabilizacija Studio Workspace layout-a i uvođenje Full-Screen režima
+- **Opis:**
+  Rešen je problem sa podrhtavanjem, širenjem i skupljanjem interfejsa pri prelasku sa segmenta na segment tokom scrubbing-a, i omogućen puni ekran za Studio radni prostor.
+  1. **Full-Screen DAW Režim (App.jsx):**
+     - Glavna staklena forma `.glass-container.studio-layout` u Studio režimu sada zauzima 100% širine i visine ekrana (`width: '100vw'`, `height: '100vh'`).
+     - Uklonjene su spoljne margine i zaobljene ivice (`margin: '0'`, `borderRadius: '0'`, `border: 'none'`), kako bi interfejs u potpunosti popunio ekran bez ikakvog skakanja ili praznog prostora sa strana.
+     - Smanjen je unutrašnji padding (`padding: '12px 16px 16px 16px'`) i gap na `12px` kako bi se maksimizovao prostor za video i timeline.
+  2. **Fiksiranje kolona (minWidth: 0):**
+     - Dodat je `minWidth: 0` na obe glavne kolone radnog prostora: video preview karticu (`.video-preview-card` u `App.jsx`) i karticu segment editora (`.segment-editor-card` u `SegmentRow.jsx`).
+     - Ovo sprečava pretraživač da preračunava i dinamički rasteže/skuplja kolone kada se dugački tekstovi, textarea ili drugi unutrašnji elementi menjaju tokom kretanja kroz segmente.
+  3. **Verifikacija:**
+     - Projekat se uspešno bilda i sve promene su stabilne.
+
+## [2026-06-05 09:20:00] Reorganizacija Segment Editora sa novom Glas & TTS karticom (tabom)
+- **Opis:**
+  Izvršena je reorganizacija segment editora (`SegmentRow.jsx`) radi jasnijeg razdvajanja poslova i poboljšanja UX-a uvođenjem novog taba specifično namenjenog sintezi glasa.
+  1. **Uvođenje taba "Glas & TTS":**
+     - Dodat je treći tab `🎙️ Glas & TTS` u navigaciju segment editora, smešten između tabova `📝 Tekst & Prevod` i `🔊 Podešavanja Zvuka`.
+     - Sve opcije vezane za generisanje i kontrolu sinteze glasa su izvučene i premštene u ovaj namenski tab:
+       - Dropdown "Glas za ovaj segment" za odabir modela glasa (klonirani ili generički).
+       - Audio plejer za preslušavanje izgenerisanog probnog segmenta.
+       - Dugme "Generiši / Regeneriši Probni Glas".
+  2. **Uprošćavanje ostalih tabova:**
+     - Tab `📝 Tekst & Prevod` je rasterećen i sada se fokusira isključivo na poređenje originala i prevoda sa AI Lektorom (Magic Shorten).
+     - Uklonjen je fiksirani donji red akcija sa dna kartice segment editora, čime se vizuelno oslobađa vertikalni prostor i poboljšava DAW estetika.
+  3. **Verifikacija:**
+     - Projekat se uspešno bilda i sve promene su stabilne.
+
+## [2026-06-05 09:15:00] Optimizacija performansi Playhead Scrubbing-a (Butter-Smooth 60fps)
+- **Opis:**
+  Rešen je problem sa kašnjenjem (lagom) tokom prevlačenja (drag-to-seek) na vremenskoj liniji optimizacijom renderinga i preusmeravanjem teških browser operacija.
+  1. **Lokalno praćenje vremena (localCurrentTime):**
+     - Uveden je lokalni state `localCurrentTime` i status prevlačenja `isScrubbingRef`.
+     - Kursor playhead-a i talasni oblici (wavesurfer) se tokom prevlačenja ažuriraju instantno u 60fps prateći pokrete miša piksel-po-piksel, bez čekanja na spore browser timeupdate događaje video plejera.
+  2. **Throttling preko requestAnimationFrame:**
+     - Seek operacije na video i audio elementima (koje zahtevaju dekodiranje frejmova i stvaraju opterećenje) su throttlovane i odlažu se za sledeći frame pretraživača.
+  3. **Izbegavanje nepotrebnog re-renderovanja React-a:**
+     - Korišćenjem `selectedSegmentIdRef` izbegnuto je učestalo menjanje React stanja. Selektovani segment se menja u bazi samo kada playhead stvarno pređe iz jednog segmenta u drugi, umesto pri svakom pomeraju miša.
+  4. **Verifikacija:**
+     - Projekat se uspešno bilda i sve promene su stabilne.
+
+## [2026-06-05 09:10:00] Implementacija Playhead Scrubbing-a (klik i drag) na vremenskoj liniji
+- **Opis:**
+  Dodata je mogućnost da se klikom i prevlačenjem (drag) vremenskog kursora (playhead) ili bilo kog dela vremenske linije vrši kontinuirano premotavanje (scrubbing) videa i zvuka.
+  1. **Scrubbing funkcionalnost (Timeline.jsx):**
+     - Dodata je funkcija `handleStartScrubbing` koja presreće `onMouseDown` događaj i dodaje globalne `mousemove` i `mouseup` listenere na `document`.
+     - Tokom prevlačenja, pozicija miša se konvertuje u sekunde na osnovu širine vremenske linije i ukupnog trajanja videa.
+     - Sinhronizovano se ažurira `currentTime` na video plejeru, kao i na sinhronizovanim audio elementima (dubbed i pozadinski zvuk) u realnom vremenu.
+     - Automatski se vrši selekcija odgovarajućeg segmenta u bazi preko `setSelectedSegmentId` na osnovu trenutne pozicije playhead-a.
+     - Scrubbing se može aktivirati klikom na skalu sekundi, prazan prostor vremenske linije, ili direktnim povlačenjem crvenog kružića na vrhu playhead kursora (`pointerEvents: 'auto'`).
+  2. **Verifikacija:**
+     - Klijentska aplikacija se uspešno bilda i nema nikakvih grešaka u konzoli ili tokovima.
+
+## [2026-06-05 09:05:00] Dinamički vizuelni highlight i prigušivanje neaktivnih audio traka na vremenskoj liniji
+- **Opis:**
+  Implementirana je logika za dinamičko vizuelno isticanje (highlight) i prigušivanje (dimming) segmenata na vremenskoj liniji (Timeline) u zavisnosti od izabranog aktivnog izvora zvuka ("Originalni ENG Vokal" ili "Srpski glas (TTS)").
+  1. **Logika na vremenskoj liniji (Timeline.jsx):**
+     - Ažurirana je definicija `isActive` stanja za segmente na obe trake (Originalna i Srpska TTS traka). Segment je aktivan samo ako je izabrana njegova traka (`activeAudioSource === "original"` ili `"dubbed"`) i ako je segment selektovan (`selectedSegmentIds.includes(seg.id)`).
+     - Segmenti na neaktivnoj traci dobijaju prigušenu pozadinu (`rgba(255, 255, 255, 0.02)`) i ivice (`rgba(255, 255, 255, 0.05)`), umesto zelene/ljubičaste boje.
+     - Talasni oblici (waveform bars) i tekstualne oznake (#ID) na neaktivnoj traci su prigušeni (opacity 8-10%, boja siva `#64748b`) kako bi se fokus prebacio na aktivni izvor reprodukcije.
+  2. **Verifikacija:**
+     - Projekat se uspešno kompajlira sa `npm run build` bez ijedne greške.
+
+## [2026-06-05 08:53:00] Reorganizacija UI/UX prostora Studio editora (No-Scroll & Ultra-Kompaktni Layout)
+- **Opis:**
+  Izvršen je kompletan redizajn i reorganizacija prostora unutar interaktivnog Studio editora kako bi ceo DAW interfejs stao na jedan ekran (viewport), rešavajući problem vidljivosti plejera i opcija segmenata.
+  1. **Uklanjanje MixerPanel-a:** Potpuno je uklonjen donji panel sa mikserom i formom za render, čime je oslobođeno preko 200px vertikalnog prostora i plejeru omogućena prirodna visina.
+  2. **Integracija akcija u zaglavlje:** Sve glavne akcije (Sačuvaj nacrt, Generiši ceo glas, Renderuj video) i dropdown za odabir globalnog TTS glasa su premešteni u zaglavlje projekta na vrhu ekrana, koje sada služi kao kompaktni kontrolni centar.
+  3. **Integracija slajdera jačine zvuka u plejer:** Kontrole jačine zvuka za pozadinsku muziku i srpski AI glas su premeštene direktno u kontrolnu traku video plejera u vidu dva tanka horizontalna slajdera.
+  4. **Sužavanje globalnog Navbar-a:** Smanjen je padding globalnog hedera sa `16px 24px` na `8px 20px` u [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx).
+  5. **Fiksiranje visine i body lock:** Glavni kontejner `.glass-container.studio-layout` u [App.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/App.jsx) popunjava tačnu visinu ekrana `calc(100vh - 32px)` sa marginom od `16px auto` i onemogućenim spoljnim prelivanjem (`overflow: hidden`). Telo stranice (`body`) dobija `overflow: hidden` u studio modu pomoću CSS `:has()` selektora.
+  6. **Interni skrol u Segment Editoru:** Kartica `.segment-editor-card` u [SegmentRow.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/SegmentRow.jsx) je zaključana na 100% visine sa unutrašnjim custom scrollbar-om za tab sadržaj.
+  7. **Verifikacija:** Vite produkcioni build uspešno prolazi bez sintaksnih ili import grešaka.
+
 ## [2026-06-05 08:36:00] Premeštanje objašnjenja glosara u tajnu dokumentaciju (sicret doc)
 - **Opis:**
   Uklonjen je javni dokument `objasnjenje_glosara.md` iz korena projekta kako ne bi bio poslat na GitHub, i prebačen u izolovano skladište dokumentacije.

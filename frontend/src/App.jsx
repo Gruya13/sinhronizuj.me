@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
-  Play, Pause, Loader2, CheckCircle2, Paperclip, ArrowRight, Video
+  Play, Pause, Loader2, CheckCircle2, Paperclip, ArrowRight, Video,
+  FolderOpen, Plus, ChevronDown, Check, LayoutDashboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudio } from './context/StudioContext';
@@ -12,7 +13,6 @@ import HardwareMonitor from './components/Common/HardwareMonitor';
 import ProjectList from './components/Dashboard/ProjectList';
 import Timeline from './components/Studio/Timeline';
 import SegmentRow from './components/Studio/SegmentRow';
-import MixerPanel from './components/Studio/MixerPanel';
 import LoginRegister from './components/Auth/LoginRegister';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
@@ -41,9 +41,12 @@ function App() {
     shouldFocusTextarea, setShouldFocusTextarea,
     currentTime, setCurrentTime,
     isPlaying, setIsPlaying,
-    bgVolume,
-    dubVolume,
+    bgVolume, setBgVolume,
+    dubVolume, setDubVolume,
+    handleRenderProject,
     probniAudios,
+    projects,
+    handleSelectProject,
     costs,
     activeAudioSource, setActiveAudioSource,
     videoRef,
@@ -64,6 +67,21 @@ function App() {
   // Lokalna klijentska stanja za pretragu/unos URL-a
   const { url, setUrl } = useStudio();
   const [videoDuration, setVideoDuration] = useState(0);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const projectDropdownRef = useRef(null);
+
+  // Zatvaranje dropdown-a za projekte klikom van njega
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target)) {
+        setProjectDropdownOpen(false);
+      }
+    };
+    if (projectDropdownOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [projectDropdownOpen]);
 
   // Praćenje vremena video reprodukcije i sinhronizacija zvuka
   useEffect(() => {
@@ -357,6 +375,8 @@ function App() {
     return <LoginRegister />;
   }
 
+  const inStudioMode = project && !loading && !videoUrl;
+
   return (
     <>
       <div className="aurora-bg">
@@ -365,7 +385,26 @@ function App() {
         <div className="aurora-blob aurora-blob-3"></div>
       </div>
 
-      <div className="glass-container studio-layout" style={{ maxWidth: '1800px', width: 'calc(100% - 48px)', margin: '24px auto' }}>
+      <div 
+        className="glass-container studio-layout" 
+        style={inStudioMode ? {
+          maxWidth: 'none',
+          width: '100vw',
+          height: '100vh',
+          margin: '0',
+          borderRadius: '0',
+          border: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          padding: '12px 16px 16px 16px',
+          gap: '12px'
+        } : { 
+          maxWidth: '1800px', 
+          width: 'calc(100% - 48px)', 
+          margin: '24px auto' 
+        }}
+      >
         
         {/* GLOBALNI HEADER (NAVBAR) */}
         <Header />
@@ -571,26 +610,256 @@ function App() {
               exit={{ opacity: 0, scale: 0.99 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="studio-v2-container" 
-              style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: '1 1 0%', overflow: 'hidden', height: '100%' }}
             >
               
-              {/* STUDIO HEADER SA DUGMETOM NAZAD */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {/* STUDIO HEADER SA AKCIJAMA I DUGMETOM NAZAD */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '8px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap', gap: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#f1f5f9' }}>📁 Projekat: {project.name || "Bez naziva"}</span>
-                  <span className="status-badge active" style={{ fontSize: '10px' }}>Aktivan radni prostor</span>
+                  {/* Dropdown za projekte */}
+                  <div ref={projectDropdownRef} style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        color: '#fff',
+                        fontFamily: 'Outfit',
+                        fontWeight: '600',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.2s',
+                        outline: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                      }}
+                    >
+                      <FolderOpen size={14} className="text-violet-400" />
+                      <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {project ? project.name : "Bez naziva"}
+                      </span>
+                      <ChevronDown size={12} style={{ transform: projectDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    </button>
+
+                    <AnimatePresence>
+                      {projectDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                          transition={{ duration: 0.15 }}
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 6px)',
+                            left: 0,
+                            width: '260px',
+                            background: 'rgba(15, 23, 42, 0.95)',
+                            backdropFilter: 'blur(16px)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '12px',
+                            padding: '6px',
+                            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(139, 92, 246, 0.03)',
+                            zIndex: 1000,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                          }}
+                        >
+                          {/* STAVKA: DASHBOARD */}
+                          <button
+                            onClick={() => {
+                              resetStudio();
+                              setProjectDropdownOpen(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              width: '100%',
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#94a3b8',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              textAlign: 'left',
+                              transition: 'all 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = '#94a3b8';
+                            }}
+                          >
+                            <LayoutDashboard size={14} />
+                            <span>Svi Projekti (Dashboard)</span>
+                          </button>
+
+                          <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '4px 2px' }} />
+
+                          {/* LISTA PROJEKATA */}
+                          <div 
+                            style={{ 
+                              maxHeight: '200px', 
+                              overflowY: 'auto',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px',
+                              paddingRight: '2px'
+                            }}
+                          >
+                            {projects && projects.length === 0 ? (
+                              <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
+                                Nema kreiranih projekata
+                              </div>
+                            ) : (
+                              projects && projects.map((proj) => {
+                                const isActive = project && project.project_id === proj.id;
+                                let statusColor = '#94a3b8';
+                                if (proj.status === 'analyzing') statusColor = '#06b6d4';
+                                else if (proj.status === 'ready') statusColor = '#8b5cf6';
+                                else if (proj.status === 'completed') statusColor = '#10b981';
+
+                                return (
+                                  <button
+                                    key={proj.id}
+                                    onClick={() => {
+                                      handleSelectProject(proj);
+                                      setProjectDropdownOpen(false);
+                                    }}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px',
+                                      width: '100%',
+                                      background: isActive ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                                      border: 'none',
+                                      color: isActive ? '#c084fc' : '#cbd5e1',
+                                      padding: '8px 12px',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.8rem',
+                                      fontWeight: isActive ? '700' : '500',
+                                      textAlign: 'left',
+                                      transition: 'all 0.15s',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                                      e.currentTarget.style.color = '#fff';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = isActive ? 'rgba(139, 92, 246, 0.1)' : 'transparent';
+                                      e.currentTarget.style.color = isActive ? '#c084fc' : '#cbd5e1';
+                                    }}
+                                  >
+                                    <div 
+                                      style={{ 
+                                        width: '6px', 
+                                        height: '6px', 
+                                        borderRadius: '50%', 
+                                        background: statusColor,
+                                        flexShrink: 0
+                                      }} 
+                                    />
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                                      {proj.name}
+                                    </span>
+                                    {isActive && <Check size={12} style={{ flexShrink: 0 }} />}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.05)', margin: '4px 2px' }} />
+
+                          {/* KREIRAJ NOVI */}
+                          <button
+                            onClick={() => {
+                              setIsCreateModalOpen(true);
+                              setProjectDropdownOpen(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              width: '100%',
+                              background: 'rgba(139, 92, 246, 0.1)',
+                              border: '1px dashed rgba(139, 92, 246, 0.3)',
+                              color: '#a78bfa',
+                              padding: '8px 12px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              textAlign: 'left',
+                              transition: 'all 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)';
+                              e.currentTarget.style.color = '#a78bfa';
+                            }}
+                          >
+                            <Plus size={14} />
+                            <span>Novi Projekat...</span>
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  
+                  <span className="status-badge active" style={{ fontSize: '9px', padding: '2px 6px' }}>Studio</span>
                 </div>
-                <button onClick={resetStudio} className="back-btn" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}>
-                  Nazad na projekte
-                </button>
+                
+                {/* AKCIJE NA DESNOJ STRANI */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Renderuj video dugme */}
+                  <button 
+                    onClick={handleRenderProject}
+                    className="glow-button"
+                    style={{ background: '#22c55e', fontSize: '0.75rem', padding: '6px 12px', borderRadius: '8px', boxShadow: '0 0 10px rgba(34, 197, 94, 0.2)' }}
+                  >
+                    Renderuj Video
+                  </button>
+
+                  <div style={{ width: '1px', height: '18px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+
+                  {/* Nazad dugme */}
+                  <button onClick={resetStudio} className="back-btn" style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', transition: 'all 0.2s' }}>
+                    Nazad
+                  </button>
+                </div>
               </div>
               
               {/* Gornji radni blok: Video i Forma */}
-              <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+              <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', flex: '1 1 0%', minHeight: 0, overflow: 'hidden' }}>
                 
                 {/* Leva strana: Preview Player */}
-                <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div className="video-frame" style={{ width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '12px', overflow: 'hidden' }}>
+                <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', overflow: 'hidden', minWidth: 0 }}>
+                  <div className="video-frame" style={{ width: '100%', flex: '1 1 0%', minHeight: 0, background: '#000', borderRadius: '12px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                     <video 
                       ref={videoRef}
                       src={project.video_url || `${API_BASE_URL}/videos/${project.video_path.split('/').pop()}`}
@@ -620,7 +889,7 @@ function App() {
                   </div>
                   
                   {/* Kontrole plejera */}
-                  <div className="video-player-controls" style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '5px 10px' }}>
+                  <div className="video-player-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '2px 4px' }}>
                     <button 
                       onClick={togglePlay} 
                       className="play-pause-btn"
@@ -633,52 +902,35 @@ function App() {
                       {formatTime(currentTime)} / {formatTime(videoDuration || getVideoDuration())}
                     </div>
 
-                    {/* Biranje primarnog audia za preslušavanje */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '8px', marginLeft: '12px' }}>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '600' }}>Primarni zvuk:</span>
-                      <button
-                        onClick={() => setActiveAudioSource("original")}
-                        style={{
-                          background: activeAudioSource === "original" ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
-                          border: activeAudioSource === "original" ? '1px solid #8b5cf6' : '1px solid transparent',
-                          color: activeAudioSource === "original" ? '#c084fc' : '#94a3b8',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        Original (ENG)
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!dubbedAudioUrl) {
-                            alert("Molimo vas da prvo generišete glas za ceo video klikom na 'Generiši Glas za Ceo Video' na dnu desnog panela.");
-                            return;
-                          }
-                          setActiveAudioSource("dubbed");
-                        }}
-                        style={{
-                          background: activeAudioSource === "dubbed" ? 'rgba(34, 197, 94, 0.25)' : 'transparent',
-                          border: activeAudioSource === "dubbed" ? '1px solid #22c55e' : '1px solid transparent',
-                          color: activeAudioSource === "dubbed" ? '#4ade80' : '#94a3b8',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          fontWeight: 'bold',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        AI Sinhronizovano (SR)
-                      </button>
+                    {/* Mikser jačine zvuka integrisan u plejer */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Muzika:</span>
+                        <input 
+                          type="range" 
+                          min="-30" 
+                          max="10" 
+                          step="1"
+                          value={bgVolume} 
+                          onChange={(e) => setBgVolume(parseInt(e.target.value))}
+                          style={{ width: '80px', accentColor: '#8b5cf6', height: '4px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.7rem', color: '#cbd5e1', width: '30px', fontFamily: 'monospace', textAlign: 'right' }}>{bgVolume}dB</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>AI Glas:</span>
+                        <input 
+                          type="range" 
+                          min="-15" 
+                          max="15" 
+                          step="1"
+                          value={dubVolume} 
+                          onChange={(e) => setDubVolume(parseInt(e.target.value))}
+                          style={{ width: '80px', accentColor: '#22c55e', height: '4px', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.7rem', color: '#cbd5e1', width: '30px', fontFamily: 'monospace', textAlign: 'right' }}>{dubVolume}dB</span>
+                      </div>
                     </div>
-
-                    <span style={{ fontSize: '0.8rem', background: 'rgba(255,255,255,0.05)', padding: '4px 10px', borderRadius: '6px', marginLeft: 'auto', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      💡 Klikni na vremensku osu ispod da premotaš
-                    </span>
                   </div>
                 </div>
 
@@ -689,8 +941,7 @@ function App() {
               {/* TIMELINE (VREMENSKA LINIJA SA TRAKAMA) */}
               <Timeline />
 
-              {/* Donji kontrolni blok: Mikser i Podešavanje glasa + Render dugme */}
-              <MixerPanel />
+
 
             </motion.div>
           )}

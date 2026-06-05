@@ -198,7 +198,7 @@ export default function LoginRegister() {
                 name="email"
                 type="email"
                 required
-                autocomplete="username"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ime@primer.com"
@@ -258,7 +258,7 @@ export default function LoginRegister() {
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 required
-                autocomplete={isLogin ? 'current-password' : 'new-password'}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"

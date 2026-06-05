@@ -1244,3 +1244,47 @@ input:checked + .slider:before {
   color: #f8fafc;
   font-family: monospace;
 }
+
+/* Custom scrollbar za Segment Editor tab sadržaj */
+.segment-editor-card div::-webkit-scrollbar {
+  width: 6px;
+}
+
+.segment-editor-card div::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+.segment-editor-card div::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
+}
+
+.segment-editor-card div::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Onemogućavanje skrolovanja body-ja kada je aktiviran fiksni Studio layout */
+body:has(.studio-layout[style*="height"]) {
+  overflow: hidden;
+}
+
+/* Custom horizontalni scrollbar za Vremensku Liniju */
+.timeline-card::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline-card::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+.timeline-card::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
+}
+
+.timeline-card::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
