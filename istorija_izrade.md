@@ -2079,14 +2079,18 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ažuriranje:** Promene su komitovane i gurnute na GitHub, a zatim povučene na serveru (`git pull`) uz restart `sinhronizuj-api` kontejnera kako bi se primenilo novo trajanje URL-ova.
 - **Status:** Završeno. Bezbednosne optimizacije su u potpunosti sprovedene, a SSH ključevi funkcionišu ispravno.
 
-### 08.06.2026. 21:48 — Integracija Cloudflare DNS-01 i Priprema Nginx-a za SSL
-- **Zahtevi:** Povezivanje domena preko Cloudflare API-ja za DNS upravljanje i priprema za SSL sertifikaciju (HTTPS) za domene `sinhronizuj.me`, `api.sinhronizuj.me` i `www.sinhronizuj.me`.
+### 08.06.2026. 21:48 — Integracija Cloudflare, SSL Izdavanje i Produkcijski Build Frontenda
+- **Zahtevi:** Povezivanje domena preko Cloudflare-a, automatska SSL sertifikacija (HTTPS), build React klijentske aplikacije sa novim API URL-om i podela Nginx serviranja za domene `sinhronizuj.me`, `api.sinhronizuj.me` i `www.sinhronizuj.me`.
 - **Urađeno:**
-    * **Nginx Konfiguracija (`/etc/nginx/sites-available/sinhronizuj.me`):** Ažuriran konfiguracioni fajl na serveru. Zamenjen `server_name _` sa eksplicitnim nazivima domena (`sinhronizuj.me api.sinhronizuj.me www.sinhronizuj.me`). Konfiguracija je testirana i Nginx je uspešno učitao izmene.
-    * **Certbot Cloudflare Plugin:** Instaliran `python3-certbot-dns-cloudflare` paket na Hetzner serveru.
-    * **Konfiguracioni fajl za API Token (`/root/cloudflare.ini`):** Kreiran fajl sa novim Cloudflare API tokenom za upravljanje DNS-om koji je korisnik prosledio, i zaštićen restriktivnim permisijama (`chmod 600`).
-    * **Analiza i Dijagnostika:** Utvrđeno je da Let's Encrypt ne uspeva da potvrdi vlasništvo nad domenom jer autoritativni DNS serveri `.me` registra (`a0.nic.me` itd.) još uvek nisu osvežili zonu (i dalje delegiraju na Loopia nameservere), iako WHOIS već prikazuje Cloudflare. Sve je spremno za generisanje sertifikata čim registar osveži zonu.
-- **Status:** U toku (čeka se DNS propagacija kod registra).
+    * **Konfiguracija Frontenda (`frontend/.env`):** Ažuriran lokalni `.env` fajl i kreiran istoimeni fajl na serveru sa produkcionom adresom `VITE_API_URL=https://api.sinhronizuj.me`.
+    * **Node.js i NPM instalacija:** Instalirane najnovije verzije Node.js (v22.22.1) i NPM (9.2.0) na Hetzner serveru.
+    * **Produkcijski Build Frontenda:** Pokrenut `npm install` i `npm run build` u `/opt/sinhronizuj.me/frontend` na serveru, čime su uspešno izgenerisani statički fajlovi u `dist/` direktorijumu.
+    * **Razdvajanje Nginx Server Blokova:** Rekonfigurisana Nginx lokacija `/etc/nginx/sites-available/sinhronizuj.me`. Kreirana su dva zasebna `server` bloka: jedan za API (`api.sinhronizuj.me`) koji proksira na port `8000`, i drugi za frontend (`sinhronizuj.me` i `www.sinhronizuj.me`) koji direktno servira fajlove iz `frontend/dist` foldera sa podrškom za React Router.
+    * **SSL Sertifikati (Let's Encrypt):** Nakon što se DNS u potpunosti propagirao na javne servere (poput Google DNS-a), pokrenuta je Certbot komanda za preuzimanje i instalaciju SSL-a. Sertifikati su uspešno izdati i automatski integrisani u Nginx za sva 3 domena.
+    * **Aktivacija Cloudflare Proxy-ja:** Pokrenuta je namenska Python skripta `scratch/cloudflare_enable_proxy.py` koja je automatski prebacila sve A i wildcard zapise u **Proxied** režim (narandžasti oblaci) na Cloudflare-u.
+    * **Verifikacija:** Eksterni `curl` testovi ka `https://sinhronizuj.me` i `https://api.sinhronizuj.me` su potvrdili da i frontend i backend uspešno i bezbedno rade preko HTTPS protokola i Cloudflare-a.
+- **Status:** Završeno. Produkcijski sistem je 100% spreman i operativan na HTTPS adresama.
+
 
 
 
