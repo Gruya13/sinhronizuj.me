@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sinhronizuj-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sinhronizuj_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-sinhronizuj_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: sinhronizuj-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP} --appendonly yes
+
+  minio:
+    image: minio/minio
+    container_name: sinhronizuj-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-sinhronizuj_storage}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-sinhronizuj_pass_2026}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  api:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: sinhronizuj-api
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+    restart: always
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ../../temp_workspace:/app/temp_workspace
+      - ../../:/app
+
+  worker-analyzer:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: sinhronizuj-worker-analyzer
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q analyze_queue
+    env_file:
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+    restart: always
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ../../temp_workspace:/app/temp_workspace
+      - ../../:/app
+
+  worker-renderer:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: sinhronizuj-worker-renderer
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q render_queue
+    env_file:
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+    restart: always
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ../../temp_workspace:/app/temp_workspace
+      - ../../:/app
+
+  worker-default:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: sinhronizuj-worker-default
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=2 -Q default_queue
+    env_file:
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+    restart: always
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ../../temp_workspace:/app/temp_workspace
+      - ../../:/app
+
+  beat:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
+    container_name: sinhronizuj-beat
+    command: celery -A backend.worker.tasks beat --loglevel=info
+    env_file:
+      - ../../.env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+    restart: always
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ../../temp_workspace:/app/temp_workspace
+
+volumes:
+  postgres_data:
+  minio_data:

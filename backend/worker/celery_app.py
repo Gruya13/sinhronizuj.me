@@ -20,6 +20,12 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="Europe/Belgrade",
     enable_utc=True,
+    task_routes={
+        "analyze_video_task": {"queue": "analyze_queue"},
+        "render_video_task": {"queue": "render_queue"},
+        "process_video_task": {"queue": "render_queue"},
+        "backend.worker.tasks.cleanup_old_files": {"queue": "default_queue"},
+    },
 )
 
 # Zadatak 3: Celery Beat konfiguracija za čišćenje SSD-a (svake noći u 03:00)

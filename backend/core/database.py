@@ -5,8 +5,8 @@ from backend.core.config import settings
 # Inicijalizacija SQLAlchemy konekcije sa PostgreSQL bazom
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=25,
+    max_overflow=50,
     pool_recycle=3600,
     pool_pre_ping=True
 )
