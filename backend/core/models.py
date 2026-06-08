@@ -71,3 +71,12 @@ class Glossary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="glossaries")
+
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="pending") # pending, approved, rejected
+

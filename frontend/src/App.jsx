@@ -14,10 +14,12 @@ import ProjectList from './components/Dashboard/ProjectList';
 import Timeline from './components/Studio/Timeline';
 import SegmentRow from './components/Studio/SegmentRow';
 import LoginRegister from './components/Auth/LoginRegister';
+import LandingPage from './components/Landing/LandingPage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
 function App() {
+  const [showLogin, setShowLogin] = useState(false);
   const {
     user,
     showProjectsList,
@@ -372,7 +374,10 @@ function App() {
   const noVocalsAudioUrl = project?.no_vocals_url || (noVocalsFilename ? `${API_BASE_URL}/videos/${noVocalsFilename}` : null);
 
   if (!user) {
-    return <LoginRegister />;
+    if (showLogin) {
+      return <LoginRegister onBack={() => setShowLogin(false)} />;
+    }
+    return <LandingPage onEnterLogin={() => setShowLogin(true)} />;
   }
 
   const inStudioMode = project && !loading && !videoUrl;

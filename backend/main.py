@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from backend.worker.celery_app import celery_app
 from backend.core.config import settings
 from backend.core.database import engine, get_db, Base
-from backend.core.models import User, Project, Segment, Glossary
+from backend.core.models import User, Project, Segment, Glossary, Waitlist
 from backend.core.auth import get_password_hash, verify_password, create_access_token, get_current_user
 from botocore.config import Config
 
@@ -83,6 +83,10 @@ class UserLoginRequest(BaseModel):
     email: str
     password: str
 
+class WaitlistRequest(BaseModel):
+    email: str
+
+
 class VideoRequest(BaseModel):
     url: str
     debug: bool = False
@@ -137,6 +141,39 @@ class MixerSettingsRequest(BaseModel):
 @app.get("/")
 def read_root():
     return {"message": "Sinhronizuj.me API je aktivan i ažuriran na v2.0 (Dvofazni, PostgreSQL, JWT)!"}
+
+@app.post("/api/v1/waitlist")
+@limiter.limit("5/minute")
+def add_to_waitlist(request: Request, data: WaitlistRequest, db: Session = Depends(get_db)):
+    """
+    Dodavanje korisnika na listu čekanja (Waitlist) za zatvorenu betu.
+    """
+    # Normalizacija email adrese
+    email_clean = data.email.strip().lower()
+    
+    # Validacija email formata
+    email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if not re.match(email_regex, email_clean):
+        raise HTTPException(status_code=400, detail="Neispravan format email adrese.")
+        
+    # Provera da li je već na listi čekanja
+    existing_waitlist = db.query(Waitlist).filter(Waitlist.email == email_clean).first()
+    if existing_waitlist:
+        raise HTTPException(status_code=400, detail="Ovaj email je već prijavljen na listu čekanja.")
+        
+    # Provera da li već postoji ulogovani nalog sa tim emailom
+    existing_user = db.query(User).filter(User.email == email_clean).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Korisnik sa ovim email-om već ima otvoren nalog. Prijavite se.")
+        
+    # Dodavanje u bazu
+    new_entry = Waitlist(email=email_clean)
+    db.add(new_entry)
+    db.commit()
+    db.refresh(new_entry)
+    
+    return {"status": "success", "message": "Uspešno ste se prijavili na listu čekanja."}
+
 
 @app.post("/api/v1/auth/register")
 @limiter.limit("10/minute")

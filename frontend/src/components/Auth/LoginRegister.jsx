@@ -3,7 +3,7 @@ import { useStudio } from '../../context/StudioContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Loader2, KeyRound, Mail, AlertCircle, Sparkles } from 'lucide-react';
 
-export default function LoginRegister() {
+export default function LoginRegister({ onBack }) {
   const { handleLogin, handleRegister, error, setError } = useStudio();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -104,8 +104,38 @@ export default function LoginRegister() {
           boxSizing: 'border-box'
         }}
       >
+        {/* DUGME NAZAD NA LANDING */}
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              left: '24px',
+              background: 'none',
+              border: 'none',
+              color: '#9ca3af',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'color 0.2s',
+              padding: 0,
+              fontFamily: 'inherit',
+              zIndex: 10
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#9ca3af'}
+          >
+            ← Nazad
+          </button>
+        )}
+
         {/* LOGO */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px', marginTop: onBack ? '12px' : '0px' }}>
           <div
             style={{
               display: 'inline-flex',
