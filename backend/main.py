@@ -49,7 +49,7 @@ def get_redis_client():
     redis_host = match.group(1) if match else "redis"
     return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
 
-def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: int = 86400) -> str:
+def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: int = 3600) -> str:
     if not object_key:
         return ""
     if object_key.startswith("http://") or object_key.startswith("https://"):
