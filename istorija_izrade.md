@@ -2091,6 +2091,20 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Eksterni `curl` testovi ka `https://sinhronizuj.me` i `https://api.sinhronizuj.me` su potvrdili da i frontend i backend uspešno i bezbedno rade preko HTTPS protokola i Cloudflare-a.
 - **Status:** Završeno. Produkcijski sistem je 100% spreman i operativan na HTTPS adresama.
 
+### 09.06.2026. 05:10 — Uklanjanje Demo Miksera i Serverless kartice sa Landing Stranice
+- **Zahtevi:** Na osnovu vizuelnih zahteva korisnika sa priloženih screenshot-ova, uklonjen je interaktivni audio mikser (Live Demo sekcija) i četvrta kartica ("Hibridna Snaga Cloud Serverless-a") iz sekcije karakteristika.
+- **Urađeno:**
+    * **LandingPage.jsx ([LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx)):**
+        * Uklonjena kompletna sekcija `{/* 3. INTERAKTIVNI LIVE DEMO (AUDIO MIKSER) */}`.
+        * Uklonjena stanja (`isPlaying`, `originalVolume`, `dubbedVolume`), reference na audio fajlove i `useEffect` hookovi za inicijalizaciju/sinhronizaciju audia na klijentu.
+        * Obrisana pomoćna funkcija `renderWaveformBars`.
+        * Uklonjena četvrta kartica o hibridnoj cloud serverless arhitekturi iz sekcije tehničkih karakteristika.
+        * Prilagođen raspored preostale 3 kartice da se automatski i responzivno prikazuju u 3 kolone na desktop ekranima (`gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))'`).
+        * Očišćeni neiskorišćeni uvozi ikona iz `lucide-react` (Volume2, Play, Pause, AudioLines).
+    * **Verifikacija:** Pokrenut lokalni klijentski build (`npm run build`) koji prolazi uspešno bez grešaka.
+- **Status:** Završeno. Landing stranica je vizuelno pojednostavljena prema zahtevima.
+
+
 
 
 

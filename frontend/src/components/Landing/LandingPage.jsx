@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Sparkles, Mail, Loader2, CheckCircle2, Volume2, 
-  Play, Pause, ArrowRight, Mic, Settings, Cpu, 
-  Check, Lock, ShieldCheck, HelpCircle, AudioLines
+  Sparkles, Mail, Loader2, CheckCircle2, 
+  ArrowRight, Mic, Settings, Cpu, 
+  Check, Lock, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,76 +15,7 @@ export default function LandingPage({ onEnterLogin }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  // Stanja za audio demo mikser
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [originalVolume, setOriginalVolume] = useState(70);
-  const [dubbedVolume, setDubbedVolume] = useState(30);
-  
-  const audioEnRef = useRef(null);
-  const audioSrRef = useRef(null);
-  const syncIntervalRef = useRef(null);
 
-  // Inicijalizacija audio objekata na klijentu
-  useEffect(() => {
-    audioEnRef.current = new Audio('/demo/demo_en.mp3');
-    audioSrRef.current = new Audio('/demo/demo_sr.mp3');
-    audioEnRef.current.loop = true;
-    audioSrRef.current.loop = true;
-
-    // Postavljanje početnog volumena
-    audioEnRef.current.volume = originalVolume / 100;
-    audioSrRef.current.volume = dubbedVolume / 100;
-
-    return () => {
-      if (audioEnRef.current) audioEnRef.current.pause();
-      if (audioSrRef.current) audioSrRef.current.pause();
-      if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
-    };
-  }, []);
-
-  // Sinhronizacija jačine zvuka sa stanjem
-  useEffect(() => {
-    if (audioEnRef.current) {
-      audioEnRef.current.volume = originalVolume / 100;
-    }
-  }, [originalVolume]);
-
-  useEffect(() => {
-    if (audioSrRef.current) {
-      audioSrRef.current.volume = dubbedVolume / 100;
-    }
-  }, [dubbedVolume]);
-
-  // Reprodukcija / pauza
-  const handleTogglePlay = () => {
-    if (!audioEnRef.current || !audioSrRef.current) return;
-
-    if (isPlaying) {
-      audioEnRef.current.pause();
-      audioSrRef.current.pause();
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current);
-      }
-    } else {
-      // Kada krećemo ispočetka, resetujemo poziciju
-      audioEnRef.current.currentTime = 0;
-      audioSrRef.current.currentTime = 0;
-
-      audioEnRef.current.play().catch(err => console.error("Greška pri puštanju EN audia:", err));
-      audioSrRef.current.play().catch(err => console.error("Greška pri puštanju SR audia:", err));
-
-      // Periodična resinhronizacija ako audio fajlovi pobegnu za više od 120ms
-      syncIntervalRef.current = setInterval(() => {
-        if (audioEnRef.current && audioSrRef.current) {
-          const diff = Math.abs(audioEnRef.current.currentTime - audioSrRef.current.currentTime);
-          if (diff > 0.12) {
-            audioSrRef.current.currentTime = audioEnRef.current.currentTime;
-          }
-        }
-      }, 400);
-    }
-    setIsPlaying(!isPlaying);
-  };
 
   // Slanje forme za listu čekanja
   const handleWaitlistSubmit = async (e) => {
@@ -119,26 +50,7 @@ export default function LandingPage({ onEnterLogin }) {
     }
   };
 
-  // Generiše talasiće za demo vizuelni mikser
-  const renderWaveformBars = () => {
-    const bars = [];
-    for (let i = 0; i < 24; i++) {
-      const height = isPlaying ? Math.floor(Math.random() * 35) + 5 : 4;
-      bars.push(
-        <div 
-          key={i} 
-          style={{
-            width: '3px',
-            height: `${height}px`,
-            background: isPlaying ? 'linear-gradient(to top, #8b5cf6, #06b6d4)' : 'rgba(255,255,255,0.15)',
-            borderRadius: '2px',
-            transition: 'height 0.15s ease'
-          }}
-        />
-      );
-    }
-    return bars;
-  };
+
 
   return (
     <div style={{ color: '#fff', fontFamily: 'Outfit, Inter, sans-serif', overflowX: 'hidden' }}>
@@ -401,187 +313,7 @@ export default function LandingPage({ onEnterLogin }) {
           </span>
         </section>
 
-        {/* 3. INTERAKTIVNI LIVE DEMO (AUDIO MIKSER) */}
-        <section style={{
-          padding: '20px 5% 100px 5%',
-          maxWidth: '1200px',
-          margin: '0 auto',
-          position: 'relative',
-          zIndex: 2
-        }}>
-          <h2 style={{
-            fontSize: '2rem',
-            fontWeight: 800,
-            textAlign: 'center',
-            marginBottom: '48px',
-            background: 'linear-gradient(to right, #fff, #94a3b8)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px'
-          }}>
-            <AudioLines className="text-cyan-400" /> Doživite AI Sinhronizaciju Uživo
-          </h2>
 
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.4)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            borderRadius: '24px',
-            padding: '40px',
-            boxShadow: '0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 40px rgba(139, 92, 246, 0.02)',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '40px',
-            alignItems: 'center'
-          }} className="demo-grid">
-            
-            {/* Leva strana - Objašnjenje i plejer kontrola */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{
-                background: 'rgba(6, 182, 212, 0.1)',
-                border: '1px solid rgba(6, 182, 212, 0.2)',
-                borderRadius: '8px',
-                padding: '4px 10px',
-                alignSelf: 'flex-start',
-                fontSize: '0.75rem',
-                color: '#22d3ee',
-                fontWeight: 700,
-                textTransform: 'uppercase'
-              }}>
-                Demonstracija u realnom vremenu
-              </div>
-              <h3 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>Kako zvuči klonirani glas?</h3>
-              <p style={{ color: '#94a3b8', lineHeight: 1.6, fontSize: '0.95rem', margin: 0 }}>
-                Kliknite na dugme za reprodukciju i pomerajte slajdere na desnoj strani. Možete potpuno utišati engleski original, pojačati srpski dubbing ili miksovati oba kanala kako biste se uverili u prirodnost glasa i studijski kvalitet obrade.
-              </p>
-
-              {/* Veliko dugme Play/Pause sa animiranim waveformom */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '16px' }}>
-                <button
-                  type="button"
-                  onClick={handleTogglePlay}
-                  style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: isPlaying ? 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    color: '#fff',
-                    boxShadow: isPlaying ? '0 0 20px rgba(236, 72, 153, 0.4)' : '0 10px 20px rgba(139, 92, 246, 0.3)',
-                    transition: 'all 0.25s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                  }}
-                >
-                  {isPlaying ? <Pause size={28} fill="#fff" /> : <Play size={28} fill="#fff" style={{ marginLeft: '4px' }} />}
-                </button>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>
-                    {isPlaying ? 'Zvuk je pokrenut' : 'Klikni za preslušavanje'}
-                  </span>
-                  <div style={{ display: 'flex', gap: '3px', alignItems: 'center', height: '40px' }}>
-                    {renderWaveformBars()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Desna strana - Slajderi za miksovanje */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '20px',
-              padding: '30px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '28px'
-            }}>
-              
-              {/* Slajder 1: Originalna traka (Engleski) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Volume2 size={16} className="text-slate-400" /> ORIGINALNI ENGLESKI VOKAL
-                  </span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#cbd5e1' }}>{originalVolume}%</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  value={originalVolume}
-                  onChange={(e) => setOriginalVolume(Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    accentColor: '#64748b',
-                    cursor: 'pointer',
-                    height: '6px',
-                    borderRadius: '3px'
-                  }}
-                />
-              </div>
-
-              {/* Slajder 2: Srpski AI Dubbing */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#c084fc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Mic size={16} style={{ color: '#a78bfa' }} /> KLONIRANI SRPSKI GLAS (AI DUB)
-                  </span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#c084fc' }}>{dubbedVolume}%</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  value={dubbedVolume}
-                  onChange={(e) => setDubbedVolume(Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    accentColor: '#8b5cf6',
-                    cursor: 'pointer',
-                    height: '6px',
-                    borderRadius: '3px'
-                  }}
-                />
-              </div>
-
-              {/* Objašnjenje harmonizacije i Resemble Enhance */}
-              <div style={{ 
-                marginTop: '10px',
-                paddingTop: '20px', 
-                borderTop: '1px solid rgba(255,255,255,0.05)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  background: isPlaying ? '#34d399' : '#64748b',
-                  boxShadow: isPlaying ? '0 0 10px #34d399' : 'none'
-                }} />
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  Audio se procesira lokalno u vašem pretraživaču. Bez kašnjenja.
-                </span>
-              </div>
-
-            </div>
-
-          </div>
-        </section>
 
         {/* 4. KAKO RADI SEKCIJA */}
         <section style={{
@@ -751,7 +483,7 @@ export default function LandingPage({ onEnterLogin }) {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: '30px'
           }} className="features-grid">
             
@@ -844,37 +576,6 @@ export default function LandingPage({ onEnterLogin }) {
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Kompletan DAW Studio u letu</h3>
                 <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
                   Finopodesite tempo, volume i pitch po segmentu. Sa tehnologijom hot-patching splicinga preslušajte promene istog trenutka bez čekanja na renderovanje.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 4 */}
-            <div className="glass-card" style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-              borderRadius: '20px',
-              padding: '30px',
-              display: 'flex',
-              gap: '20px'
-            }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: '14px',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#10b981',
-                flexShrink: 0
-              }}>
-                <Cpu size={22} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Hibridna Snaga Cloud Serverless-a</h3>
-                <p style={{ color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
-                  Stabilnost Hetzner VPS control plane-a kombinovana je sa serverless snagom GPU klastera na Modal.com (T4, L4, A10G) za instant AI proračune.
                 </p>
               </div>
             </div>
