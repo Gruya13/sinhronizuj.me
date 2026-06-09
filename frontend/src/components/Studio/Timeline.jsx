@@ -603,7 +603,7 @@ export default function Timeline() {
                         return [...prev, seg.id];
                       }
                     });
-                    setSelectedSegmentId(seg.id);
+                    setSelectedSegmentId(seg.id, true);
                   } else {
                     setSelectedSegmentId(seg.id);
                     setSelectedSegmentIds([seg.id]);
@@ -640,14 +640,17 @@ export default function Timeline() {
                 {/* Drag-and-drop i resize kontrole za ivice */}
                 <div 
                   onMouseDown={(e) => handleStartResizeLeft(e, seg)}
+                  data-testid={`resize-left-${seg.id}`}
                   style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
                 />
                 <div 
                   onMouseDown={(e) => handleStartDragMove(e, seg)}
+                  data-testid={`drag-move-${seg.id}`}
                   style={{ position: 'absolute', left: '6px', right: '6px', top: 0, bottom: 0, cursor: 'move', zIndex: 10 }}
                 />
                 <div 
                   onMouseDown={(e) => handleStartResizeRight(e, seg)}
+                  data-testid={`resize-right-${seg.id}`}
                   style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
                 />
 
@@ -746,6 +749,7 @@ export default function Timeline() {
             return (
               <div 
                 key={seg.id}
+                data-testid={`dubbed-segment-${seg.id}`}
                 onMouseEnter={() => setHoveredSegmentId(seg.id)}
                 onMouseLeave={() => setHoveredSegmentId(null)}
                 onClick={(e) => {
@@ -760,7 +764,7 @@ export default function Timeline() {
                         return [...prev, seg.id];
                       }
                     });
-                    setSelectedSegmentId(seg.id);
+                    setSelectedSegmentId(seg.id, true);
                   } else {
                     setSelectedSegmentId(seg.id);
                     setSelectedSegmentIds([seg.id]);

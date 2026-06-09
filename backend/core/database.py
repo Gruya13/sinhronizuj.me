@@ -3,13 +3,19 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from backend.core.config import settings
 
 # Inicijalizacija SQLAlchemy konekcije sa PostgreSQL bazom
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_size=25,
-    max_overflow=50,
-    pool_recycle=3600,
-    pool_pre_ping=True
-)
+if settings.DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        settings.DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
+else:
+    engine = create_engine(
+        settings.DATABASE_URL,
+        pool_size=25,
+        max_overflow=50,
+        pool_recycle=3600,
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
