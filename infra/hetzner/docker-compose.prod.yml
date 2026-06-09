@@ -62,7 +62,7 @@ services:
       context: ../../
       dockerfile: Dockerfile
     container_name: sinhronizuj-worker-analyzer
-    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q analyze_queue
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=2 -Q analyze_queue
     env_file:
       - ../../.env
     environment:
@@ -81,12 +81,13 @@ services:
       context: ../../
       dockerfile: Dockerfile
     container_name: sinhronizuj-worker-renderer
-    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q render_queue
+    command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=2 -Q render_queue
     env_file:
       - ../../.env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-sinhronizuj_user}:${POSTGRES_PASSWORD:-sinhronizuj_pass_2026}@db:5432/${POSTGRES_DB:-sinhronizuj_me}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}@redis:6379/0
+
     restart: always
     depends_on:
       - redis
