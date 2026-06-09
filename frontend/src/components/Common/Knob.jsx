@@ -152,6 +152,7 @@ export default function Knob({
       {/* Kružni deo */}
       <div
         ref={knobRef}
+        data-testid="knob-circle"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
         onDoubleClick={handleDoubleClick}

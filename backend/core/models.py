@@ -1,14 +1,48 @@
 import uuid
 from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime, JSON
+from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.core.database import Base
 
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type, otherwise uses CHAR(32), storing as stringhex.
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(CHAR(32))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            if isinstance(value, uuid.UUID):
+                return value
+            return uuid.UUID(value)
+        else:
+            if isinstance(value, uuid.UUID):
+                return value.hex
+            else:
+                return uuid.UUID(value).hex
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(value)
+
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -19,9 +53,9 @@ class User(Base):
 class Project(Base):
     __tablename__ = "projects"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(String, default="empty") # empty, analyzing, ready, completed
     video_title = Column(String, default="")
     
@@ -42,7 +76,7 @@ class Project(Base):
 class Segment(Base):
     __tablename__ = "segments"
 
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
     segment_id = Column(Integer, primary_key=True) # Hronološki indeks (0, 1, 2...) koji se koristi na frontendu
     start = Column(Float, nullable=False)
     end = Column(Float, nullable=False)
@@ -64,8 +98,8 @@ class Segment(Base):
 class Glossary(Base):
     __tablename__ = "glossaries"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     source_word = Column(String, nullable=False)
     target_word = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -75,8 +109,7 @@ class Glossary(Base):
 class Waitlist(Base):
     __tablename__ = "waitlist"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="pending") # pending, approved, rejected
-

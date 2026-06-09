@@ -40,12 +40,14 @@ export function StudioProvider({ children }) {
   const [selectedSegmentId, setSelectedSegmentIdState] = useState(0);
   const [selectedSegmentIds, setSelectedSegmentIds] = useState([]);
 
-  const setSelectedSegmentId = (id) => {
+  const setSelectedSegmentId = (id, keepGroup = false) => {
     setSelectedSegmentIdState(id);
-    setSelectedSegmentIds(prev => {
-      if (prev.includes(id) && prev.length === 1) return prev;
-      return [id];
-    });
+    if (!keepGroup) {
+      setSelectedSegmentIds(prev => {
+        if (prev.includes(id) && prev.length === 1) return prev;
+        return [id];
+      });
+    }
   };
 
   // Undo/Redo istorija
