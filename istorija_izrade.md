@@ -2129,6 +2129,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** HTTPS curl provere na API i frontend potvrđuju da sve radi 100% ispravno.
 - **Status:** Završeno. Produkcija je uspešno preseljena na jači server.
 
+### 09.06.2026. 05:35 — Uspešno Testiranje Opterećenja (Load Testing) na Novom Serveru (CPX32)
+- **Zahtevi:** Pokretanje load testa sa 20 konkurentnih korisnika na novoj HTTPS produkcionoj infrastrukturi (`https://api.sinhronizuj.me`) radi provere stabilnosti i odziva pod opterećenjem.
+- **Urađeno:**
+    * **Instalacija i Pokretanje:** Instaliran `locust` u lokalnom okruženju i pokrenut test u headless režimu u trajanju od 30 sekundi, sa ramp-up brzinom od 2 korisnika u sekundi.
+    * **Ponašanje Servera (Docker Stats):** Prispeće zahteva nije izazvalo nikakvo primetno opterećenje na serveru. API kontejner je bio na maksimalno 0.80% CPU, baza podataka na 0.49% CPU, a ukupna RAM potrošnja svih servisa je ostala bezbedno ispod 800 MiB (od dostupnih 8 GB RAM-a).
+    * **Odziv API-ja (Response Latency):**
+        * **Medijana odziva (50% requests):** 50 ms.
+        * **95. percentil:** 360 ms.
+        * **Prosečno vreme odziva:** 115 ms.
+    * **Verifikacija Bezbednosti (Limiter):** Tokom testa, zabeleženo je tačno 10 odbijenih registracija sa statusom `429 Rate limit exceeded`. Ovo je potvrdilo da SlowAPI i Redis rate-limiter na ruti `/api/v1/auth/register` (limit od 10 registracija po minuti) ispravno rade i štite sistem od brute-force zloupotrebe. Nijedan drugi zahtev nije propao (100% uspešnost za logovanje i kreiranje projekata).
+- **Status:** Završeno. Novi server je stabilan, brz i spreman za close betu.
+
+
 
 
 
