@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, Mail, Loader2, CheckCircle2, 
   ArrowRight, Mic, Settings, Cpu, 
-  Check, Lock, ShieldCheck
+  Check, Lock, ShieldCheck, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

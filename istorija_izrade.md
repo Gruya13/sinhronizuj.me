@@ -2104,6 +2104,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Pokrenut lokalni klijentski build (`npm run build`) koji prolazi uspešno bez grešaka.
 - **Status:** Završeno. Landing stranica je vizuelno pojednostavljena prema zahtevima.
 
+### 09.06.2026. 05:14 — Popravka uvoza Volume2 ikone u LandingPage (Hotfix)
+- **Problem:** Nakon uklanjanja Live Demo miksera, ikonica `Volume2` je greškom izbačena iz uvoza na vrhu fajla [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx), što je uzrokovalo ReferenceError crash jer se ista ikonica koristi u sekciji "Kako radi" pod Korakom 3.
+- **Urađeno:** Vraćen uvoz za `Volume2` ikonicu iz `lucide-react` na vrhu datoteke [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx).
+- **Status:** Završeno. Bag je otklonjen i aplikacija se uspešno učitava.
+
+
 
 
 
