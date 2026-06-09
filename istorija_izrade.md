@@ -2141,6 +2141,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija Bezbednosti (Limiter):** Tokom testa, zabeleženo je tačno 10 odbijenih registracija sa statusom `429 Rate limit exceeded`. Ovo je potvrdilo da SlowAPI i Redis rate-limiter na ruti `/api/v1/auth/register` (limit od 10 registracija po minuti) ispravno rade i štite sistem od brute-force zloupotrebe. Nijedan drugi zahtev nije propao (100% uspešnost za logovanje i kreiranje projekata).
 - **Status:** Završeno. Novi server je stabilan, brz i spreman za close betu.
 
+### 09.06.2026. 05:42 — Izrada Detaljne Analize Testiranja Opterećenja u sicret doc
+- **Zahtevi:** Izrada detaljnog izveštaja i tehničke analize stabilnosti i opterećenja u novom dokumentu unutar tajne dokumentacije (`sicret doc`).
+- **Urađeno:**
+    * **Izrada Dokumenta:** Kreiran je novi markdown dokument `analiza_testiranja_cpx32.md` unutar [sicret doc direktorijuma](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc).
+    * **Sadržaj Analize:** Dokument detaljno opisuje specifikacije novog produkcijskog okruženja (CPX32 server), metodologiju testiranja opterećenja sa 20 konkurentnih korisnika preko Locust-a, zbirne rezultate latencije odziva (medijana 50ms, prosek 115ms), analizu bezbednosnih limiter rute, kao i monitoring potrošnje resursa na serveru u piku opterećenja.
+- **Status:** Završeno. Dokumentacija je ažurirana.
+
+
 
 
 
