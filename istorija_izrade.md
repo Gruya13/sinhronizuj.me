@@ -2109,6 +2109,27 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:** Vraćen uvoz za `Volume2` ikonicu iz `lucide-react` na vrhu datoteke [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx).
 - **Status:** Završeno. Bag je otklonjen i aplikacija se uspešno učitava.
 
+### 09.06.2026. 05:28 — Migracija Produkcije na Jači Hetzner Server (CPX32) i Uvođenje Main Grane
+- **Zahtevi:** Zamena uloga servera (prelazak na jači CPX32 server `178.104.214.78` za produkciju i prebacivanje slabijeg servera na development/dev status) i kreiranje stabilne `main` grane za produkcijski spremni kod.
+- **Urađeno:**
+    * **Git Reorganizacija:** Kreirana je nova stabilna grana `main` iz trenutne `development` grane i gurnuta na GitHub.
+    * **Zatvaranje Starih Servisa:** Zaustavljen i uklonjen stari razvojni stak i zasebni `daca-minio` kontejner koji su zauzimali portove na jačem serveru.
+    * **Konfiguracija Servera:**
+        * Podešen produkcioni `.env` fajl sa lokalnim mrežnim putanjama i MinIO/Postgres produkcionim lozinkama.
+        * Kreiran i aktiviran Swap fajl od 4 GB za prevenciju OOM prekida.
+    * **Optimizacija Celery-ja:** Povećana konkurentnost na `--concurrency=2` za analyzer i renderer u `docker-compose.prod.yml` jer jači server raspolaže sa 8GB RAM-a i 4 vCPU.
+    * **Node.js Ažuriranje:** Nadograđen Node.js na verziju v22.22.3 na jačem serveru.
+    * **Nginx Ruting:** Postavljeni zasebni server blokovi za API (proksiranje FastAPI na portu 8000) i frontend (serviranje statičkog builda iz `frontend/dist`).
+    * **Build Frontenda:** Instalirane zavisnosti i pokrenut Vite produkcijski build na serveru.
+    * **DNS i SSL:**
+        * Preusmereni svi A zapisi na Cloudflare-u na novu IP adresu `178.104.214.78` u DNS-only modu.
+        * Certbot je uspešno izdao SSL sertifikate i konfigurisao HTTPS za `sinhronizuj.me`, `api.sinhronizuj.me` i `www.sinhronizuj.me`.
+        * Aktiviran Cloudflare Proxy (narandžasti oblaci) nakon SSL verifikacije.
+    * **Bezbednost:** Uklonjeno SSH logovanje lozinkom (samo SSH ključevi), aktiviran fail2ban i UFW firewall.
+    * **Verifikacija:** HTTPS curl provere na API i frontend potvrđuju da sve radi 100% ispravno.
+- **Status:** Završeno. Produkcija je uspešno preseljena na jači server.
+
+
 
 
 
