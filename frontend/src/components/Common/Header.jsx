@@ -11,22 +11,7 @@ export default function Header() {
   } = useStudio();
 
   return (
-    <header 
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '8px 20px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-        background: 'rgba(15, 23, 42, 0.2)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '24px 24px 0 0',
-        position: 'relative',
-        zIndex: 999,
-        gap: '20px',
-        flexWrap: 'wrap'
-      }}
-    >
+    <header className="main-header">
       {/* BRANDING / LOGO */}
       <div 
         onClick={resetStudio}
@@ -77,8 +62,9 @@ export default function Header() {
       {/* DESNI DEO: KORISNIČKI PROFIL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderLeft: '1px solid rgba(255, 255, 255, 0.08)', paddingLeft: '16px' }}>
+          <div className="header-user-section">
             <div 
+              className="hide-mobile"
               style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 

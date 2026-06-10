@@ -391,24 +391,7 @@ function App() {
       </div>
 
       <div 
-        className="glass-container studio-layout" 
-        style={inStudioMode ? {
-          maxWidth: 'none',
-          width: '100vw',
-          height: '100vh',
-          margin: '0',
-          borderRadius: '0',
-          border: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          padding: '12px 16px 16px 16px',
-          gap: '12px'
-        } : { 
-          maxWidth: '1800px', 
-          width: 'calc(100% - 48px)', 
-          margin: '24px auto' 
-        }}
+        className={`glass-container studio-layout ${inStudioMode ? 'studio-mode-active' : 'studio-mode-inactive'}`}
       >
         
         {/* GLOBALNI HEADER (NAVBAR) */}
@@ -860,7 +843,7 @@ function App() {
               </div>
               
               {/* Gornji radni blok: Video i Forma */}
-              <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', flex: '1 1 0%', minHeight: 0, overflow: 'hidden' }}>
+              <div className="studio-workspace">
                 
                 {/* Leva strana: Preview Player */}
                 <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', overflow: 'hidden', minWidth: 0 }}>
@@ -908,7 +891,7 @@ function App() {
                     </div>
 
                     {/* Mikser jačine zvuka integrisan u plejer */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+                    <div className="player-mixer-controls">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Muzika:</span>
                         <input 
