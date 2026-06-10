@@ -35,9 +35,15 @@ export default function LoginRegister({ onBack }) {
   };
 
   const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setError(null);
-    setPassword('');
+    if (isLogin) {
+      if (onBack) {
+        onBack();
+      }
+    } else {
+      setIsLogin(true);
+      setError(null);
+      setPassword('');
+    }
   };
 
   return (
