@@ -1,3 +1,18 @@
+## [2026-06-10 09:48:00] Integracija test staka u GitHub Actions CI pipeline
+- **Opis:**
+  Integrisali smo automatsko pokretanje svih testova (pytest, vitest, Playwright) u CI pipeline kako bi se verifikovala stabilnost koda pre merdžovanja u `main` granu.
+  1. **Backend CI (`backend-ci.yml`):**
+     - Dodali smo korake za filtriranje zavisnosti iz `requirements.txt` kako bismo izostavili teške biblioteke (`torch`, `torchaudio`, `demucs`, `torchcodec`) koje se izvršavaju na Modal platformi i nisu potrebne za lokalne API testove.
+     - Konfigurisali smo instalaciju preostalih potrebnih paketa i alata za testiranje (`pytest`, `pytest-mock`, `httpx`).
+     - Dodali smo korak za pokretanje `pytest` testova.
+  2. **Frontend CI (`frontend-ci.yml`):**
+     - Preimenovali smo job u `build-lint-test` kako bi odražavao novi opseg CI provera.
+     - Integrisali smo pokretanje unit i integracionih testova preko Vitest-a (`npm run test`).
+     - Dodali smo instalaciju Playwright pretraživača (samo `chromium` radi optimizacije brzine i resursa).
+     - Integrisali smo pokretanje Playwright E2E testova (`npx playwright test`).
+  3. **Verifikacija:**
+     - Sintaksa oba workflow fajla je uspešno verifikovana i sve zavisnosti su lokalno testirane sa 100% prolaznošću.
+
 ## [2026-06-05 10:27:00] Dinamičko edge-safe pozicioniranje tooltip-a (Sprečavanje odsecanja na ivicama)
 - **Opis:**
   Rešen je problem sa odsecanjem tooltip-a na ivicama ekrana (npr. na samom početku videa na 0.0s) kada se tooltip centrirao i ispadao sa leve strane kontejnera.

@@ -7,7 +7,7 @@ on:
     branches: [ development, main ]
 
 jobs:
-  build-and-lint:
+  build-lint-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,7 +31,23 @@ jobs:
         cd frontend
         npm run lint
 
+    - name: Pokretanje unit testova (Vitest)
+      run: |
+        cd frontend
+        npm run test
+
+    - name: Instalacija Playwright pretraživača
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+
+    - name: Pokretanje E2E testova (Playwright)
+      run: |
+        cd frontend
+        npx playwright test
+
     - name: Build aplikacije
       run: |
         cd frontend
         npm run build
+
