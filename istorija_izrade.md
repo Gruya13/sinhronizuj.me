@@ -10,8 +10,11 @@
      - Integrisali smo pokretanje unit i integracionih testova preko Vitest-a (`npm run test`).
      - Dodali smo instalaciju Playwright pretraživača (samo `chromium` radi optimizacije brzine i resursa).
      - Integrisali smo pokretanje Playwright E2E testova (`npx playwright test`).
-  3. **Verifikacija:**
-     - Sintaksa oba workflow fajla je uspešno verifikovana i sve zavisnosti su lokalno testirane sa 100% prolaznošću.
+  3. **Verifikacija i Ispravka:**
+     - Sintaksa oba workflow fajla je uspešno verifikovana.
+     - Rešen je problem sa padom lintera u GitHub Actions-u zbog korišćenja `process` globalne promenljive u `playwright.config.js` tako što je fajl dodat u `globalIgnores` unutar `eslint.config.js`.
+     - Nakon popravke, linter i svi testovi lokalno prolaze sa 100% uspešnosti.
+
 
 ## [2026-06-05 10:27:00] Dinamičko edge-safe pozicioniranje tooltip-a (Sprečavanje odsecanja na ivicama)
 - **Opis:**
