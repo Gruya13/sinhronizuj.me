@@ -1,3 +1,19 @@
+## [2026-06-10 10:00:00] Preusmeravanje sa registracije u login formi na close beta waitlist i produkcioni deploy
+- **Opis:**
+  Sprečen je problem gde su korisnici tokom faze prikupljanja prijava za close betu mogli da kreiraju nalog kroz formu za prijavu postojećih korisnika i odmah se uloguju na njega.
+  1. **Logika preusmeravanja u `LoginRegister.jsx`:**
+     - Izmenjena je `toggleMode` funkcija u komponenti [LoginRegister.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Auth/LoginRegister.jsx).
+     - Kada je korisnik na formi za prijavu (`isLogin === true`) i klikne na dugme "Kreirajte nalog", umesto prebacivanja na formu za registraciju, sada se poziva `onBack()` povratna funkcija.
+     - Ovo zatvara formu za prijavu i vraća korisnika nazad na [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx) gde se nalazi zvanična forma za prijavu na listu čekanja za close betu (waitlist).
+  2. **Verifikacija:**
+     - Pokrenut je produkcioni Vite build (`npm run build`) koji prolazi bez grešaka za 564ms.
+     - Vitest testovi su uspešno izvršeni sa 100% prolaznošću.
+     - Linter provera (`npm run lint`) potvrđuje da nema grešaka u sintaksi koda.
+  3. **Produkcioni Deploy (Hetzner VPS):**
+     - Povezali smo se na Hetzner VPS (`178.104.214.78`) preko SSH/SCP-a.
+     - Preneli smo izmenjeni [LoginRegister.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Auth/LoginRegister.jsx) i [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md) na odgovarajuće lokacije u `/opt/sinhronizuj-me`.
+     - Pokrenuli smo produkcioni frontend build (`npm run build`) na serveru, čime su novi statički fajlovi uspešno generisani u `/opt/sinhronizuj-me/frontend/dist` i odmah pušteni u rad preko Nginx-a.
+
 ## [2026-06-10 09:48:00] Integracija test staka u GitHub Actions CI pipeline
 - **Opis:**
   Integrisali smo automatsko pokretanje svih testova (pytest, vitest, Playwright) u CI pipeline kako bi se verifikovala stabilnost koda pre merdžovanja u `main` granu.
