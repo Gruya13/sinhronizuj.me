@@ -1,3 +1,15 @@
+## [2026-06-10 10:01:00] Implementacija Continuous Deployment (CD) pipeline-a za Hetzner VPS
+- **Opis:**
+  Uveli smo automatski deployment (CD) u GitHub Actions koji se pokreće nakon svakog `push` događaja na grane `development` i `main`.
+  1. **Novi workflow (`deploy.yml`):**
+     - Kreiran je [.github/workflows/deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) koji se trigeruje na `push` na grane `development` i `main`.
+     - Koristi se akcija `appleboy/ssh-action` za automatsku i sigurnu prijavu na Hetzner VPS preko SSH-a.
+     - Skripta automatski prepoznaje granu koja je trigerovala workflow, radi `git checkout` i `git pull` na toj grani na serveru, i ponovo gradi i podiže produkcione Docker kontejnere (`docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build`).
+  2. **Sigurnost:**
+     - Svi SSH parametri (host, korisničko ime, privatni ključ i port) su parametrizovani kroz tajne GitHub Actions sekrete (`VPS_HOST`, `VPS_USERNAME`, `VPS_SSH_KEY`, `VPS_PORT`).
+  3. **Verifikacija:**
+     - Sintaksa novog workflow fajla je uspešno verifikovana i YAML struktura je validna.
+
 ## [2026-06-10 10:00:00] Preusmeravanje sa registracije u login formi na close beta waitlist i produkcioni deploy
 - **Opis:**
   Sprečen je problem gde su korisnici tokom faze prikupljanja prijava za close betu mogli da kreiraju nalog kroz formu za prijavu postojećih korisnika i odmah se uloguju na njega.
