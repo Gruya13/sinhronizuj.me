@@ -1,3 +1,12 @@
+## [2026-06-11 09:55:00] Integracija automatskog Vite build-a u CD pipeline
+- **Opis:**
+  Dodali smo automatsko prevođenje (build) klijentskog koda (frontenda) prilikom deployment-a na servere.
+  1. **Ažuriranje CD skripti (`ci-cd.yml`):**
+     - Ažurirali smo [.github/workflows/ci-cd.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/ci-cd.yml) i u poslove `deploy-staging` i `deploy-production` dodali korake `npm install` i `npm run build` na serveru odmah nakon povlačenja koda.
+     - Ovo garantuje da će se izmene na interfejsu (poput novog Admin Panela) odmah prevesti i primeniti na serveru, umesto da Nginx servira stare statičke fajlove.
+  2. **Manuelno osvežavanje:**
+     - Pokrenuli smo Vite build ručno preko SSH-a na oba servera (Staging i Produkcija) kako bi najnoviji kod odmah bio aktivan u radu.
+
 ## [2026-06-11 09:50:00] Rešavanje ESLint i Pytest blokada u CI/CD pipeline-u za produkciju
 - **Opis:**
   Dijagnostikovali smo i otklonili probleme koji su blokirali izvršavanje CI/CD pipeline-a i sprečavali deploy na produkcijski server.

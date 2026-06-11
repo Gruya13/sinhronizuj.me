@@ -113,6 +113,12 @@ jobs:
           git checkout development
           git pull origin development
           
+          # Instalacija zavisnosti i build frontenda
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          
           # Pokretanje, re-build i restart Docker kontejnera
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
           docker compose -f infra/hetzner/docker-compose.prod.yml restart
@@ -141,6 +147,12 @@ jobs:
           # Osiguravanje da smo na pravoj grani i povlačenje koda
           git checkout main
           git pull origin main
+          
+          # Instalacija zavisnosti i build frontenda
+          cd frontend
+          npm install
+          npm run build
+          cd ..
           
           # Pokretanje, re-build i restart Docker kontejnera
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
