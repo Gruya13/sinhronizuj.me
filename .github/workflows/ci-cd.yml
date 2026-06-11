@@ -38,7 +38,7 @@ jobs:
 
     - name: Pokretanje Backend testova (pytest)
       run: |
-        pytest
+        pytest tests/
 
   # -------------------------------------------------------------
   # 2. POSAO: Testiranje i build Frontenda
