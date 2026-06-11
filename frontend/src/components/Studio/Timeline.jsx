@@ -479,7 +479,7 @@ export default function Timeline() {
       className="timeline-card" 
       style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '12px 16px', overflowX: 'auto', overflowY: 'hidden', flexShrink: 0 }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+      <div className="timeline-header-row">
         <h4 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
           <Film size={14} /> Vremenski Editor (Timeline)
         </h4>

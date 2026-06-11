@@ -1,0 +1,37 @@
+name: Generate Release Changelog
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-release:
+    name: Kreiranje GitHub Release-a
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Preuzimanje koda
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Generisanje oznake verzije (Tag-a)
+      id: tag_generator
+      run: |
+        TAG_NAME="v$(date +'%Y.%m.%d-%H%M')"
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "Kreirana oznaka verzije: $TAG_NAME"
+
+    - name: Kreiranje GitHub Release-a i Changelog-a
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.tag_generator.outputs.tag_name }}
+        name: Release ${{ steps.tag_generator.outputs.tag_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -15,6 +15,7 @@ import Timeline from './components/Studio/Timeline';
 import SegmentRow from './components/Studio/SegmentRow';
 import LoginRegister from './components/Auth/LoginRegister';
 import LandingPage from './components/Landing/LandingPage';
+import AdminPanel from './components/Admin/AdminPanel';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
@@ -23,6 +24,7 @@ function App() {
   const {
     user,
     showProjectsList,
+    isAdminMode,
     newProjectName, setNewProjectName,
     isCreateModalOpen, setIsCreateModalOpen,
     creatingProject,
@@ -391,24 +393,7 @@ function App() {
       </div>
 
       <div 
-        className="glass-container studio-layout" 
-        style={inStudioMode ? {
-          maxWidth: 'none',
-          width: '100vw',
-          height: '100vh',
-          margin: '0',
-          borderRadius: '0',
-          border: 'none',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          padding: '12px 16px 16px 16px',
-          gap: '12px'
-        } : { 
-          maxWidth: '1800px', 
-          width: 'calc(100% - 48px)', 
-          margin: '24px auto' 
-        }}
+        className={`glass-container studio-layout ${inStudioMode ? 'studio-mode-active' : 'studio-mode-inactive'}`}
       >
         
         {/* GLOBALNI HEADER (NAVBAR) */}
@@ -422,8 +407,22 @@ function App() {
         )}
 
         <AnimatePresence mode="wait">
+          {/* ADMIN PANEL */}
+          {isAdminMode && user?.is_admin && (
+            <motion.div
+              key="admin-panel"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <AdminPanel />
+            </motion.div>
+          )}
+
           {/* DASHBOARD: LISTA PROJEKATA */}
-          {!loading && !videoUrl && !previewFile && !project && showProjectsList && (
+          {!isAdminMode && !loading && !videoUrl && !previewFile && !project && showProjectsList && (
             <motion.div
               key="dashboard"
               initial={{ opacity: 0, y: 15 }}
@@ -436,7 +435,7 @@ function App() {
           )}
 
           {/* FAZA 0: UNOS VIDEA */}
-          {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
+          {!isAdminMode && !loading && !videoUrl && !previewFile && !project && !showProjectsList && (
             <motion.div
               key="input-area"
               initial={{ opacity: 0, y: 15 }}
@@ -484,7 +483,7 @@ function App() {
           )}
 
           {/* PREVIEW NAKON UČITAVANJA PRE ANALIZE */}
-          {!loading && !videoUrl && previewFile && !project && (
+          {!isAdminMode && !loading && !videoUrl && previewFile && !project && (
             <motion.div
               key="preview-pane"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -549,7 +548,7 @@ function App() {
           )}
 
           {/* ASINHRONI PROGRES EKRAN (FAZA 1 ILI FAZA 2 RENDER) */}
-          {loading && !videoUrl && !project && (
+          {!isAdminMode && loading && !videoUrl && !project && (
             <motion.div
               key="progress-screen"
               initial={{ opacity: 0 }}
@@ -607,7 +606,7 @@ function App() {
           )}
 
           {/* FAZA 1.5: INTERAKTIVNI STUDIO EDITOR (DRAFT MOD STATUS) */}
-          {project && !loading && !videoUrl && (
+          {!isAdminMode && project && !loading && !videoUrl && (
             <motion.div
               key="studio-editor"
               initial={{ opacity: 0, scale: 0.99 }}
@@ -860,7 +859,7 @@ function App() {
               </div>
               
               {/* Gornji radni blok: Video i Forma */}
-              <div className="studio-workspace" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', flex: '1 1 0%', minHeight: 0, overflow: 'hidden' }}>
+              <div className="studio-workspace">
                 
                 {/* Leva strana: Preview Player */}
                 <div className="video-preview-card" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', height: '100%', overflow: 'hidden', minWidth: 0 }}>
@@ -908,7 +907,7 @@ function App() {
                     </div>
 
                     {/* Mikser jačine zvuka integrisan u plejer */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: 'auto' }}>
+                    <div className="player-mixer-controls">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Muzika:</span>
                         <input 

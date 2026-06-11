@@ -1,18 +1,83 @@
-## [2026-06-10 09:59:00] Implementacija Continuous Deployment (CD) pipeline-a za Hetzner VPS
+## [2026-06-11 08:42:00] Kreiranje i konfiguracija administratora grujovic.igor89@gmail.com
 - **Opis:**
-  Dodali smo automatski deployment (CD) u GitHub Actions koji se pokreće nakon uspešnih provera i šalje najnoviji kod na Hetzner VPS.
-  1. **Novi workflow (`deploy.yml`):**
-     - Kreiran je [.github/workflows/deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) koji se trigeruje na `push` događaje na granama `development` i `main`.
-     - Koristi se akcija `appleboy/ssh-action` za sigurnu prijavu na Hetzner VPS preko SSH protokola.
-     - Skripta automatski prepoznaje aktivnu granu okidača, prebacuje se na nju na serveru, radi `git pull` i re-kreira Docker kontejnere sa produkcionim postavkama (`docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build`).
-  2. **Sigurnost:**
-     - Svi SSH kredencijali (IP adresa VPS-a, korisničko ime, privatni ključ i port) su parametrizovani kroz GitHub Actions sekrete (`VPS_HOST`, `VPS_USERNAME`, `VPS_SSH_KEY`, `VPS_PORT`).
-  3. **Verifikacija:**
-     - Sintaksa workflow fajla je uspešno verifikovana i YAML je ispravan.
+  Kreiran je i aktiviran administrativni nalog u bazi podataka sa adresom `grujovic.igor89@gmail.com`.
+  1. **Ažuriranje šeme baze podataka (Postgres):**
+     - Otkrili smo da u bazi podataka unutar Docker kontejnera `sinhronizuj-db` nije postojala kolona `is_admin` u tabeli `users` (nakon prethodnih promena modela).
+     - Izvršili smo SQL komandu `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;` unutar kontejnera kako bismo ažurirali šemu bez brisanja postojećih podataka.
+  2. **Pokretanje skripte za kreiranje administratora:**
+     - Pokrenuli smo python skriptu `scratch/create_admin.py` unutar kontejnera `sinhronizuj-api` da bi se uspešno povezao na bazu.
+     - Nalog sa email-om `grujovic.igor89@gmail.com` je uspešno kreiran u bazi podataka i promovisan u administratora sa odgovarajućom lozinkom.
 
-## [2026-06-10 09:56:00] Preusmeravanje sa registracije u login formi na close beta waitlist
+## [2026-06-11 08:37:00] Implementacija automatskog generisanja GitHub Release-a i Changelog-a
 - **Opis:**
-  Sprečen je problem gde su korisnici tokom faze prikupljanja prijava za close betu mogli da kreiraju nalog kroz standardnu formu za prijavu/registraciju postojećih korisnika i odmah se uloguju na njega.
+  Dodali smo automatsko generisanje GitHub Release-a sa strukturisanim changelog-om pri svakom prenosu koda u produkciju.
+  1. **Novi workflow (`release.yml`):**
+     - Kreiran je [.github/workflows/release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml) koji se trigeruje na `push` događaje na granu `main`.
+     - Koristi se akcija `softprops/action-gh-release` sa parametrom `generate_release_notes: true` koji automatski generiše pregledan changelog sa spiskom svih commit-ova i Pull Request-ova spojenih između ove i prethodne verzije.
+     - Oznake verzije (tagovi) se generišu automatski na osnovu datuma i vremena (format `vGGGG.MM.DD-HHMM`).
+  2. **Verifikacija:**
+     - Sintaksa novog workflow-a je uspešno proverena i ispravna.
+
+## [2026-06-11 08:27:00] Objedinjavanje svih CI/CD workflow-ova u jedinstveni i siguran pipeline
+- **Opis:**
+  Spojili smo sve odvojene frontend i backend provere i CD konfiguracije u jedan jedinstveni, siguran i čist CI/CD pipeline kako bi se deploy vršio isključivo nakon uspešnog prolaska svih testova.
+  1. **Zajednički workflow (`ci-cd.yml`):**
+     - Kreiran je [.github/workflows/ci-cd.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/ci-cd.yml) koji zamenjuje stare fajlove `backend-ci.yml`, `frontend-ci.yml` i `deploy.yml`.
+     - Definisani su paralelni poslovi `backend-ci` (Ruff linter + Pytest testovi) i `frontend-ci` (ESLint linter + Vitest unit testovi + Playwright E2E testovi + Build).
+     - CD poslovi (`deploy-staging` i `deploy-production`) su konfigurisani tako da zahtevaju uspešan završetak oba CI posla (`needs: [backend-ci, frontend-ci]`). Deployment se pokreće samo na push događaje i na odgovarajućim granama (development -> Staging, main -> Produkcija).
+  2. **Čišćenje projekta:**
+     - Obrisan je stari workflow za backend ([backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml)), frontend ([frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml)) i deploy ([deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml)).
+  3. **Verifikacija:**
+     - Uspešno je proverena i validirana YAML sintaksa novog workflow fajla.
+
+## [2026-06-11 08:20:00] Integracija automatskog restarta u CD i otklanjanje konflikata na Staging serveru
+- **Opis:**
+  Dodali smo eksplicitan restart Docker Compose staka na kraju CD-a kako bi se učitao novi kod montiran preko volume-a, i uspešno testirali ceo CD tok na Staging serveru.
+  1. **Ažuriranje `deploy.yml`:**
+     - Dodali smo komandu `docker compose -f infra/hetzner/docker-compose.prod.yml restart` na kraj oba CD posla (`deploy-staging` i `deploy-production`). Ovo garantuje da se Uvicorn i Celery procesi restartuju i učitaju nove Python fajlove montirane kroz volumene.
+  2. **Otklanjanje konflikta na Staging serveru (`116.202.103.35`):**
+     - Otkrili smo da je `git pull` na Staging serveru bio blokiran zbog nekomitovanih lokalnih promena u `frontend/package-lock.json`.
+     - Očistili smo radni direktorijum na serveru (`git reset --hard` i `git clean -fd`) čime smo omogućili nesmetano povlačenje izmena u budućim automatskim CD pokretanjima.
+  3. **Verifikacija CD-a:**
+     - Ručno smo pokrenuli povlačenje koda i re-build staka na serveru.
+     - Celokupna aplikacija, uključujući i novoinstalirani Admin Panel, uspešno je podignuta i puštena u rad.
+
+## [2026-06-11 08:05:00] Podela CI/CD pipeline-a na Staging i Produkciju (Hetzner VPS)
+- **Opis:**
+  Konfigurisali smo CD (Continuous Deployment) pipeline tako da vrši automatski deploy na različite servere u zavisnosti od aktivne grane na koju se vrši `push`.
+  1. **Deployment na Staging (`deploy-staging`):**
+     - Trigeruje se na `push` na granu `development`.
+     - SSH konekcija se uspostavlja na Staging server (`116.202.103.35`) kao `root` u direktorijum `/opt/sinhronizuj.me`.
+  2. **Deployment na Produkciju (`deploy-production`):**
+     - Trigeruje se na `push` na granu `main`.
+     - SSH konekcija se uspostavlja na Produkcijski server (`178.104.214.78`) kao `root` u direktorijum `/opt/sinhronizuj-me`.
+  3. **Verifikacija:**
+     - Uspešno je testiran i potvrđen SSH pristup sa lokalnim ključem `id_ed25519` na oba servera kao `root`.
+     - Sintaksa novog [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) fajla je validirana.
+
+## [2026-06-11 07:45:00] Ispravka CD putanje i preciziranje SSH konfiguracije za Hetzner VPS
+- **Opis:**
+  Rešen je problem sa netačnom putanjom i korisničkim nalogom za deploy na VPS-u u okviru CD pipeline-a.
+  1. **Ispravka putanje u `deploy.yml`:**
+     - Ažurirali smo [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) da koristi ispravnu apsolutnu putanju do koda na serveru: `/opt/sinhronizuj-me` (umesto `/home/gruya/Projektri/sinhronizuj.me`).
+  2. **Verifikacija SSH pristupa:**
+     - Testirali smo i verifikovali da se uspešan SSH login vrši isključivo preko naloga `root` koristeći lokalni privatni ključ `id_ed25519`.
+
+## [2026-06-10 10:01:00] Implementacija Continuous Deployment (CD) pipeline-a za Hetzner VPS
+- **Opis:**
+  Uveli smo automatski deployment (CD) u GitHub Actions koji se pokreće nakon svakog `push` događaja na grane `development` i `main`.
+  1. **Novi workflow (`deploy.yml`):**
+     - Kreiran je [.github/workflows/deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) koji se trigeruje na `push` na grane `development` i `main`.
+     - Koristi se akcija `appleboy/ssh-action` za automatsku i sigurnu prijavu na Hetzner VPS preko SSH-a.
+     - Skripta automatski prepoznaje granu koja je trigerovala workflow, radi `git checkout` i `git pull` na toj grani na serveru, i ponovo gradi i podiže produkcione Docker kontejnere (`docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build`).
+  2. **Sigurnost:**
+     - Svi SSH parametri (host, korisničko ime, privatni ključ i port) su parametrizovani kroz tajne GitHub Actions sekrete (`VPS_HOST`, `VPS_USERNAME`, `VPS_SSH_KEY`, `VPS_PORT`).
+  3. **Verifikacija:**
+     - Sintaksa novog workflow fajla je uspešno verifikovana i YAML struktura je validna.
+
+## [2026-06-10 10:00:00] Preusmeravanje sa registracije u login formi na close beta waitlist i produkcioni deploy
+- **Opis:**
+  Sprečen je problem gde su korisnici tokom faze prikupljanja prijava za close betu mogli da kreiraju nalog kroz formu za prijavu postojećih korisnika i odmah se uloguju na njega.
   1. **Logika preusmeravanja u `LoginRegister.jsx`:**
      - Izmenjena je `toggleMode` funkcija u komponenti [LoginRegister.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Auth/LoginRegister.jsx).
      - Kada je korisnik na formi za prijavu (`isLogin === true`) i klikne na dugme "Kreirajte nalog", umesto prebacivanja na formu za registraciju, sada se poziva `onBack()` povratna funkcija.
@@ -21,6 +86,10 @@
      - Pokrenut je produkcioni Vite build (`npm run build`) koji prolazi bez grešaka za 564ms.
      - Vitest testovi su uspešno izvršeni sa 100% prolaznošću.
      - Linter provera (`npm run lint`) potvrđuje da nema grešaka u sintaksi koda.
+  3. **Produkcioni Deploy (Hetzner VPS):**
+     - Povezali smo se na Hetzner VPS (`178.104.214.78`) preko SSH/SCP-a.
+     - Preneli smo izmenjeni [LoginRegister.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Auth/LoginRegister.jsx) i [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md) na odgovarajuće lokacije u `/opt/sinhronizuj-me`.
+     - Pokrenuli smo produkcioni frontend build (`npm run build`) na serveru, čime su novi statički fajlovi uspešno generisani u `/opt/sinhronizuj-me/frontend/dist` i odmah pušteni u rad preko Nginx-a.
 
 ## [2026-06-10 09:48:00] Integracija test staka u GitHub Actions CI pipeline
 - **Opis:**
@@ -2270,3 +2339,26 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
 - **Urađeno:**
     * **Analiza Koda (`sicret doc/analiza_koda.md`):** Kreiran je novi izveštaj [analiza_koda.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/analiza_koda.md) sa pozicije sistemskog arhitekte. Dokument analizira troslojnu arhitekturu (API sloj na FastAPI-ju, pozadinske Celery radnike, serverless Modal compute sloj), detaljnu strukturu bekenda (baza podataka, `tasks.py` orkestracija, `merger.py` FFmpeg/pydub audio manipulacija), strukturu frontenda (upravljanje globalnim stanjem kroz `StudioContext.jsx`, undo/redo mehanizam, zvučne kontrole), pre-procesiranje na Modalu i optimalne GPU modele. Takođe su identifikovane stavke tehničkog duga (legacy RunPod kod, monolitni `App.jsx`, nedostatak automatskog testiranja na CI) i definisan je akcioni plan za refaktorisanje.
 - **Status:** Završeno. Arhitektonska analiza koda je uspešno generisana i sačuvana.
+
+### 10.06.2026. 14:15 — Mobilna responzivnost i UI optimizacija aplikacije
+- **Zahtevi:** Prilagođavanje celokupnog korisničkog interfejsa (Landing Page, Login, Dashboard, Studio) mobilnim ekranima tako da bude pregledan i potpuno funkcionalan.
+- **Urađeno:**
+    * **Optimizacija globalnih CSS stilova (`index.css`):** Definisane klase `.studio-mode-active` i `.studio-mode-inactive` koje na telefonima omogućavaju skrolovanje uklanjanjem nasilnih `100vh` visina. Implementiran responzivni grid `.daw-controls-grid` koji Knob kontrole preslaže u 2x2 raspored, i responzivni stilovi za zaglavlja, tabove segmenata, prelamanje forme i elemente vremenske linije.
+    * **Studio interfejs (`App.jsx`):** Zamenjeni inline stilovi koji blokiraju responzivnost CSS klasama. Kontrole plejera (volume slajderi za pozadinsku muziku i srpski AI glas) preformulisani tako da se na telefonu uredno lome u novi red ispod plejera umesto da se preklapaju sa vremenskim kodom i play dugmetom.
+    * **Zaglavlje i Statusi (`Header.jsx` i `HardwareMonitor.jsx`):** Navbar je prebačen na klasu `.main-header` i smanjen mu je padding. Detalji korisničkog profila i tekstualne informacije o Hetzner VPS i Modal GPU opterećenju se automatski sakrivaju na ekranima širine < 600px pomoću klase `.hide-mobile`, ostavljajući diskretne i kompaktne statusne ikonice. Redis dugme je svedeno na ikonicu kante.
+    * **Landing i Login (`LandingPage.jsx` i `LoginRegister.jsx`):** Hero naslov se automatski smanjuje na mobilnim telefonima radi izbegavanja prelamanja. Waitlist forma se prelama u kolonu na telefonima. Login kartica koristi manji padding i optimalnije iskorišćava prostor.
+    * **DAW i tabovi u segmentima (`SegmentRow.jsx`):** Inline mreže zamenjene klasama `.daw-controls-grid` i `.segment-tabs-container` koje rešavaju prelamanje kontrola u 2x2 raspored i sprečavaju lomljenje tabova.
+    * **Vremenska linija (`Timeline.jsx`):** Prilagođene kontrole zvuka i prelomljeni naslovi.
+    * **Verifikacija koda:** Projekat je uspešno prošao kroz produkcioni Vite build (`npm run build`) i sve automatske Vitest testove (`npm run test` - 7 testova prošlo).
+- **Status:** Završeno. Aplikacija je u potpunosti responzivna i spremna za sve uređaje.
+
+### 11.06.2026. 08:20 — Implementacija Kompletnog Admin Panela za Sinhronizuj.me
+- **Zahtevi:** Izrada administrativnog panela za praćenje waitlista, korisnika, troškova i sistemskih resursa bez narušavanja postojećeg rada.
+- **Urađeno:**
+    * **Baza Podataka i Migracije:** U model `User` u `backend/core/models.py` dodata kolona `is_admin` sa podrazumevanom vrednošću `false`. U startup logiku FastAPI-ja u `backend/main.py` dodata automatska alter table migracija koja osigurava kreiranje kolone u PostgreSQL bazi.
+    * **Backend API & Autentifikacija:** U `backend/core/auth.py` dodata zavisnost `get_current_admin_user` koja štiti admin endpointove. Rute `/api/v1/auth/login` i `/api/v1/auth/me` su ažurirane tako da vraćaju `is_admin` status. Dodate su admin rute za dobijanje statistike (`GET /api/v1/admin/stats`), listanje i odobravanje/odbijanje waitlista (`GET /api/v1/admin/waitlist`, `POST /api/v1/admin/waitlist/{id}/approve`, `POST /api/v1/admin/waitlist/{id}/reject`), listanje korisnika i togglovanje uloga (`GET /api/v1/admin/users`, `POST /api/v1/admin/users/{id}/toggle-admin`), listanje i detaljan pregled projekata sa integrisanom pretragom worker logova (`GET /api/v1/admin/projects`, `GET /api/v1/admin/project/{id}`) i pomoćni endpoint za inicijalizaciju prvog administratora.
+    * **Frontend Integracija:** Ažurirano je globalno stanje u `StudioContext.jsx` sa `isAdminMode` i `adminStats` (koji periodično osvežava metrike). U `Header.jsx` dodato je prelepo stakleno dugme "🛡️ Admin" za korisnike sa admin privilegijama koje prikazuje i bedž sa brojem waitlist prijava na čekanju. Kreirana je nova komponenta `AdminPanel.jsx` u `frontend/src/components/Admin/AdminPanel.jsx` koja sadrži tabove za Dashboard, Waitlist, Korisnike i Projekte. Stilizovana je u `index.css` sa modernim staklenim dizajnom (glassmorphism) i animacijama. U `App.jsx` je integrisan ruter koji prikazuje AdminPanel kada je uključen admin mod.
+    * **Verifikacija koda:** Napisani su backend pytest testovi u `tests/test_admin.py` za proveru autorizacije i admin akcija. Svi testovi su uspešno prošli (4/4 pytest i 7/7 vitest testova). Uspešno je pokrenut i produkcioni build (`npm run build`).
+- **Status:** Završeno. Kompletan Admin Panel je uspešno implementiran i integrisan u sistem.
+
+

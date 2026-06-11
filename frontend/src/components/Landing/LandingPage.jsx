@@ -175,16 +175,7 @@ export default function LandingPage({ onEnterLogin }) {
             <span>Zatvoreno Beta Testiranje</span>
           </div>
 
-          <h1 style={{
-            fontSize: '3.6rem',
-            fontWeight: 900,
-            lineHeight: 1.1,
-            letterSpacing: '-1.5px',
-            margin: '0 0 24px 0',
-            background: 'linear-gradient(to right, #ffffff, #e2e8f0, #94a3b8)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}>
+          <h1 className="hero-title">
             Neka vaši video snimci progovore srpski — <span style={{ background: 'linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>vašim glasom</span>
           </h1>
 
@@ -227,18 +218,9 @@ export default function LandingPage({ onEnterLogin }) {
               ) : (
                 <motion.form 
                   onSubmit={handleWaitlistSubmit}
-                  style={{
-                    display: 'flex',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid rgba(255, 255, 255, 0.07)',
-                    borderRadius: '16px',
-                    padding: '6px',
-                    gap: '8px',
-                    boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    boxSizing: 'border-box'
-                  }}
+                  className="waitlist-form"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, position: 'relative', paddingLeft: '14px' }}>
+                  <div className="waitlist-form-input-wrapper">
                     <Mail size={18} style={{ color: '#64748b', position: 'absolute', left: '14px' }} />
                     <input 
                       type="email" 
@@ -335,11 +317,7 @@ export default function LandingPage({ onEnterLogin }) {
             Sinhronizacija u 3 Jednostavna Koraka
           </h2>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '30px'
-          }} className="steps-grid">
+          <div className="steps-grid">
             
             {/* Korak 1 */}
             <div style={{

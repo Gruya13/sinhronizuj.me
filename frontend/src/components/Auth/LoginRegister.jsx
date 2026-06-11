@@ -47,20 +47,7 @@ export default function LoginRegister({ onBack }) {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        width: '100%',
-        background: 'radial-gradient(circle at top left, rgba(139, 92, 246, 0.15) 0%, transparent 40%), radial-gradient(circle at bottom right, rgba(6, 182, 212, 0.1) 0%, transparent 40%), #0b0f19',
-        padding: '24px',
-        boxSizing: 'border-box',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
+    <div className="auth-container">
       {/* Dekorativni pozadinski elementi */}
       <div
         style={{
@@ -95,20 +82,7 @@ export default function LoginRegister({ onBack }) {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        style={{
-          width: '100%',
-          maxWidth: '440px',
-          background: 'rgba(17, 24, 39, 0.45)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255, 255, 255, 0.07)',
-          borderRadius: '24px',
-          padding: '40px 32px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(139, 92, 246, 0.04)',
-          zIndex: 2,
-          position: 'relative',
-          boxSizing: 'border-box'
-        }}
+        className="auth-card"
       >
         {/* DUGME NAZAD NA LANDING */}
         {onBack && (

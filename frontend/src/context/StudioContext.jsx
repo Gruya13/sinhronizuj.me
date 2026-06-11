@@ -10,10 +10,23 @@ export function StudioProvider({ children }) {
   // Stanja za autentifikaciju
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('sinhronizuj_me_token'));
+  const [adminStats, setAdminStats] = useState(null);
+
+  const fetchAdminStats = async () => {
+    const activeToken = localStorage.getItem('sinhronizuj_me_token');
+    if (!activeToken) return;
+    try {
+      const stats = await api.getAdminStats();
+      setAdminStats(stats);
+    } catch (err) {
+      console.error("Greška pri učitavanju admin statistika:", err);
+    }
+  };
 
   // Stanja za listu projekata i pretragu
   const [projects, setProjects] = useState([]);
   const [showProjectsList, setShowProjectsList] = useState(true);
+  const [isAdminMode, setIsAdminMode] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -218,6 +231,17 @@ export function StudioProvider({ children }) {
     checkAuth();
   }, [token]);
 
+  // Periodično učitavanje admin statistika
+  useEffect(() => {
+    if (user && user.is_admin) {
+      fetchAdminStats();
+      const interval = setInterval(fetchAdminStats, 20000); // 20 sekundi
+      return () => clearInterval(interval);
+    } else {
+      setAdminStats(null);
+    }
+  }, [user]);
+
   // Listanje projekata
   async function fetchProjects() {
     if (!localStorage.getItem('sinhronizuj_me_token')) return;
@@ -365,6 +389,7 @@ export function StudioProvider({ children }) {
     // Povratak na projekte
     setCurrentProjectId(null);
     setShowProjectsList(true);
+    setIsAdminMode(false);
     fetchProjects();
   };
 
@@ -770,6 +795,9 @@ export function StudioProvider({ children }) {
     <StudioContext.Provider value={{
       user, setUser,
       token, setToken,
+      adminStats, setAdminStats,
+      fetchAdminStats,
+      isAdminMode, setIsAdminMode,
       handleLogin, handleRegister, handleLogout,
       projects, setProjects,
       showProjectsList, setShowProjectsList,

@@ -237,5 +237,79 @@ export const api = {
         dubbed_volume: dubbedVolume
       })
     });
+  },
+
+  /**
+   * Dobavlja globalne statistike za admin dashboard.
+   */
+  async getAdminStats() {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/stats`);
+  },
+
+  /**
+   * Dobavlja listu svih prijava na waitlistu.
+   */
+  async getAdminWaitlist() {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/waitlist`);
+  },
+
+  /**
+   * Odobrava waitlist prijavu.
+   */
+  async approveWaitlist(waitlistId) {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/waitlist/${waitlistId}/approve`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * Odbija waitlist prijavu.
+   */
+  async rejectWaitlist(waitlistId) {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/waitlist/${waitlistId}/reject`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * Dobavlja listu svih registrovanih korisnika.
+   */
+  async getAdminUsers() {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/users`);
+  },
+
+  /**
+   * Togluje admin privilegije za određenog korisnika.
+   */
+  async toggleUserAdmin(userId) {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/users/${userId}/toggle-admin`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * Dobavlja listu svih projekata u sistemu.
+   */
+  async getAdminProjects() {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/projects`);
+  },
+
+  /**
+   * Dobavlja detalje određenog projekta za administratore.
+   */
+  async getAdminProjectDetail(projectId) {
+    return authFetch(`${API_BASE_URL}/api/v1/admin/project/${projectId}`);
+  },
+
+  /**
+   * Kreira prvog administratora u sistemu (pomoćna ruta).
+   */
+  async createFirstAdmin(email, password) {
+    const res = await fetch(`${API_BASE_URL}/api/v1/admin/create-first-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    return handleResponse(res);
   }
 };

@@ -131,7 +131,7 @@ export default function SegmentRow() {
           </div>
 
           {/* Grupni DAW kontrolni panel */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', padding: '16px 8px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.03)' }}>
+          <div className="daw-controls-grid">
             <Knob
               label="Volume"
               min={-20}
@@ -296,7 +296,7 @@ export default function SegmentRow() {
       </div>
 
       {/* Navigacija tabova */}
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', gap: '15px', marginBottom: '4px' }}>
+      <div className="segment-tabs-container">
         <button
           onClick={() => setSegmentEditorTab("text")}
           style={{
@@ -605,7 +605,7 @@ export default function SegmentRow() {
             </div>
 
             {/* Kružni DAW kontrolni panel */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', padding: '16px 8px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="daw-controls-grid">
               <Knob
                 label="Volume"
                 min={-20}

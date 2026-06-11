@@ -1365,4 +1365,369 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.2);
 }
 
+/* ==========================================================================
+   MOBILNA RESPONZIVNOST (Sinhronizuj.me Studio V2)
+   ========================================================================== */
+
+/* Glavni studio layout */
+.studio-mode-active {
+  max-width: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  padding: 12px 16px 16px 16px !important;
+  gap: 12px !important;
+}
+
+.studio-mode-inactive {
+  max-width: 1800px !important;
+  width: calc(100% - 48px) !important;
+  margin: 24px auto !important;
+}
+
+/* Studio Workspace */
+.studio-workspace {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* DAW kontrole - Knob grid */
+.daw-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 16px 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Plejer kontrole i mikser */
+.player-mixer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.video-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px;
+}
+
+/* Globalni Navbar Header */
+.main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(20px);
+  border-radius: 24px 24px 0 0;
+  position: relative;
+  z-index: 999;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Hardverski monitor resursa */
+.hardware-monitor-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 20px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* Landing Page Hero Naslov i Waitlist Forma */
+.hero-title {
+  font-size: 3.6rem;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin: 0 0 24px 0;
+  background: linear-gradient(to right, #ffffff, #e2e8f0, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.waitlist-form {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 6px;
+  gap: 8px;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* Login/Register kartice */
+.auth-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(circle at top left, rgba(139, 92, 246, 0.15) 0%, transparent 40%), radial-gradient(circle at bottom right, rgba(6, 182, 212, 0.1) 0%, transparent 40%), #0b0f19;
+  padding: 24px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 24px;
+  padding: 40px 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(139, 92, 246, 0.04);
+  z-index: 2;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Korisnički profil u zaglavlju */
+.header-user-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding-left: 16px;
+}
+
+/* Tabovi editora segmenata */
+.segment-tabs-container {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+  gap: 15px;
+  margin-bottom: 4px;
+}
+
+/* Zaglavlje vremenske linije */
+.timeline-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Omotač za input liste čekanja */
+.waitlist-form-input-wrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  padding-left: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONZIVNI MEDIJSKI UPITI (Mobilni Telefoni i Tableti)
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .studio-workspace {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto !important;
+    overflow-y: visible !important;
+    flex: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Uklanjanje fiksnog visinskog ograničenja u studiju za mobilne ekrane */
+  .studio-mode-active {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    padding: 8px 12px !important;
+    gap: 16px !important;
+  }
+
+  .glass-container {
+    margin: 12px !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+  
+  /* Mobilni navigacioni header */
+  .main-header {
+    padding: 10px 14px !important;
+    border-radius: 16px !important;
+    gap: 12px !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  /* Korisnički profil u zaglavlju mobilnog */
+  .header-user-section {
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
+
+  /* Plejer kontrole se prelamaju na mobilnom */
+  .video-player-controls {
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+
+  .player-mixer-controls {
+    margin-left: 0 !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding-top: 10px !important;
+    margin-top: 6px !important;
+  }
+
+  /* Hero naslov na mobilnom */
+  .hero-title {
+    font-size: 2.2rem !important;
+    letter-spacing: -0.5px !important;
+  }
+
+  /* Pozicioniranje zaglavlja timeline-a */
+  .timeline-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Sakrivanje elemenata hardver statusa na telefonima */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .hardware-monitor-container {
+    gap: 8px !important;
+    padding: 6px 10px !important;
+    border-radius: 50px !important;
+  }
+
+  /* DAW kontrole 2x2 mreža */
+  .daw-controls-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px 10px !important;
+    padding: 12px 8px !important;
+  }
+
+  /* Tabovi u editoru segmenata na mobilnom */
+  .segment-tabs-container {
+    gap: 4px !important;
+    justify-content: space-between !important;
+  }
+  
+  .segment-tabs-container button {
+    padding: 6px 8px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Waitlist forma prelazi u vertikalnu */
+  .waitlist-form {
+    flex-direction: column !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    gap: 12px !important;
+  }
+
+  .waitlist-form-input-wrapper {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 12px !important;
+    width: 100% !important;
+    padding: 4px !important;
+  }
+
+  .waitlist-form button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Smanjenje margina i paddinga na ekranima login forme */
+  .auth-container {
+    padding: 8px !important;
+  }
+
+  .auth-card {
+    padding: 24px 16px !important;
+    border-radius: 16px !important;
+  }
+}
+
+/* ==========================================================================
+   STILOVI ZA ADMIN PANEL (Sinhronizuj.me Admin)
+   ========================================================================== */
+
+.admin-panel-container {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.admin-tabs button:hover {
+  color: #fff !important;
+  border-bottom-color: rgba(167, 139, 250, 0.5) !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Glassmorphism tabela za admin */
+.admin-panel-container table {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.admin-panel-container tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-panel-container input::placeholder {
+  color: #64748b;
+}
+
+.admin-panel-container select option {
+  background: #0f172a !important;
+  color: #fff !important;
+}
+
+
+
+
 
