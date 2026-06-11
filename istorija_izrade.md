@@ -1,3 +1,12 @@
+## [2026-06-11 13:25:00] Izrada novog DevOps i Infrastrukturnog Izveštaja v2
+- **Opis:**
+  Kreirali smo detaljan tehnički izveštaj [devops_izvestaj_v2.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/devops_izvestaj_v2.md) u tajnom dokumentacionom folderu `sicret doc`.
+  1. **Dokumentovane teme:**
+     - Detaljan pregled nove staging (`116.202.103.35`) i produkcione (`178.104.214.78`) topologije servera i izolacije baza podataka.
+     - Detaljan opis objedinjenog i sigurnog CI/CD pipeline-a (`ci-cd.yml`) koji pokreće lintere, pytest testove, Vitest unit testove i Playwright E2E testove, te automatski deploy i Vite build klijentskog koda na serverima.
+     - Opis automatskog tagovanja i generisanja changeloga na GitHub-u (`release.yml`).
+     - Detaljan prikaz nedavnih stabilizacionih radova i otklanjanja blokada (ESLint hoisting ispravka u `AdminPanel.jsx`, pytest collection limitiranje i GitHub Push Protection za Cloudflare tokene).
+
 ## [2026-06-11 09:55:00] Integracija automatskog Vite build-a u CD pipeline
 - **Opis:**
   Dodali smo automatsko prevođenje (build) klijentskog koda (frontenda) prilikom deployment-a na servere.
