@@ -1,3 +1,16 @@
+## [2026-06-11 08:05:00] Podela CI/CD pipeline-a na Staging i Produkciju (Hetzner VPS)
+- **Opis:**
+  Konfigurisali smo CD (Continuous Deployment) pipeline tako da vrši automatski deploy na različite servere u zavisnosti od aktivne grane na koju se vrši `push`.
+  1. **Deployment na Staging (`deploy-staging`):**
+     - Trigeruje se na `push` na granu `development`.
+     - SSH konekcija se uspostavlja na Staging server (`116.202.103.35`) kao `root` u direktorijum `/opt/sinhronizuj.me`.
+  2. **Deployment na Produkciju (`deploy-production`):**
+     - Trigeruje se na `push` na granu `main`.
+     - SSH konekcija se uspostavlja na Produkcijski server (`178.104.214.78`) kao `root` u direktorijum `/opt/sinhronizuj-me`.
+  3. **Verifikacija:**
+     - Uspešno je testiran i potvrđen SSH pristup sa lokalnim ključem `id_ed25519` na oba servera kao `root`.
+     - Sintaksa novog [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) fajla je validirana.
+
 ## [2026-06-11 07:45:00] Ispravka CD putanje i preciziranje SSH konfiguracije za Hetzner VPS
 - **Opis:**
   Rešen je problem sa netačnom putanjom i korisničkim nalogom za deploy na VPS-u u okviru CD pipeline-a.
