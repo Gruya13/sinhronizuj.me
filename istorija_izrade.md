@@ -1,3 +1,13 @@
+## [2026-06-11 17:00:00] Kreiranje Mermaid dijagrama infrastrukture i DevOps procesa
+- **Opis:**
+  Kreirali smo sveobuhvatni vizuelni Mermaid dijagram [infrastruktura_dijagram.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/infrastruktura_dijagram.md) u tajnom dokumentacionom folderu `sicret doc`.
+  1. **Dokumentovane komponente:**
+     - Klijentski i Cloudflare proksi sloj.
+     - GitHub Actions i CI/CD provere (backend/frontend provere) sa uslovnim prelazima.
+     - Arhitektura Staging i Production VPS servera u Docker Compose i Nginx staku.
+     - Tokovi prenosa koda kroz SSH deploy i build statičkih fajlova.
+     - Asinhrona komunikacija Celery radnika sa serverless GPU radnicima na Modal platformi.
+
 ## [2026-06-11 13:25:00] Izrada novog DevOps i Infrastrukturnog Izveštaja v2
 - **Opis:**
   Kreirali smo detaljan tehnički izveštaj [devops_izvestaj_v2.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/devops_izvestaj_v2.md) u tajnom dokumentacionom folderu `sicret doc`.
