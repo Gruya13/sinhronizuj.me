@@ -27,11 +27,6 @@ export default function AdminPanel() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [loadingProjectDetail, setLoadingProjectDetail] = useState(false);
 
-  // Učitavanje podataka u zavisnosti od aktivnog tab-a
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
-
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -54,6 +49,11 @@ export default function AdminPanel() {
       setLoading(false);
     }
   };
+
+  // Učitavanje podataka u zavisnosti od aktivnog tab-a
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
 
   // Upravljanje Waitlistom
   const handleApproveWaitlist = async (id) => {
