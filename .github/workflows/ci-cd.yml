@@ -1,0 +1,147 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ development, main ]
+  pull_request:
+    branches: [ development, main ]
+
+jobs:
+  # -------------------------------------------------------------
+  # 1. POSAO: Testiranje i provera Backenda
+  # -------------------------------------------------------------
+  backend-ci:
+    name: Backend Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Preuzimanje koda
+      uses: actions/checkout@v4
+
+    - name: Podešavanje Python okruženja
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalacija zavisnosti za testiranje
+      run: |
+        # Izbacujemo torch i demucs jer se oni ne testiraju lokalno/u CI (izvršavaju se na Modalu)
+        grep -v -E "torch|demucs" requirements.txt > requirements-ci.txt
+        python -m pip install --upgrade pip
+        pip install ruff pytest pytest-mock httpx
+        pip install -r requirements-ci.txt
+
+    - name: Provera sintakse koda (Ruff Linter)
+      run: |
+        ruff check --select=E9,F63,F7,F82 backend modal_workers
+
+    - name: Pokretanje Backend testova (pytest)
+      run: |
+        pytest
+
+  # -------------------------------------------------------------
+  # 2. POSAO: Testiranje i build Frontenda
+  # -------------------------------------------------------------
+  frontend-ci:
+    name: Frontend Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Preuzimanje koda
+      uses: actions/checkout@v4
+
+    - name: Podešavanje Node.js okruženja
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+
+    - name: Instalacija zavisnosti
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Pokretanje lintera
+      run: |
+        cd frontend
+        npm run lint
+
+    - name: Pokretanje unit testova (Vitest)
+      run: |
+        cd frontend
+        npm run test
+
+    - name: Instalacija Playwright pretraživača
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+
+    - name: Pokretanje E2E testova (Playwright)
+      run: |
+        cd frontend
+        npx playwright test
+
+    - name: Build aplikacije
+      run: |
+        cd frontend
+        npm run build
+
+  # -------------------------------------------------------------
+  # 3. POSAO: Deploy na Staging (Samo za development granu i nakon uspešnog CI-ja)
+  # -------------------------------------------------------------
+  deploy-staging:
+    name: Deploy na Staging VPS
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/development'
+
+    steps:
+    - name: SSH konekcija i ažuriranje kontejnera na Stagingu
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.STAGING_VPS_HOST }}
+        username: ${{ secrets.STAGING_VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.STAGING_VPS_PORT || 22 }}
+        script: |
+          cd /opt/sinhronizuj.me
+          echo "Započinjem deployment na Staging za granu: development"
+          
+          # Osiguravanje da smo na pravoj grani i povlačenje koda
+          git checkout development
+          git pull origin development
+          
+          # Pokretanje, re-build i restart Docker kontejnera
+          docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
+          docker compose -f infra/hetzner/docker-compose.prod.yml restart
+
+  # -------------------------------------------------------------
+  # 4. POSAO: Deploy na Produkciju (Samo za main granu i nakon uspešnog CI-ja)
+  # -------------------------------------------------------------
+  deploy-production:
+    name: Deploy na Produkciju VPS
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: SSH konekcija i ažuriranje kontejnera na Produkciji
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_VPS_HOST }}
+        username: ${{ secrets.PROD_VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.PROD_VPS_PORT || 22 }}
+        script: |
+          cd /opt/sinhronizuj-me
+          echo "Započinjem deployment na Produkciju za granu: main"
+          
+          # Osiguravanje da smo na pravoj grani i povlačenje koda
+          git checkout main
+          git pull origin main
+          
+          # Pokretanje, re-build i restart Docker kontejnera
+          docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
+          docker compose -f infra/hetzner/docker-compose.prod.yml restart

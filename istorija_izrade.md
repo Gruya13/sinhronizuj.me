@@ -1,3 +1,15 @@
+## [2026-06-11 08:27:00] Objedinjavanje svih CI/CD workflow-ova u jedinstveni i siguran pipeline
+- **Opis:**
+  Spojili smo sve odvojene frontend i backend provere i CD konfiguracije u jedan jedinstveni, siguran i čist CI/CD pipeline kako bi se deploy vršio isključivo nakon uspešnog prolaska svih testova.
+  1. **Zajednički workflow (`ci-cd.yml`):**
+     - Kreiran je [.github/workflows/ci-cd.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/ci-cd.yml) koji zamenjuje stare fajlove `backend-ci.yml`, `frontend-ci.yml` i `deploy.yml`.
+     - Definisani su paralelni poslovi `backend-ci` (Ruff linter + Pytest testovi) i `frontend-ci` (ESLint linter + Vitest unit testovi + Playwright E2E testovi + Build).
+     - CD poslovi (`deploy-staging` i `deploy-production`) su konfigurisani tako da zahtevaju uspešan završetak oba CI posla (`needs: [backend-ci, frontend-ci]`). Deployment se pokreće samo na push događaje i na odgovarajućim granama (development -> Staging, main -> Produkcija).
+  2. **Čišćenje projekta:**
+     - Obrisan je stari workflow za backend ([backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml)), frontend ([frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml)) i deploy ([deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml)).
+  3. **Verifikacija:**
+     - Uspešno je proverena i validirana YAML sintaksa novog workflow fajla.
+
 ## [2026-06-11 08:20:00] Integracija automatskog restarta u CD i otklanjanje konflikata na Staging serveru
 - **Opis:**
   Dodali smo eksplicitan restart Docker Compose staka na kraju CD-a kako bi se učitao novi kod montiran preko volume-a, i uspešno testirali ceo CD tok na Staging serveru.
