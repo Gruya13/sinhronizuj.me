@@ -1,3 +1,13 @@
+## [2026-06-11 08:42:00] Kreiranje i konfiguracija administratora grujovic.igor89@gmail.com
+- **Opis:**
+  Kreiran je i aktiviran administrativni nalog u bazi podataka sa adresom `grujovic.igor89@gmail.com`.
+  1. **Ažuriranje šeme baze podataka (Postgres):**
+     - Otkrili smo da u bazi podataka unutar Docker kontejnera `sinhronizuj-db` nije postojala kolona `is_admin` u tabeli `users` (nakon prethodnih promena modela).
+     - Izvršili smo SQL komandu `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;` unutar kontejnera kako bismo ažurirali šemu bez brisanja postojećih podataka.
+  2. **Pokretanje skripte za kreiranje administratora:**
+     - Pokrenuli smo python skriptu `scratch/create_admin.py` unutar kontejnera `sinhronizuj-api` da bi se uspešno povezao na bazu.
+     - Nalog sa email-om `grujovic.igor89@gmail.com` je uspešno kreiran u bazi podataka i promovisan u administratora sa odgovarajućom lozinkom.
+
 ## [2026-06-11 08:37:00] Implementacija automatskog generisanja GitHub Release-a i Changelog-a
 - **Opis:**
   Dodali smo automatsko generisanje GitHub Release-a sa strukturisanim changelog-om pri svakom prenosu koda u produkciju.
