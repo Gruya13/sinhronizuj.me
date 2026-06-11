@@ -1,3 +1,15 @@
+## [2026-06-11 08:20:00] Integracija automatskog restarta u CD i otklanjanje konflikata na Staging serveru
+- **Opis:**
+  Dodali smo eksplicitan restart Docker Compose staka na kraju CD-a kako bi se učitao novi kod montiran preko volume-a, i uspešno testirali ceo CD tok na Staging serveru.
+  1. **Ažuriranje `deploy.yml`:**
+     - Dodali smo komandu `docker compose -f infra/hetzner/docker-compose.prod.yml restart` na kraj oba CD posla (`deploy-staging` i `deploy-production`). Ovo garantuje da se Uvicorn i Celery procesi restartuju i učitaju nove Python fajlove montirane kroz volumene.
+  2. **Otklanjanje konflikta na Staging serveru (`116.202.103.35`):**
+     - Otkrili smo da je `git pull` na Staging serveru bio blokiran zbog nekomitovanih lokalnih promena u `frontend/package-lock.json`.
+     - Očistili smo radni direktorijum na serveru (`git reset --hard` i `git clean -fd`) čime smo omogućili nesmetano povlačenje izmena u budućim automatskim CD pokretanjima.
+  3. **Verifikacija CD-a:**
+     - Ručno smo pokrenuli povlačenje koda i re-build staka na serveru.
+     - Celokupna aplikacija, uključujući i novoinstalirani Admin Panel, uspešno je podignuta i puštena u rad.
+
 ## [2026-06-11 08:05:00] Podela CI/CD pipeline-a na Staging i Produkciju (Hetzner VPS)
 - **Opis:**
   Konfigurisali smo CD (Continuous Deployment) pipeline tako da vrši automatski deploy na različite servere u zavisnosti od aktivne grane na koju se vrši `push`.

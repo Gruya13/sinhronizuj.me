@@ -28,6 +28,8 @@ jobs:
           
           # Pokretanje i re-build Docker kontejnera
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
+          # Restart servisa kako bi se učitao novi kod montiran preko volume-a
+          docker compose -f infra/hetzner/docker-compose.prod.yml restart
 
   deploy-production:
     name: Deploy na Produkciju VPS
@@ -52,3 +54,5 @@ jobs:
           
           # Pokretanje i re-build Docker kontejnera
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d --build
+          # Restart servisa kako bi se učitao novi kod montiran preko volume-a
+          docker compose -f infra/hetzner/docker-compose.prod.yml restart
