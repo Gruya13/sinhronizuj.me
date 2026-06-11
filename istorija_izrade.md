@@ -1,3 +1,11 @@
+## [2026-06-11 07:45:00] Ispravka CD putanje i preciziranje SSH konfiguracije za Hetzner VPS
+- **Opis:**
+  Rešen je problem sa netačnom putanjom i korisničkim nalogom za deploy na VPS-u u okviru CD pipeline-a.
+  1. **Ispravka putanje u `deploy.yml`:**
+     - Ažurirali smo [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) da koristi ispravnu apsolutnu putanju do koda na serveru: `/opt/sinhronizuj-me` (umesto `/home/gruya/Projektri/sinhronizuj.me`).
+  2. **Verifikacija SSH pristupa:**
+     - Testirali smo i verifikovali da se uspešan SSH login vrši isključivo preko naloga `root` koristeći lokalni privatni ključ `id_ed25519`.
+
 ## [2026-06-10 10:01:00] Implementacija Continuous Deployment (CD) pipeline-a za Hetzner VPS
 - **Opis:**
   Uveli smo automatski deployment (CD) u GitHub Actions koji se pokreće nakon svakog `push` događaja na grane `development` i `main`.
