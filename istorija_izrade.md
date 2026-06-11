@@ -1,3 +1,13 @@
+## [2026-06-11 08:37:00] Implementacija automatskog generisanja GitHub Release-a i Changelog-a
+- **Opis:**
+  Dodali smo automatsko generisanje GitHub Release-a sa strukturisanim changelog-om pri svakom prenosu koda u produkciju.
+  1. **Novi workflow (`release.yml`):**
+     - Kreiran je [.github/workflows/release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml) koji se trigeruje na `push` događaje na granu `main`.
+     - Koristi se akcija `softprops/action-gh-release` sa parametrom `generate_release_notes: true` koji automatski generiše pregledan changelog sa spiskom svih commit-ova i Pull Request-ova spojenih između ove i prethodne verzije.
+     - Oznake verzije (tagovi) se generišu automatski na osnovu datuma i vremena (format `vGGGG.MM.DD-HHMM`).
+  2. **Verifikacija:**
+     - Sintaksa novog workflow-a je uspešno proverena i ispravna.
+
 ## [2026-06-11 08:27:00] Objedinjavanje svih CI/CD workflow-ova u jedinstveni i siguran pipeline
 - **Opis:**
   Spojili smo sve odvojene frontend i backend provere i CD konfiguracije u jedan jedinstveni, siguran i čist CI/CD pipeline kako bi se deploy vršio isključivo nakon uspešnog prolaska svih testova.
