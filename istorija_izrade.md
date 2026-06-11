@@ -1,3 +1,12 @@
+## [2026-06-11 21:25:00] Izrada izveštaja o troškovima Modal GPU radnika
+- **Opis:**
+  Kreirali smo detaljan izveštaj [analiza_troskova_modal.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/analiza_troskova_modal.md) u tajnom dokumentacionom folderu `sicret doc`.
+  1. **Dokumentovane teme:**
+     - Logika dinamičkog proračuna troškova u Celery radniku na osnovu vremena rada GPU kontejnera na Modalu.
+     - Detaljan cenovnik i stope za sve tipove GPU resursa koje koristimo (NVIDIA T4, L4, A10G, A100) na Modalu.
+     - Realna projekcija i proračun troškova za video u trajanju od 1 minut (60 sekundi) po fazama (Separacija, Transkripcija, Prevođenje, Lektura, Sinteza govora).
+     - Objašnjenje uticaja hladnog starta i optimizacije kroz NFS keširanje modela.
+
 ## [2026-06-11 17:02:00] Kreiranje i integracija Mermaid dijagrama u DevOps Izveštaj
 - **Opis:**
   Kreirali smo sveobuhvatni vizuelni Mermaid dijagram [infrastruktura_dijagram.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/infrastruktura_dijagram.md) i ugradili ga direktno u [devops_izvestaj_v2.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/devops_izvestaj_v2.md) unutar tajnog dokumentacionog foldera `sicret doc`.
