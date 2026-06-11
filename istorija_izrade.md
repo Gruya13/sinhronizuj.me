@@ -1,3 +1,14 @@
+## [2026-06-11 09:50:00] Rešavanje ESLint i Pytest blokada u CI/CD pipeline-u za produkciju
+- **Opis:**
+  Dijagnostikovali smo i otklonili probleme koji su blokirali izvršavanje CI/CD pipeline-a i sprečavali deploy na produkcijski server.
+  1. **Popravka ESLint greške (hoisting):**
+     - U [AdminPanel.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Admin/AdminPanel.jsx) smo premestili deklaraciju funkcije `fetchData` iznad `useEffect` hook-a kako bismo rešili grešku o korišćenju promenljive pre njene deklaracije.
+  2. **Rešavanje Pytest greške u CI okruženju (import error):**
+     - Otkrili smo da je `pytest` u CI okruženju pokušavao da skenira pomoćne skripte u `scratch/` direktorijumu i padao zbog nedostatka `paramiko` biblioteke u `scratch/test_passwords.py`.
+     - Ažurirali smo [.github/workflows/ci-cd.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/ci-cd.yml) da pokreće testove isključivo u `tests/` direktorijumu (`pytest tests/`).
+  3. **Ažuriranje zavisnosti:**
+     - Dodali smo `bcrypt==5.0.0` eksplicitno u [requirements.txt](file:///home/gruya/Projektri/sinhronizuj.me/requirements.txt) kako bismo osigurali njegovu instalaciju u CI.
+
 ## [2026-06-11 08:42:00] Kreiranje i konfiguracija administratora grujovic.igor89@gmail.com
 - **Opis:**
   Kreiran je i aktiviran administrativni nalog u bazi podataka sa adresom `grujovic.igor89@gmail.com`.
