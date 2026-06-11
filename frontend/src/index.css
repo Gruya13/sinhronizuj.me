@@ -1686,6 +1686,48 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
 }
 
+/* ==========================================================================
+   STILOVI ZA ADMIN PANEL (Sinhronizuj.me Admin)
+   ========================================================================== */
+
+.admin-panel-container {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.admin-tabs button:hover {
+  color: #fff !important;
+  border-bottom-color: rgba(167, 139, 250, 0.5) !important;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Glassmorphism tabela za admin */
+.admin-panel-container table {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.admin-panel-container tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-panel-container input::placeholder {
+  color: #64748b;
+}
+
+.admin-panel-container select option {
+  background: #0f172a !important;
+  color: #fff !important;
+}
+
+
 
 
 

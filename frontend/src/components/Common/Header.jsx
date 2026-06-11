@@ -7,7 +7,10 @@ export default function Header() {
   const {
     user,
     handleLogout,
-    resetStudio
+    resetStudio,
+    isAdminMode,
+    setIsAdminMode,
+    adminStats
   } = useStudio();
 
   return (
@@ -62,7 +65,53 @@ export default function Header() {
       {/* DESNI DEO: KORISNIČKI PROFIL */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
         {user && (
-          <div className="header-user-section">
+          <div className="header-user-section" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            
+            {/* DUGME ZA ADMIN PANEL */}
+            {user.is_admin && (
+              <button
+                onClick={() => {
+                  if (isAdminMode) {
+                    resetStudio();
+                  } else {
+                    resetStudio();
+                    setIsAdminMode(true);
+                  }
+                }}
+                style={{
+                  background: isAdminMode ? 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)' : 'rgba(255, 255, 255, 0.05)',
+                  border: isAdminMode ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '10px',
+                  padding: '6px 12px',
+                  color: '#fff',
+                  fontFamily: 'Outfit, sans-serif',
+                  fontWeight: '600',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  outline: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                🛡️ Admin
+                {adminStats?.users?.waitlist_pending > 0 && (
+                  <span style={{
+                    background: '#ef4444',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    padding: '1px 6px',
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                    marginLeft: '2px'
+                  }}>
+                    {adminStats.users.waitlist_pending}
+                  </span>
+                )}
+              </button>
+            )}
+
             <div 
               className="hide-mobile"
               style={{ 
@@ -74,7 +123,9 @@ export default function Header() {
               }}
             >
               <span style={{ fontWeight: '700', color: '#f1f5f9' }}>{user.email}</span>
-              <span>Korisnik</span>
+              <span style={{ fontSize: '0.65rem', color: user.is_admin ? '#c084fc' : '#94a3b8' }}>
+                {user.is_admin ? "Administrator" : "Korisnik"}
+              </span>
             </div>
             <button
               onClick={handleLogout}

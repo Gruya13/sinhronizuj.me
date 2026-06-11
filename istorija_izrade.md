@@ -2308,3 +2308,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija koda:** Projekat je uspešno prošao kroz produkcioni Vite build (`npm run build`) i sve automatske Vitest testove (`npm run test` - 7 testova prošlo).
 - **Status:** Završeno. Aplikacija je u potpunosti responzivna i spremna za sve uređaje.
 
+### 11.06.2026. 08:20 — Implementacija Kompletnog Admin Panela za Sinhronizuj.me
+- **Zahtevi:** Izrada administrativnog panela za praćenje waitlista, korisnika, troškova i sistemskih resursa bez narušavanja postojećeg rada.
+- **Urađeno:**
+    * **Baza Podataka i Migracije:** U model `User` u `backend/core/models.py` dodata kolona `is_admin` sa podrazumevanom vrednošću `false`. U startup logiku FastAPI-ja u `backend/main.py` dodata automatska alter table migracija koja osigurava kreiranje kolone u PostgreSQL bazi.
+    * **Backend API & Autentifikacija:** U `backend/core/auth.py` dodata zavisnost `get_current_admin_user` koja štiti admin endpointove. Rute `/api/v1/auth/login` i `/api/v1/auth/me` su ažurirane tako da vraćaju `is_admin` status. Dodate su admin rute za dobijanje statistike (`GET /api/v1/admin/stats`), listanje i odobravanje/odbijanje waitlista (`GET /api/v1/admin/waitlist`, `POST /api/v1/admin/waitlist/{id}/approve`, `POST /api/v1/admin/waitlist/{id}/reject`), listanje korisnika i togglovanje uloga (`GET /api/v1/admin/users`, `POST /api/v1/admin/users/{id}/toggle-admin`), listanje i detaljan pregled projekata sa integrisanom pretragom worker logova (`GET /api/v1/admin/projects`, `GET /api/v1/admin/project/{id}`) i pomoćni endpoint za inicijalizaciju prvog administratora.
+    * **Frontend Integracija:** Ažurirano je globalno stanje u `StudioContext.jsx` sa `isAdminMode` i `adminStats` (koji periodično osvežava metrike). U `Header.jsx` dodato je prelepo stakleno dugme "🛡️ Admin" za korisnike sa admin privilegijama koje prikazuje i bedž sa brojem waitlist prijava na čekanju. Kreirana je nova komponenta `AdminPanel.jsx` u `frontend/src/components/Admin/AdminPanel.jsx` koja sadrži tabove za Dashboard, Waitlist, Korisnike i Projekte. Stilizovana je u `index.css` sa modernim staklenim dizajnom (glassmorphism) i animacijama. U `App.jsx` je integrisan ruter koji prikazuje AdminPanel kada je uključen admin mod.
+    * **Verifikacija koda:** Napisani su backend pytest testovi u `tests/test_admin.py` za proveru autorizacije i admin akcija. Svi testovi su uspešno prošli (4/4 pytest i 7/7 vitest testova). Uspešno je pokrenut i produkcioni build (`npm run build`).
+- **Status:** Završeno. Kompletan Admin Panel je uspešno implementiran i integrisan u sistem.
+
+

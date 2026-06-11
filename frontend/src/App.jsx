@@ -15,6 +15,7 @@ import Timeline from './components/Studio/Timeline';
 import SegmentRow from './components/Studio/SegmentRow';
 import LoginRegister from './components/Auth/LoginRegister';
 import LandingPage from './components/Landing/LandingPage';
+import AdminPanel from './components/Admin/AdminPanel';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
 
@@ -23,6 +24,7 @@ function App() {
   const {
     user,
     showProjectsList,
+    isAdminMode,
     newProjectName, setNewProjectName,
     isCreateModalOpen, setIsCreateModalOpen,
     creatingProject,
@@ -405,8 +407,22 @@ function App() {
         )}
 
         <AnimatePresence mode="wait">
+          {/* ADMIN PANEL */}
+          {isAdminMode && user?.is_admin && (
+            <motion.div
+              key="admin-panel"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              style={{ width: '100%', height: '100%' }}
+            >
+              <AdminPanel />
+            </motion.div>
+          )}
+
           {/* DASHBOARD: LISTA PROJEKATA */}
-          {!loading && !videoUrl && !previewFile && !project && showProjectsList && (
+          {!isAdminMode && !loading && !videoUrl && !previewFile && !project && showProjectsList && (
             <motion.div
               key="dashboard"
               initial={{ opacity: 0, y: 15 }}
@@ -419,7 +435,7 @@ function App() {
           )}
 
           {/* FAZA 0: UNOS VIDEA */}
-          {!loading && !videoUrl && !previewFile && !project && !showProjectsList && (
+          {!isAdminMode && !loading && !videoUrl && !previewFile && !project && !showProjectsList && (
             <motion.div
               key="input-area"
               initial={{ opacity: 0, y: 15 }}
@@ -467,7 +483,7 @@ function App() {
           )}
 
           {/* PREVIEW NAKON UČITAVANJA PRE ANALIZE */}
-          {!loading && !videoUrl && previewFile && !project && (
+          {!isAdminMode && !loading && !videoUrl && previewFile && !project && (
             <motion.div
               key="preview-pane"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -532,7 +548,7 @@ function App() {
           )}
 
           {/* ASINHRONI PROGRES EKRAN (FAZA 1 ILI FAZA 2 RENDER) */}
-          {loading && !videoUrl && !project && (
+          {!isAdminMode && loading && !videoUrl && !project && (
             <motion.div
               key="progress-screen"
               initial={{ opacity: 0 }}
@@ -590,7 +606,7 @@ function App() {
           )}
 
           {/* FAZA 1.5: INTERAKTIVNI STUDIO EDITOR (DRAFT MOD STATUS) */}
-          {project && !loading && !videoUrl && (
+          {!isAdminMode && project && !loading && !videoUrl && (
             <motion.div
               key="studio-editor"
               initial={{ opacity: 0, scale: 0.99 }}
