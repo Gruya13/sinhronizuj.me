@@ -2454,6 +2454,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ažuriranje README.md:** Uklonjen je primer i objašnjenje za `GEMINI_API_KEY` iz dela sa konfiguracijom u korenskom `README.md`.
 - **Status:** Završeno. Ključ je kompletno uklonjen iz konfiguracije.
 
+### 12.06.2026. 08:30 — Prebacivanje Dokumentacije u doc i Merge sa main Granom
+- **Zahtevi:** Prebaciti kompletnu dokumentaciju iz `sicret doc/` u javni direktorijum `doc/`, odraditi push na git, verifikovati prolazak CI/CD testova, i ukoliko sve prolazi uspešno, uraditi merge grane `development` sa granom `main`.
+- **Urađeno:**
+    * **Prebacivanje dokumentacije:** Uklonjeni stari, zastareli markdown fajlovi iz direktorijuma `doc/` i prebačeni novi i detaljniji dokumenti iz `sicret doc/` (`kompletna_dokumentacija.md`, `arhitektura_i_baza.md`, `frontend_dokumentacija.md`, `backend_dokumentacija.md`, `audio_i_video_procesiranje.md`, `modal_workers_i_ai.md`, `infrastruktura_i_devops.md`).
+    * **Lokalna verifikacija testova:** Pokrenuti i uspešno završeni svi backend testovi (`pytest` - 15/15 prošlo) i frontend testovi (`npm run test:run` - 7/7 prošlo) pre spajanja grana.
+    * **Git operacije i spajanje:** Sve izmene na dokumentaciji dodate na granu `development` i push-ovane. Potom je izvršeno prebacivanje na granu `main`, spajanje sa granom `development` i slanje (push) ažurne `main` verzije na GitHub.
+- **Status:** Završeno. Dokumentacija je javno integrisana, svi testovi prolaze, a grane development i main su sinhronizovane.
+
+
 
 
 
