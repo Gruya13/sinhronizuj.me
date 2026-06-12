@@ -25,7 +25,8 @@ app = modal.App("sinhronizuj-lektor")
     volumes={"/root/.cache/huggingface": huggingface_cache},
     scaledown_window=1800, # Kontejner ostaje topao 30 minuta nakon poslednjeg zahteva
     timeout=3600,
-    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"}
+    env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"},
+    secrets=[modal.Secret.from_dotenv()]
 )
 @modal.web_server(port=8000, startup_timeout=600)
 def serve():
@@ -33,6 +34,7 @@ def serve():
     Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct AWQ model.
     """
     import subprocess
+    import os
     from modal.experimental import stop_fetching_inputs
 
     cmd = [
@@ -47,6 +49,11 @@ def serve():
         "--enable-chunked-prefill",
         "--port", "8000"
     ]
+
+    api_key = os.environ.get("MODAL_API_KEY")
+    if api_key:
+        print(f"[LEKTOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        cmd.extend(["--api-key", api_key])
 
     print(f"Pokretanje vLLM servera za model: Qwen/Qwen3-32B-AWQ")
     subprocess.Popen(cmd)

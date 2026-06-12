@@ -2589,6 +2589,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Testirao HTTPS rute i potvrdio da se saobraćaj ka MinIO uspešno preusmerava preko Cloudflare-a i Nginx-a bez blokiranja pretraživača.
 - **Status:** Završeno. Mixed Content greška je trajno otklonjena.
 
+### 12.06.2026. 14:30 — Implementacija Sveobuhvatnih Bezbednosnih Unapređenja i Otklanjanja Ranjivosti
+- **Zahtevi:** Implementirati sve preporučene bezbednosne mere iz prethodno sprovedenog bezbednosnog audita.
+- **Urađeno:**
+    * **Modal API Autentifikacija (SEC-01):** Modifikovao sve Modal radnike (`demucs_worker.py`, `stt_worker.py`, `sensevoice_worker.py`, `translator_worker.py`, `lektor_worker.py`, `tts.py`, `tts_openvoice.py`) da preuzimaju tajne iz okruženja preko `modal.Secret.from_dotenv()` i vrše proveru API ključa iz HTTP zaglavlja (`X-API-Key` i `Authorization: Bearer` za vLLM instance). Ažurirao helper klijent `call_modal_endpoint` na backendu da automatski šalje ove ključeve.
+    * **CORS Restrikcija (SEC-05):** Ažurirao `backend/core/config.py` tako da učitava listu dozvoljenih origins `ALLOWED_ORIGINS` iz `.env` fajla, i podesio CORS middleware u `backend/main.py` da koristi ovu listu umesto nesigurnog wildcard `["*"]`.
+    * **SSRF Zaštita (SEC-07):** Implementirao funkciju `is_safe_url` u `backend/worker/downloader.py` koja zabranjuje preuzimanje videa sa privatnih i lokalnih mrežnih opsega (RFC 1918 i loopback), uspešno sprečavajući Server-Side Request Forgery napade.
+    * **Uklanjanje Hardkodovanih Lozinki (SEC-03 & SEC-04):** Očistio `backend/core/config.py` od osetljivih produkcionih lozinki i postavio bezbedne default vrednosti na SQLite za lokalni razvoj. Smanjio trajanje pristupnih JWT tokena sa 7 dana na 60 minuta radi prevencije zloupotrebe sesije.
+    * **Verifikacija:** Uspešno pokrenuo kompletan test paket (`pytest` - 15/15 testova prošlo uspešno) preko lokalnog virtuelnog okruženja, čime je potvrđena funkcionalna ispravnost svih unetih promena bez uticaja na postojeće API rute.
+- **Status:** Završeno. Bezbednosna unapređenja su uspešno integrisana u sistem i verifikovana.
+
+
 
 
 

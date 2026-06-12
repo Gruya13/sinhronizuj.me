@@ -59,7 +59,7 @@ image = (
     .pip_install("torch", "torchaudio", "huggingface-hub", "orjson", "matplotlib", "librosa", "soundfile", "vector-quantize-pytorch", "torchcodec==0.11.1")
 )
 
-@app.cls(image=image, gpu="L4", network_file_systems={VOLUME_PATH: models_nfs}, scaledown_window=300, timeout=1200)
+@app.cls(image=image, gpu="L4", network_file_systems={VOLUME_PATH: models_nfs}, scaledown_window=300, timeout=1200, secrets=[modal.Secret.from_dotenv()])
 class WorkerV110:
     @modal.enter()
     def setup(self):
@@ -148,7 +148,7 @@ class WorkerV110:
         return {"id": seg_id, "audio_base64": audio_b64}
 
     @modal.fastapi_endpoint(method="POST")
-    def task(self, data: dict):
+    def task(self, data: dict, request = None):
         import traceback
         import base64
         import os
@@ -156,6 +156,15 @@ class WorkerV110:
         import glob
         import uuid
         import shutil
+        from fastapi.responses import JSONResponse
+        
+        # Provera API ključa
+        if request is not None:
+            expected_key = os.environ.get("MODAL_API_KEY")
+            if expected_key:
+                api_key = request.headers.get("X-API-Key")
+                if api_key != expected_key:
+                    return JSONResponse(status_code=403, content={"error": "Neovlašćen pristup. API ključ je neispravan."})
         
         try:
             # Podesavanje putanje

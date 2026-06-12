@@ -11,6 +11,11 @@ def call_modal_endpoint(url: str, payload: dict, timeout_seconds: int = 600, pro
     headers = {
         "Content-Type": "application/json"
     }
+    if getattr(settings, "MODAL_API_KEY", None):
+        headers["X-API-Key"] = settings.MODAL_API_KEY
+        headers["Authorization"] = f"Bearer {settings.MODAL_API_KEY}"
+
+
     
     max_retries = 5
     retry_delay = 5.0

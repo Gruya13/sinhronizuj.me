@@ -13,12 +13,14 @@ app = modal.App("sm-demucs")
     gpu="T4", # T4 GPU za brzu separaciju zvuka
     image=image_demucs,
     timeout=600,
-    scaledown_window=300
+    scaledown_window=300,
+    secrets=[modal.Secret.from_dotenv()]
 )
 class DemucsWorker:
     @modal.asgi_app()
     def task(self):
         from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
         import base64
         import tempfile
         import os
@@ -29,6 +31,13 @@ class DemucsWorker:
 
         @web_app.post("/")
         async def handle_request(request: Request):
+            # Provera API ključa
+            expected_key = os.environ.get("MODAL_API_KEY")
+            if expected_key:
+                api_key = request.headers.get("X-API-Key")
+                if api_key != expected_key:
+                    return JSONResponse(status_code=403, content={"error": "Neovlašćen pristup. API ključ je neispravan."})
+
             data = await request.json()
             audio_b64 = data.get("audio_base64")
             if not audio_b64:

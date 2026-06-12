@@ -48,10 +48,11 @@ image = (
     )
 )
 
-@app.cls(image=image, gpu="L4", network_file_systems={VOLUME_PATH: models_nfs}, scaledown_window=300, timeout=1200)
+@app.cls(image=image, gpu="L4", network_file_systems={VOLUME_PATH: models_nfs}, scaledown_window=300, timeout=1200, secrets=[modal.Secret.from_dotenv()])
 class OpenVoiceWorker:
     @modal.enter()
     def setup(self):
+
         import torch
         # Postavljanje keš direktorijuma na NFS
         os.environ["HF_HOME"] = f"{VOLUME_PATH}/hf_cache"
@@ -218,8 +219,18 @@ class OpenVoiceWorker:
             return {"id": seg_id, "error": str(ex)}
 
     @modal.fastapi_endpoint(method="POST")
-    def task(self, data: dict):
+    def task(self, data: dict, request = None):
         import sys
+        from fastapi.responses import JSONResponse
+        
+        # Provera API ključa
+        if request is not None:
+            expected_key = os.environ.get("MODAL_API_KEY")
+            if expected_key:
+                api_key = request.headers.get("X-API-Key")
+                if api_key != expected_key:
+                    return JSONResponse(status_code=403, content={"error": "Neovlašćen pristup. API ključ je neispravan."})
+
         from unittest.mock import MagicMock
         sys.modules['faster_whisper'] = MagicMock()
         

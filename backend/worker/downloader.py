@@ -3,14 +3,57 @@ import yt_dlp
 import uuid
 import boto3
 import subprocess
+import socket
+from urllib.parse import urlparse
 from backend.core.config import settings
+
+def is_safe_url(url: str) -> bool:
+    """
+    Proverava da li je URL bezbedan i sprečava SSRF napade ka lokalnoj mreži.
+    """
+    try:
+        parsed_url = urlparse(url)
+        # S3 interna šema je dozvoljena u našem sistemu
+        if parsed_url.scheme == "s3":
+            return True
+            
+        if parsed_url.scheme not in ["http", "https"]:
+            return False
+            
+        hostname = parsed_url.hostname
+        if not hostname:
+            return False
+            
+        # Rezolucija IP adrese
+        ip = socket.gethostbyname(hostname)
+        
+        # Provera privatnih i loopback opsega (RFC 1918 i localhost)
+        ip_parts = list(map(int, ip.split('.')))
+        if (
+            ip_parts[0] == 127 or                  # Loopback
+            ip_parts[0] == 10 or                   # Klasa A
+            (ip_parts[0] == 172 and 16 <= ip_parts[1] <= 31) or # Klasa B
+            (ip_parts[0] == 192 and ip_parts[1] == 168) or      # Klasa C
+            ip == "0.0.0.0"
+        ):
+            print(f"[SSRF BLOCKED] Odbijen pristup privatnom mrežnom opsegu: {ip} za URL: {url}")
+            return False
+            
+        return True
+    except Exception as e:
+        print(f"[SSRF ERROR] Greška pri validaciji URL-a: {e}")
+        return False
 
 def download_video(url: str) -> dict:
     """
     Glavna funkcija za dobavljanje videa. Podržava YouTube i S3.
     """
+    if not is_safe_url(url):
+        return {"status": "error", "message": "Zabranjen ili neispravan URL (SSRF zaštita)."}
+
     if not os.path.exists(settings.TEMP_WORKSPACE):
         os.makedirs(settings.TEMP_WORKSPACE)
+
 
     if url.startswith("s3://"):
         return _download_from_s3(url)

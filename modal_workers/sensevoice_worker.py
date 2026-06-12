@@ -34,7 +34,8 @@ app = modal.App("sm-sensevoice-only")
     gpu="T4", 
     image=image_sensevoice, 
     timeout=600,
-    scaledown_window=300
+    scaledown_window=300,
+    secrets=[modal.Secret.from_dotenv()]
 )
 class SenseVoiceWorker:
     @modal.enter()
@@ -52,10 +53,18 @@ class SenseVoiceWorker:
     @modal.asgi_app()
     def task(self):
         from fastapi import FastAPI, Request
+        from fastapi.responses import JSONResponse
         web_app = FastAPI()
         
         @web_app.post("/")
         async def handle_request(request: Request):
+            # Provera API ključa
+            expected_key = os.environ.get("MODAL_API_KEY")
+            if expected_key:
+                api_key = request.headers.get("X-API-Key")
+                if api_key != expected_key:
+                    return JSONResponse(status_code=403, content={"error": "Neovlašćen pristup. API ključ je neispravan."})
+
             import base64
             import tempfile
             import os

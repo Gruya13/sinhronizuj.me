@@ -34,7 +34,8 @@ model_volume = modal.Volume.from_name("sinhronizuj-models", create_if_missing=Tr
     max_containers=1,
     env={
         "VLLM_WORKER_MULTIPROC_METHOD": "spawn",
-    }
+    },
+    secrets=[modal.Secret.from_dotenv()]
 )
 @modal.web_server(port=8000, startup_timeout=1200)
 def serve():
@@ -83,6 +84,11 @@ def serve():
         "--host", "0.0.0.0",
         "--port", "8000"
     ]
+    
+    api_key = os.environ.get("MODAL_API_KEY")
+    if api_key:
+        print(f"[TRANSLATOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        cmd.extend(["--api-key", api_key])
     
     subprocess.Popen(cmd)
 
