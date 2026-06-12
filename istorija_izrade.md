@@ -2505,6 +2505,7 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Docker Compose Optimizacija:** Ažuriran `infra/hetzner/docker-compose.prod.yml` sa zdravstvenim proverama (healthchecks) za Postgres i Redis, depends_on uslovima, resursnim limitima za API i radnike, log rotacijom i uklanjanjem javno izloženih portova 5432 i 6379. Dodata podrška za dinamički `IMAGE_TAG`.
     * **GitHub Actions CI/CD:** Ažuriran `.github/workflows/deploy.yml` tako da Actions sada grade i šalju (push) Docker slike na GitHub Container Registry (GHCR), a na VPS-u se samo povlače gotove slike (`docker compose pull`) što eliminiše build opterećenje na serveru.
     * **Monitoring (Sentry):** Dodat `sentry-sdk` u `requirements.txt`. Integrisan Sentry u `backend/main.py` i `backend/worker/celery_app.py` za automatsko praćenje i dojavu grešaka u realnom vremenu na FastAPI i Celery instancama.
-    * **Verifikacija:** Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15) i frontend testovi (`vitest` - 7/7).
-- **Status:** Završeno. Sve DevOps izmene su uspešno integrisane i testirane.
+    * **Verifikacija i Izveštaj:** Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15) i frontend testovi (`vitest` - 7/7). Kreiran je detaljan DevOps verifikacioni izveštaj `devops_verifikacija_izvestaj.md` u tajnom direktorijumu `sicret doc`.
+- **Status:** Završeno. Sve DevOps izmene su uspešno integrisane, verifikovane i dokumentovane.
+
 
