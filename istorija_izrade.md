@@ -2490,3 +2490,10 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Analiza koda i strukture:** Detaljno pregledani React klijent (DAW komponente), FastAPI API Gateway, Celery worker sa pipeline koracima i Modal.com AI radnici.
     * **Izrada izveštaja o oceni:** Kreiran je novi arhitektonski izveštaj `arhitektonska_ocena_sistema.md` u direktorijumu za artifakte, koji definiše ključne snage projekta (ekonomičnost, Ensemble ASR, dynamic time stretching, perzistencija), slabosti (lokalni Wav2Lip CPU bottleneck, nedostatak diarizacije, polling latencija) i daje konkretne akcione predloge za prelazak na sledeću fazu.
 - **Status:** Završeno. Izveštaj o oceni sistema je uspešno kreiran i postavljen.
+
+### 12.06.2026. 09:00 — DevOps Pregled i Predlozi za Unapređenje Sistema
+- **Zahtevi:** Izvršiti detaljan DevOps pregled projekta, analizirati CI/CD konfiguraciju, Docker postavke, backup procese, sigurnosne aspekte i dati konkretne predloge za poboljšanje i skaliranje.
+- **Urađeno:**
+    * **Analiza infrastrukture:** Pregledani su Dockerfiles, docker-compose konfiguracije za produkciju i lokalni razvoj, GitHub Actions workflow datoteke, backup skripte i mrežne postavke.
+    * **Izrada DevOps izveštaja:** Kreiran je dokument `doc/devops_predlozi_unapredjenja.md` sa detaljnim objašnjenjima i rešenjima za build pipeline (uvođenje Docker Registry), bezbednost (skrivanje izloženih portova baze i Redis-a), backup (otpremanje na eksterni cloud storage umesto lokalnog MinIO), monitoring (Sentry, Uptime Kuma) i skaliranje Celery radnika.
+- **Status:** Završeno. DevOps izveštaj je uspešno kreiran i postavljen u doc folder.
