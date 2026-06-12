@@ -23,6 +23,72 @@
 
 ---
 
+## 🌐 Arhitektura i Infrastruktura
+
+Mermaid dijagram ispod prikazuje protok podataka i povezanost komponenti unutar sinhronizuj.me sistema:
+
+```mermaid
+graph TD
+    subgraph Klijent [Klijentski Sloj]
+        Browser["Korisnički Browser (React/Vite)"]
+    end
+
+    subgraph CF [Mrežna Zaštita]
+        Cloudflare["Cloudflare Proxy (DNS / SSL / DDoS)"]
+    end
+
+    subgraph HetznerVPS [Hetzner VPS - Docker Compose]
+        NginxProxy["Nginx SSL Reverse Proxy"]
+        
+        subgraph DockerNet [sinhronizuj-net (Izolovana mreža)]
+            Frontend["sinhronizuj-frontend (Nginx Port 3000)"]
+            API["sinhronizuj-api (FastAPI Port 8000)"]
+            Celery["sinhronizuj-celery (Celery Worker)"]
+            Redis["sinhronizuj-redis (Message Broker)"]
+            Postgres[("sinhronizuj-db (PostgreSQL)")]
+            MinIO[("MinIO S3 Storage (Port 9000)")]
+        end
+    end
+
+    subgraph ModalCloud [Modal.com Serverless GPU]
+        Demucs["Demucs Worker (Separacija - T4 GPU)"]
+        SenseVoice["SenseVoice Worker (STT - T4 GPU)"]
+        Translator["Translator Worker (Llama-3 - CPU/T4)"]
+        Lektor["Lektor Worker (Qwen-3 - CPU)"]
+        TTS["TTS OpenVoice Worker (Sinteza - L4 GPU)"]
+    end
+
+    subgraph GitHubFlow [CI/CD Pipeline]
+        GHActions["GitHub Actions Runner"]
+        GHCR["GitHub Container Registry (GHCR)"]
+    end
+
+    %% Klijentske veze
+    Browser -->|HTTPS Zahtev| Cloudflare
+    Cloudflare -->|Rutiranje| NginxProxy
+    NginxProxy -->|Servira statiku| Frontend
+    NginxProxy -->|API rute| API
+
+    %% API veze
+    API -->|Upiti i Snimanje| Postgres
+    API -->|Generiše upload URL| MinIO
+    Browser -->|Direktan Upload videa| MinIO
+    API -->|Enqueue task| Redis
+    Redis -->|Osluškuje| Celery
+
+    %% Celery radnik i Modal veze
+    Celery -->|Poziva AI modele preko HTTP-a| ModalCloud
+    ModalCloud -.->|Vraća rezultate| Celery
+    Celery -->|Čita/Piše fajlove| MinIO
+    Celery -->|Ažurira stanje projekta| Postgres
+
+    %% CI/CD Tok
+    GHActions -->|Gradi i šalje Docker slike| GHCR
+    GHCR -.->|VPS povlači slike preko SSH-a| HetznerVPS
+```
+
+---
+
 ## 🛠️ Tehnološki Stack
 
 | Sloj | Tehnologije i Modeli |

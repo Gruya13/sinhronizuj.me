@@ -2515,5 +2515,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ažuriranje kompletne dokumentacije:** Izmenjene i javna (`doc/kompletna_dokumentacija.md`) i tajna (`sicret doc/kompletna_dokumentacija.md`) verzija sveobuhvatne dokumentacije. Dodate su nove stavke o Sentry praćenju u backend delu, kontejnerizaciji React/Vite frontenda pod Nginxom na portu 3000, i prelazak deploy pipeline-a na GitHub Container Registry (GHCR) za povlačenje pre-built slika na Hetzner VPS.
 - **Status:** Završeno. Sva dokumentacija je uspešno ažurirana, usklađena sa stvarnim stanjem sistema i spremna za korišćenje.
 
+### 12.06.2026. 09:30 — Dodavanje Arhitektonskog Dijagrama u README
+- **Zahtevi:** Dodati detaljan Mermaid arhitektonski i infrastrukturni dijagram u korenski `README.md`.
+- **Urađeno:**
+    * **Izrada Mermaid dijagrama:** Kreirao i integrisao vizuelni `mermaid` dijagram koji prikazuje sve slojeve sistema:
+        * *Klijentski sloj*: Browser interakcija.
+        * *Mrežna zaštita*: Cloudflare proxy i Nginx SSL reverse proxy.
+        * *Hetzner VPS*: Docker Compose konfiguracija (API, Frontend, Celery, Redis, PostgreSQL, MinIO S3) unutar izolovane mreže.
+        * *Modal Cloud*: Serverless GPU AI radnici za Demucs, SenseVoice, prevođenje, lektorisanje i TTS.
+        * *CI/CD cevovod*: GitHub Actions sa automatskim build-om slika i push-om na GHCR.
+- **Status:** Završeno. README.md sadrži kompletan vizuelni pregled arhitekture sistema.
+
+
 
 
