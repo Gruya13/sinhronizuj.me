@@ -19,8 +19,14 @@ class Settings:
     
     # MinIO Storage
     MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin") # Koristi standardni minio default za dev
-    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    
+    _minio_secret: str = os.getenv("MINIO_SECRET_KEY", "")
+    if not _minio_secret:
+        if os.getenv("ENVIRONMENT") == "production":
+            raise ValueError("MINIO_SECRET_KEY mora biti definisan u produkcionom okruženju!")
+        _minio_secret = "minioadmin"
+    MINIO_SECRET_KEY: str = _minio_secret
     MINIO_BUCKET: str = "uploads"
     MINIO_PUBLIC_ENDPOINT: str = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://localhost:9000")
     MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "False").lower() == "true"
@@ -34,12 +40,22 @@ class Settings:
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
 
     # JWT Security
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "insecure_default_secret_key_change_in_production")
+    _jwt_secret: str = os.getenv("JWT_SECRET", "")
+    if not _jwt_secret:
+        if os.getenv("ENVIRONMENT") == "production":
+            raise ValueError("JWT_SECRET mora biti definisan u produkcionom okruženju!")
+        _jwt_secret = "insecure_default_secret_key_change_in_production"
+    JWT_SECRET: str = _jwt_secret
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
     # Database Configuration
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./sinhronizuj_local.db") # Default na SQLite za dev
+    _db_url: str = os.getenv("DATABASE_URL", "")
+    if not _db_url:
+        if os.getenv("ENVIRONMENT") == "production":
+            raise ValueError("DATABASE_URL mora biti definisan u produkcionom okruženju!")
+        _db_url = "sqlite:///./sinhronizuj_local.db"
+    DATABASE_URL: str = _db_url
 
     # Security & CORS
     ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")

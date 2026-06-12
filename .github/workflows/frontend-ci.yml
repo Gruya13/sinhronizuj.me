@@ -28,6 +28,11 @@ jobs:
         cd frontend
         npm ci
 
+    - name: Provera zavisnosti na bezbednosne ranjivosti (npm audit)
+      run: |
+        cd frontend
+        npm audit --audit-level=high
+
     - name: Pokretanje lintera
       run: |
         cd frontend

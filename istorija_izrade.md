@@ -1,3 +1,19 @@
+## [2026-06-12 14:26:00] Analiza bezbednosti i implementacija preporučenih sigurnosnih mera
+- **Opis:**
+  Sproveli smo bezbednosnu analizu projekta, ažurirali tajni izveštaj [bezbednosni_audit_izvestaj.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/bezbednosni_audit_izvestaj.md) i u potpunosti implementirali predložena bezbednosna unapređenja:
+  1. **Konfiguracija okruženja i učitavanje tajni (SEC-03):**
+     - Izmenili smo [config.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/core/config.py) tako da osetljive varijable (`JWT_SECRET`, `MINIO_SECRET_KEY`, `DATABASE_URL`) nemaju podrazumevane dev vrednosti u produkciji. Aplikacija sada baca `ValueError` na startu ako ove varijable nisu setovane kada je `ENVIRONMENT=production`.
+  2. **Zatvaranje mrežnih portova (SEC-02):**
+     - U [docker-compose.prod.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/hetzner/docker-compose.prod.yml) smo konfigurisali da portovi za API (`8000`), MinIO (`9000`, `9001`) i Frontend (`3000`) slušaju isključivo na localhost-u (`127.0.0.1`), čime su zaštićeni od direktnih spoljnih napada i primorani da komuniciraju isključivo kroz lokalni HTTPS reverse proxy.
+     - Dodali smo `ENVIRONMENT=production` u sva backend okruženja u docker-compose-u.
+  3. **Poboljšanje strategije bekapovanja (SEC-06):**
+     - Ažurirali smo [backup.py](file:///home/gruya/Projektri/sinhronizuj.me/infra/backup.py) da detektuje i koristi eksterne S3 bekap akreditive (`BACKUP_S3_ENDPOINT`, `BACKUP_S3_ACCESS_KEY`, `BACKUP_S3_SECRET_KEY`) ukoliko su definisani u okruženju, omogućavajući off-site bekapovanje na drugi cloud provajder.
+  4. **Bezbednosne provere u CI/CD pipeline-u (SEC-08):**
+     - Integrisali smo **Bandit** (SAST skener za Python) u [backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml) nakon Ruff lintera kako bi automatski proveravao kod na sigurnosne propuste.
+     - Integrisali smo `npm audit --audit-level=high` u [frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml) nakon instalacije zavisnosti radi automatskog skeniranja ranjivosti u npm paketima.
+  5. **Verifikacija:**
+     - Pokrenuli smo celokupan pytest test suite lokalno (15/15 testova uspešno prošlo), čime je verifikovana stabilnost API-ja nakon bezbednosnih izmena konfiguracije.
+
 ## [2026-06-12 13:38:00] Čišćenje produkcijske baze podataka i promena lozinke za korisnika
 - **Opis:**
   Izvršili smo administrativne akcije nad produkcijskom bazom podataka u kontejneru `sinhronizuj-db` na VPS-u (`178.104.214.78`).

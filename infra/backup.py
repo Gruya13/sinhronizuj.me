@@ -33,14 +33,31 @@ def run_backup():
         print(f"[ERROR] pg_dump komanda nije uspela: {e}")
         sys.exit(1)
         
-    # 2. Otpremamo backup fajl na MinIO (S3) bucket pod nazivom 'backups'
-    bucket_name = "backups"
+    # 2. Otpremamo backup fajl na S3 (podržava i eksterni i lokalni MinIO)
+    backup_endpoint = os.getenv("BACKUP_S3_ENDPOINT")
+    backup_access_key = os.getenv("BACKUP_S3_ACCESS_KEY")
+    backup_secret_key = os.getenv("BACKUP_S3_SECRET_KEY")
+    backup_bucket = os.getenv("BACKUP_S3_BUCKET", "backups")
+    backup_secure = os.getenv("BACKUP_S3_SECURE", "True").lower() == "true"
     
+    if backup_endpoint and backup_access_key and backup_secret_key:
+        endpoint_url = f"https://{backup_endpoint}" if backup_secure else f"http://{backup_endpoint}"
+        aws_access_key_id = backup_access_key
+        aws_secret_access_key = backup_secret_key
+        bucket_name = backup_bucket
+        print(f"Koristim EKSTERNI S3 backup endpoint: {endpoint_url} (bucket: {bucket_name})")
+    else:
+        endpoint_url = f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}"
+        aws_access_key_id = settings.MINIO_ACCESS_KEY
+        aws_secret_access_key = settings.MINIO_SECRET_KEY
+        bucket_name = "backups"
+        print(f"Upozorenje: Nisu definisani eksterni S3 akreditivi. Koristim lokalni MinIO: {endpoint_url}")
+        
     s3_client = boto3.client(
         's3',
-        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
-        aws_access_key_id=settings.MINIO_ACCESS_KEY,
-        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        endpoint_url=endpoint_url,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
         config=Config(signature_version='s3v4'),
         region_name='us-east-1'
     )
