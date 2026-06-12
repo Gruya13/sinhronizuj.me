@@ -2508,4 +2508,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija i Izveštaj:** Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15) i frontend testovi (`vitest` - 7/7). Kreiran je detaljan DevOps verifikacioni izveštaj `devops_verifikacija_izvestaj.md` u tajnom direktorijumu `sicret doc`.
 - **Status:** Završeno. Sve DevOps izmene su uspešno integrisane, verifikovane i dokumentovane.
 
+### 12.06.2026. 09:20 — Ažuriranje Celokupne Dokumentacije
+- **Zahtevi:** Ažurirati celokupnu tehničku dokumentaciju u javnom (`doc/`) i tajnom (`sicret doc/`) direktorijumu kako bi u potpunosti odražavala nove DevOps izmene i CI/CD integraciju.
+- **Urađeno:**
+    * **Usklađivanje backend dokumentacije:** Ažuriran dokument `sicret doc/backend_dokumentacija.md` dodavanjem detaljnih informacija o integraciji Sentry monitoringa i automatskom beleženju grešaka, čime je u potpunosti sinhronizovan sa javnom verzijom `doc/backend_dokumentacija.md`.
+    * **Ažuriranje kompletne dokumentacije:** Izmenjene i javna (`doc/kompletna_dokumentacija.md`) i tajna (`sicret doc/kompletna_dokumentacija.md`) verzija sveobuhvatne dokumentacije. Dodate su nove stavke o Sentry praćenju u backend delu, kontejnerizaciji React/Vite frontenda pod Nginxom na portu 3000, i prelazak deploy pipeline-a na GitHub Container Registry (GHCR) za povlačenje pre-built slika na Hetzner VPS.
+- **Status:** Završeno. Sva dokumentacija je uspešno ažurirana, usklađena sa stvarnim stanjem sistema i spremna za korišćenje.
+
+
 

@@ -81,8 +81,11 @@ Zaštita produkcionog VPS servera implementirana je kroz više slojeva:
     *   Login i Register: Ograničeni na 10 zahteva po minuti po IP adresi.
 4.  **Cloudflare Proxy**:
     Javni DNS zapisi za `sinhronizuj.me` prolaze kroz Cloudflare proxy. Ovo sakriva stvarnu IP adresu VPS-a, pruža automatsku DDoS zaštitu i omogućava keširanje statičkih frontend resursa na Cloudflare ivici (edge).
+5.  **Sentry Monitoring i Izveštavanje o Greškama**:
+    U FastAPI i Celery radnike je integrisan Sentry SDK. Ukoliko se u konfiguraciji definiše `SENTRY_DSN` ključ, sve neočekivane greške, izuzeci (500 internal server error) i kritični logovi se automatski prijavljuju i grupišu na Sentry kontrolnoj tabli u realnom vremenu, što olakšava i ubrzava otklanjanje problema u produkciji.
 
 ---
+
 
 ## 5. Backend Testiranje
 

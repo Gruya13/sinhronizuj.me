@@ -64,6 +64,7 @@ FastAPI obezbeđuje visokoperformansni API gateway sa naprednim zaštitama i asi
 *   **Rate Limiting (SlowAPI)**: Zaštita osetljivih ruta (waitlist, login, registracija) od brute-force napada ograničavanjem broja zahteva po IP adresi.
 *   **Celery Integracija**: Preusmeravanje teških poslova obrade u Redis red poruka, osiguravajući da API gateway ostane slobodan i brz za sve korisnike.
 *   **Hardware Monitor**: API periodično prikuplja podatke o statusu veze sa Redisom, iskorišćenosti sistemskih resursa hosta i statusu Modal serverless GPU instanci.
+*   **Sentry SDK**: Integrisano praćenje grešaka u realnom vremenu za FastAPI i Celery, što omogućava brzu dijagnostiku u produkciji.
 
 ---
 
@@ -104,15 +105,16 @@ Aplikacija se razvija i isporučuje kroz strukturisani DevOps pipeline:
 *   **Production VPS**: `178.104.214.78` (povezan sa `main` granom).
 *   **Sigurnost**: Nginx SSL reverse proxy, Cloudflare proxy zaštita i mrežni UFW firewall.
 
-### 6.2. Docker Compose lokalni servisi
+### 6.2. Docker Compose lokalni servisi i produkcioni kontejneri
 Zajedničko pokretanje servisa vrši se kroz kontejnere:
 *   `sinhronizuj-db` (Postgres, port 5432)
 *   `sinhronizuj-redis` (Redis, port 6379)
 *   `sinhronizuj-api` (FastAPI web server, port 8000)
 *   `sinhronizuj-celery` (Celery pozadinski radnik)
+*   `sinhronizuj-frontend` (Nginx, port 3000 za produkciju, servira kontejnerizovane React/Vite resurse)
 
 ### 6.3. CI/CD GitHub Actions Workflows
 *   [backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml): Automatski pokreće Python pytest integracione testove prilikom svakog push-a.
 *   [frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml): Instalira zavisnosti i pokreće frontend unit testove (`npm run test:run`).
-*   [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml): Objedinjuje testove i automatski vrši ažuriranje koda na odgovarajući VPS server putem SSH-a nakon prolaska celog CI paketa.
+*   [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml): Automatski gradi Docker slike nakon prolaska testova, radi push na GitHub Container Registry (GHCR), te na Hetzner VPS-u povlači slike (pull) i radi brzi deploy preko SSH-a, eliminišući lokalni build na serveru.
 *   **Backup**: Cron posao svake noći u 02:00h vrši backup PostgreSQL baze i šalje ga na MinIO S3 bucket sa rotacijom i automatskim brisanjem arhiva starijih od 7 dana.
