@@ -2428,4 +2428,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15 testova prošlo).
 - **Status:** Završeno. Kod je refaktorisan, testovi su uspešno integrisani, a Alembic migracije su spremne.
 
+### 12.06.2026. 08:05 — Izrada Sveobuhvatne i Detaljne Dokumentacije Sistema u sicret doc
+- **Zahtevi:** Kreirati kompletnu tehničku dokumentaciju u jednom sveobuhvatnom markdown fajlu i dodatno izraditi još detaljniju dokumentaciju podeljenu po specifičnim oblastima u zasebnim markdown fajlovima unutar tajnog direktorijuma `sicret doc`.
+- **Urađeno:**
+    * **Centralni dokument (`sicret doc/kompletna_dokumentacija.md`):** Izrađena je sveobuhvatna knjiga sistema koja na jednom mestu sumira arhitekturu, bazu podataka, frontend, backend, cevovode obrade, veštačku inteligenciju i DevOps prakse, sa brzim linkovima ka detaljnim oblastima.
+    * **Arhitektura i Baza podataka (`sicret doc/arhitektura_i_baza.md`):** Detaljno dokumentovan troslojni model sistema, SQLAlchemy modeli (`User`, `Project`, `Segment`, `Glossary`, `Waitlist`), pre-potpisani S3 upload, startup logika API-ja i Alembic migracioni tok.
+    * **Frontend klijent (`sicret doc/frontend_dokumentacija.md`):** Detaljno opisane komponente po direktorijumima (Admin, Auth, Studio, Dashboard, Common), globalno upravljanje stanjem u `StudioContext.jsx`, undo/redo mehanizam, mobilna responzivnost i dizajn sistem (glassmorphism), kao i testiranje preko Vitest-a.
+    * **Backend server (`sicret doc/backend_dokumentacija.md`):** Dokumentovane sve FastAPI rute (uključujući javne, zaštićene admin rute i rute za obradu), JWT autentifikacioni protokol, Celery i Redis asinhroni radnici, kao i bezbednosni parametri (Nginx SSL, UFW firewall, SlowAPI rate limiting, Cloudflare proxy).
+    * **Audio i Video procesiranje (`sicret doc/audio_i_video_procesiranje.md`):** Detaljno objašnjen cevovod obrade od uploada do renderovanja, Demucs separacija vokala, SenseVoice STT, integracija glosara u prevođenju, OpenVoice/MeloTTS kloniranje glasa i `merger.py` sa dinamičkim ubrzanjem i pydub miksovanjem.
+    * **AI i Modal radnici (`sicret doc/modal_workers_i_ai.md`):** Dokumentovana serverless infrastruktura na Modalu, modeli, precizna analiza i optimizacija GPU troškova po videu (prosečno ispod $0.03 po videu), i strategija zagrevanja kontejnera (warmup) radi eliminacije hladnog starta.
+    * **Infrastruktura i DevOps (`sicret doc/infrastruktura_i_devops.md`):** Detaljno specifikovani Hetzner VPS serveri (Development na `116.202.103.35`, Production na `178.104.214.78`), Docker Compose lokalno i produkciono okruženje, noćni backup baze i medija sa rotacijom na MinIO S3 od 7 dana, i modularni GitHub Actions workflows (`backend-ci.yml`, `frontend-ci.yml`, `deploy.yml`).
+- **Status:** Završeno. Sveobuhvatna i podeljena dokumentacija je uspešno generisana i sačuvana u tajnom direktorijumu.
+
+
 
