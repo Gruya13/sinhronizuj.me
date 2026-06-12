@@ -1,3 +1,13 @@
+## [2026-06-12 13:38:00] Čišćenje produkcijske baze podataka i promena lozinke za korisnika
+- **Opis:**
+  Izvršili smo administrativne akcije nad produkcijskom bazom podataka u kontejneru `sinhronizuj-db` na VPS-u (`178.104.214.78`).
+  1. **Brisanje testnih korisnika:**
+     - Obrisan je svih 10 korisnika kreiranih tokom load testiranja, čiji email-ovi počinju sa `loadtest_` (kroz upit `DELETE FROM users WHERE email LIKE 'loadtest%';`).
+     - Svi povezani podaci (projekti, segmenti, rečnici) su kaskadno obrisani iz baze zahvaljujući stranim ključevima sa `ON DELETE CASCADE`.
+  2. **Promena lozinke korisnika:**
+     - Lozinka za korisnika `gruyo89@gmail.com` je uspešno promenjena na `koliko123`.
+     - Heš lozinke je generisan korišćenjem bcrypt biblioteke unutar `sinhronizuj-api` kontejnera i ažuriran u bazi podataka.
+
 ## [2026-06-12 09:30:00] Usklađivanje i ispravljanje celokupne projektne dokumentacije
 - **Opis:**
   Proverili smo i ažurirali sve datoteke dokumentacije u projektu kako bismo ih uskladili sa stvarnim stanjem programskog koda i otklonili netačne opise.
