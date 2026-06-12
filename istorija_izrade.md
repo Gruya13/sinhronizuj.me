@@ -2580,6 +2580,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Kreiranje bezbednosnog izveštaja:** Izrađen je sveobuhvatan dokument `bezbednosni_audit_izvestaj.md` na srpskom jeziku koji detaljno objašnjava svaki rizik, klasifikuje pretnje i pruža gotova programska i sistemska rešenja sa primerima koda za otklanjanje propusta. Dokument je uspešno sačuvan i kao sistemski artefakt sesije i u poverljivom direktorijumu `sicret doc/bezbednosni_audit_izvestaj.md`.
 - **Status:** Završeno. Bezbednosni audit je u potpunosti sproveden i dokumentovan.
 
+### 12.06.2026. 14:20 — Rešavanje Mixed Content Greške Pri Uploadu Videa
+- **Zahtevi:** Dijagnostikovati i otkloniti "Mixed Content" grešku koja blokira upload videa sa klijentskog interfejsa na produkcionom serveru.
+- **Urađeno:**
+    * **Konfiguracija Nginx-a:** Na produkcionom VPS serveru (`178.104.214.78`) ažurirao konfiguraciju za `api.sinhronizuj.me` u `/etc/nginx/sites-enabled/sinhronizuj.me` dodavanjem specifičnih `location /uploads/` i `location /previews/` blokova koji bezbedno proksiraju saobraćaj preko HTTPS-a na interni MinIO port `9000`.
+    * **Ažuriranje promenljivih okruženja:** Izmenio `MINIO_PUBLIC_ENDPOINT` u `/opt/sinhronizuj-me/.env` iz `http://178.104.214.78:9000` u `https://api.sinhronizuj.me` kako bi aplikacija generisala isključivo bezbedne HTTPS pre-signed URL-ove za upload i preuzimanje.
+    * **Ponovno pokretanje servisa:** Pokrenuo `docker compose up -d` da bi se kreirali kontejneri za API i sve Celery radnike sa osveženim promenljivim okruženja, te uspešno reloadovao Nginx.
+    * **Verifikacija:** Testirao HTTPS rute i potvrdio da se saobraćaj ka MinIO uspešno preusmerava preko Cloudflare-a i Nginx-a bez blokiranja pretraživača.
+- **Status:** Završeno. Mixed Content greška je trajno otklonjena.
+
+
 
 
 
