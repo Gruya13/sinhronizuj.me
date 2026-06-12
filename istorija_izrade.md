@@ -1,3 +1,12 @@
+## [2026-06-12 15:05:00] Ispravka mešanja few-shot primera sa stvarnim prevodom u translator.py
+- **Opis:**
+  Otklonili smo grešku gde su se rečenice iz primera za prevođenje (few-shot primeri) pojavljivale kao prevodi stvarnih video segmenata sa ID-evima 0 i 1.
+  1. **Izmena u translator.py:**
+     - Izmenili smo prompt u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) tako da few-shot primeri više ne koriste dinamičke ID-eve na osnovu `batch_start` i `batch_start+1` (koji bi bili 0 i 1 za prvi batch), već fiktivne statičke ID-eve `9999` i `99999`.
+     - Ovim smo sprečili "attention collapse" (gde model prepisuje primere za iste ID-eve) i osigurali da parser na klijentskoj strani ignoriše primere jer ne upadaju u opseg aktivnog batch-a.
+  2. **Verifikacija:**
+     - Pokrenuli smo celokupan test suite (`pytest tests/`) i svi testovi (15/15) su uspešno prošli.
+
 ## [2026-06-12 14:26:00] Analiza bezbednosti i implementacija preporučenih sigurnosnih mera
 - **Opis:**
   Sproveli smo bezbednosnu analizu projekta, ažurirali tajni izveštaj [bezbednosni_audit_izvestaj.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/bezbednosni_audit_izvestaj.md) i u potpunosti implementirali predložena bezbednosna unapređenja:
