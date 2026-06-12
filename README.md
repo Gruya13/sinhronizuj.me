@@ -145,9 +145,6 @@ SECRET_KEY=tvoj_jwt_secret_key
 ADMIN_EMAIL=admin@sinhronizuj.me
 ADMIN_PASSWORD=tvoja_admin_lozinka_na_startu
 
-# Gemini API (za lokalne probe)
-GEMINI_API_KEY=tvoj_gemini_api_key
-
 # Modal Serverless Endpoints
 MODAL_STT_URL=https://tvoj-username--sm-stt-only-sttworker-task.modal.run
 MODAL_TRANSLATOR_URL=https://tvoj-username--sm-translator-serve.modal.run

@@ -2447,6 +2447,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Tehnički Detalji:** Dokumentovane su nove modularne CI/CD GitHub Actions skripte (`backend-ci.yml`, `frontend-ci.yml`, `deploy.yml`), pokretanje testova za oba sloja (`pytest` i `npm run test:run`), nova struktura foldera i očišćene promenljive okruženja (bez legacy ključeva).
 - **Status:** Završeno. Novi README.md je uspešno integrisan u koren projekta.
 
+### 12.06.2026. 08:25 — Uklanjanje Neiskorišćenog Gemini API Ključa
+- **Zahtevi:** Izbaciti `GEMINI_API_KEY` iz `.env` fajla i konfiguracije jer se ne koristi nigde u projektu.
+- **Urađeno:**
+    * **Čišćenje .env fajla:** Uklonjena je linija `GEMINI_API_KEY` iz lokalne `.env` datoteke.
+    * **Ažuriranje README.md:** Uklonjen je primer i objašnjenje za `GEMINI_API_KEY` iz dela sa konfiguracijom u korenskom `README.md`.
+- **Status:** Završeno. Ključ je kompletno uklonjen iz konfiguracije.
+
+
 
 
 
