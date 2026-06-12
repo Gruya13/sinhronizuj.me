@@ -2462,6 +2462,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Git operacije i spajanje:** Sve izmene na dokumentaciji dodate na granu `development` i push-ovane. Potom je izvršeno prebacivanje na granu `main`, spajanje sa granom `development` i slanje (push) ažurne `main` verzije na GitHub.
 - **Status:** Završeno. Dokumentacija je javno integrisana, svi testovi prolaze, a grane development i main su sinhronizovane.
 
+### 12.06.2026. 08:35 — Ažuriranje i Restart Produkcijskog Servera
+- **Zahtevi:** Povući najnoviju `main` granu na produkcijski VPS server i restartovati Docker kontejnere.
+- **Urađeno:**
+    * **Povlačenje koda (Git Pull):** Povezao se preko SSH-a na produkcijski VPS server (`178.104.214.78`) i povukao najnoviji kod sa `main` grane.
+    * **Build i Deployment:** Pokrenuo `npm install` i `npm run build` za frontend unutar servera radi primene dekomponovanih komponenti, a potom izvršio rebuild backend slika sa novim kodom (`docker compose up -d --build`).
+    * **Restart i Verifikacija:** Izvršio kompletno restartovanje svih Docker kontejnera na serveru i verifikovao njihov status pomoću `docker ps`. Svi servisi (Postgres, Redis, API, Celery radnici, MinIO) su u stanju `Up` i uspešno pokrenuti sa novom verzijom.
+- **Status:** Završeno. Produkcijski server je uspešno ažuriran i operativan.
+
+
 
 
 
