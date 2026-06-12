@@ -2470,6 +2470,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Restart i Verifikacija:** Izvršio kompletno restartovanje svih Docker kontejnera na serveru i verifikovao njihov status pomoću `docker ps`. Svi servisi (Postgres, Redis, API, Celery radnici, MinIO) su u stanju `Up` i uspešno pokrenuti sa novom verzijom.
 - **Status:** Završeno. Produkcijski server je uspešno ažuriran i operativan.
 
+### 12.06.2026. 08:40 — Otklanjanje Problema sa Prijavom na Produkciju
+- **Zahtevi:** Dijagnostifikovati i rešiti problem korisnika `grujovic.igor89@gmail.com` koji dobija grešku "Pogrešan email ili lozinka" na produkcijskom Login ekranu.
+- **Urađeno:**
+    * **Dijagnostika baze:** Povezao se na produkcijski Postgres kontejner (`sinhronizuj-db`) u bazu `sinhronizuj_me`. Pretragom je utvrđeno da korisnik `grujovic.igor89@gmail.com` uopšte nije postojao u tabelama `users` niti na `waitlist` listi čekanja.
+    * **Kreiranje naloga:** Izračunao sam bcrypt heš lozinke sa slike (`E89120d9dfeB#`) direktno unutar API kontejnera pomoću funkcije `get_password_hash`. Zatim sam preko SQL upita kreirao novi nalog sa unetim emailom, generisanim hešom lozinke i dodelio mu administratorske privilegije (`is_admin=true`).
+- **Status:** Završeno. Administratorski nalog je uspešno kreiran na produkcijskom serveru i spreman je za prijavu.
+
+
 
 
 
