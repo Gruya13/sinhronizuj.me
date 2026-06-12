@@ -28,9 +28,9 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 *   **Karakteristike**: SenseVoice je izabran jer je višestruko brži od standardnog Whisper modela, a pored transkripcije nudi i detekciju bogatih akustičnih događaja (smeh, plač, muzika) i automatsku interpunkciju.
 
 ### 2.3. Prevođenje (`translator_worker.py`)
-*   **Model**: Fine-tuned Llama-3-8B-Instruct ili slični manji LLM modeli optimizovani za prevod na srpski jezik.
-*   **GPU zahtev**: CPU instanca (za manje zahteve) ili Nvidia T4 (za veće dokumente).
-*   **Funkcija**: Prevodi transkribovane segmente uz očuvanje prirodnog tona govora.
+*   **Model**: Qwen2-VL-7B-Instruct-AWQ (Vision-Language model pokrenut preko vLLM OpenAI API-ja).
+*   **GPU zahtev**: Nvidia A10G (24GB VRAM) za vLLM kvantizovani model.
+*   **Funkcija**: Prevodi transkribovane segmente na srpski jezik uz očuvanje prirodnog tona govora.
 
 ### 2.4. Kloniranje i Sinteza glasa (`tts_openvoice.py` / `tts.py`)
 *   **Model**: OpenVoice v2 (razvijen od strane MyShell-a) u kombinaciji sa MeloTTS-om.
@@ -52,10 +52,10 @@ Na osnovu testiranja obavljenih na platformi, troškovi obrade su izuzetno optim
 | :--- | :--- | :--- | :--- | :--- |
 | **Demucs Separacija** | Nvidia T4 (GPU) | ~30 sekundi | $0.59 / h | ~$0.005 |
 | **SenseVoice STT** | Nvidia T4 (GPU) | ~15 sekundi | $0.59 / h | ~$0.003 |
-| **Prevođenje** | CPU (Shared) | ~10 sekundi | $0.05 / h | ~$0.0001 |
+| **Prevođenje** | Nvidia A10G (GPU) | ~10 sekundi | $1.10 / h | ~$0.003 |
 | **OpenVoice TTS (Kloniranje)**| Nvidia L4 (GPU) | ~60 sekundi (ukupno za sve segmente) | $1.25 / h | ~$0.021 |
 | **Sklapanje Videa (FFmpeg)** | CPU (Shared na hostu) | ~15 sekundi | - (Host resurs) | $0.000 |
-| **Ukupno** | - | **~2.2 minuta** | - | **~$0.029 (manje od 3 centa)** |
+| **Ukupno** | - | **~2.2 minuta** | - | **~$0.032 (oko 3.5 dinara)** |
 
 > [!TIP]
 > Prosečna cena obrade 5-minutnog videa iznosi **manje od 0.03 USD (oko 3 dinara)**. Čak i pod maksimalnim opterećenjem i dužim hladnim startovima, trošak ne prelazi **0.05 USD** po videu, što platformu sinhronizuj.me čini izuzetno profitabilnom i skalabilnom za masovnu upotrebu.

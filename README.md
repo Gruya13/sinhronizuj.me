@@ -51,7 +51,7 @@ flowchart TD
     subgraph ModalCloud ["Modal.com Serverless GPU AI"]
         Demucs["Demucs Worker (Separacija - T4 GPU)"]
         SenseVoice["SenseVoice Worker (STT - T4 GPU)"]
-        Translator["Translator Worker (Llama-3 - CPU/T4)"]
+        Translator["Translator Worker (Qwen2-VL - A10G GPU)"]
         Lektor["Lektor Worker (Qwen-3 - CPU)"]
         TTS["TTS OpenVoice Worker (Sinteza - L4 GPU)"]
     end
@@ -105,7 +105,7 @@ flowchart TD
 | :--- | :--- |
 | **Frontend** | React (Vite), Vanilla CSS (Premium Glassmorphism), HTML5 Audio API |
 | **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker), PostgreSQL (Baza), MinIO S3 (Skladište) |
-| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **SenseVoice Large** (ASR/STT), **Llama-3-8B** (Prevod), **Qwen-3** (Lektor), **OpenVoice v2 & MeloTTS** (Sinteza/Kloniranje) |
+| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **SenseVoice Large** (ASR/STT), **Qwen2-VL-7B** (Prevod), **Qwen-3** (Lektor), **OpenVoice v2 & MeloTTS** (Sinteza/Kloniranje) |
 
 ---
 
@@ -145,7 +145,7 @@ sinhronizuj.me/
 ├── modal_workers/           # Serverless radnici na Modal.com
 │   ├── demucs_worker.py     # Demucs separacija vokala (T4 GPU)
 │   ├── sensevoice_worker.py # SenseVoice STT transkripcija (T4 GPU)
-│   ├── translator_worker.py # Llama prevodilac (CPU/T4)
+│   ├── translator_worker.py # Qwen2-VL prevodilac (A10G GPU)
 │   ├── tts_openvoice.py     # OpenVoice + MeloTTS kloniranje (L4 GPU)
 │   └── lektor_worker.py     # Lektorisanje i skraćivanje teksta
 ├── sicret doc/              # [IGNORISANO] Tajna, detaljna tehnička dokumentacija

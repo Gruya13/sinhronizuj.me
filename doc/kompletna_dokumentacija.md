@@ -88,7 +88,7 @@ AI modeli se izvršavaju na serverless Modal platformi, što omogućava nulte tr
 *   **SenseVoice Large**: Govor-u-tekst (STT) model.
 *   **Demucs v4**: Separacija instrumenata i vokala.
 *   **OpenVoice v2 + MeloTTS**: Sinteza glasa i prenos stila.
-*   **Llama-3-8B**: Mašinsko prevođenje.
+*   **Qwen2-VL-7B-Instruct**: Mašinsko prevođenje.
 
 ### 5.1. Analiza Troškova i Warmup Strategija
 *   **Troškovi**: Ukupna obrada 5 minuta videa (separacija, STT, translacija i klonirani TTS) na Modalu košta **manje od 0.03 USD** (oko 3 dinara), što platformu čini ekonomski izuzetno održivom.

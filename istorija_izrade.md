@@ -2533,6 +2533,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Čišćenje labela**: Uklonio sam zagrade unutar labela za Postgres i MinIO (npr. `[("...")]`) i stavio čistiju, kompatibilniju sintaksu sa navodnicima i jednostavnim tekstom.
 - **Status:** Završeno. Mermaid dijagram se sada uspešno i pravilno renderuje.
 
+### 12.06.2026. 09:40 — Ispravka Referenci Modela za Prevođenje (Qwen2-VL umesto Llama-3)
+- **Zahtevi:** Ispraviti netačne navode u dokumentaciji koji pominju Llama-3-8B za prevođenje, s obzirom da se u kodu translator radnika na Modalu zapravo koristi Qwen2-VL-7B-Instruct-AWQ.
+- **Urađeno:**
+    * **Ažuriranje README.md**: Zamenjen model na dijagramu, u tabeli tehnološkog stack-a i u opisu strukture projekta (translator_worker.py koristi Qwen2-VL na A10G GPU-u).
+    * **Usklađivanje kompletne dokumentacije**: Izmenjeni javni `doc/kompletna_dokumentacija.md` i tajni `sicret doc/kompletna_dokumentacija.md` zamenom `Llama-3-8B` sa `Qwen2-VL-7B-Instruct`.
+    * **Ažuriranje AI dokumentacije**: Izmenjeni javni `doc/modal_workers_i_ai.md` i tajni `sicret doc/modal_workers_i_ai.md` u delu specifikacije modela i tabele troškova (ispravljeno sa CPU na Nvidia A10G i ažurirana cena na $1.10/h).
+- **Status:** Završeno. Sve reference na translator model su usklađene sa stvarnom implementacijom u kodu.
+
+
 
 
 
