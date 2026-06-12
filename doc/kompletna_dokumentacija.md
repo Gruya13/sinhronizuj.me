@@ -43,6 +43,7 @@ Baza koristi PostgreSQL i definisana je preko sledećih SQLAlchemy klasa:
 Klijentski deo aplikacije je strukturisan da obezbedi interaktivno DAW (Digital Audio Workstation) iskustvo u realnom vremenu:
 
 ### 2.1. Centralne Komponente
+*   **`LandingPage`**: Uvodna prezentaciona stranica za neprijavljene posetioce.
 *   **`StudioTimeline`**: Crta zvučne talase i omogućava vizuelnu navigaciju kroz video i audio zapise.
 *   **`SegmentEditor`**: Editor segmenata u kojem korisnik koriguje prevode i podešava pitch/speed/volume za svaki sintetizovani glas.
 *   **`AudioMixer`**: Slajderi za kontrolu nivoa jačine zvuka vokala i pozadinske muzike.
@@ -74,10 +75,10 @@ Sistem implementira sledeći tok obrade za svaki video:
 
 1.  **Direct S3 Upload**: Klijent dobija pre-potpisan URL i otprema video direktno na S3.
 2.  **Audio Separacija**: Modal Demucs razdvaja zvučni zapis na vokale i pozadinsku muziku/zvučne efekte bez vokala.
-3.  **Transkripcija**: Modal SenseVoice Large vrši brzu transkripciju vokala sa milisekundnim tajminzima.
+3.  **Transkripcija**: **Faster-Whisper (large-v3)** vrši brzu transkripciju vokala sa milisekundnim tajminzima na nivou reči, dok se **SenseVoice-Small** koristi za sekundarnu transkripciju i LLM arbitražu.
 4.  **Prevođenje**: Tekst se prevodi na srpski, a pre slanja na TTS automatski se primenjuje sistemski i korisnički glosar za očuvanje terminologije.
-5.  **Glasovna Sinteza**: Poziva se Modal OpenVoice v2 i MeloTTS za generisanje srpskog govora sa parametrima jačine, brzine i visine tona, uz kloniranje glasa originalnog govornika.
-6.  **Dinamičko Spajanje (`merger.py`)**: FFmpeg i pydub dinamički uklapaju srpski govor. Ukoliko je srpska rečenica duža od originalnog segmenta, ona se automatski ubrzava (`speedup_audio_file`) kako bi se uklopila i sprečila desinhronizaciju. Zatim se sve miksuje sa pozadinskom muzikom i spaja sa video strimom bez gubitka kvaliteta slike.
+5.  **Glasovna Sinteza**: Poziva se **Piper TTS** i Modal **OpenVoice v2** za generisanje srpskog govora sa parametrima jačine, brzine i visine tona, uz kloniranje glasa originalnog govornika.
+6.  **Dinamičko Spajanje (`merger.py`)**: FFmpeg i pydub dinamički uklapaju srpski govor. Ukoliko je srpska rečenica duža od originalnog segmenta, ona se automatski ubrzava (`speedup_audio_file`) kako bi se uklopila i sprečila desinhronizaciju. Zatim se na VPS-u vrši **LipSync (Wav2Lip)** ako ima dovoljno lica, video i pozadinska muzika se stišavaju (ducking) i po potrebi se video i muzika blago usporavaju (maksimalno do 1.05x). Sve se miksuje sa pozadinskom muzikom i spaja sa video strimom bez gubitka kvaliteta slike.
 
 ---
 
@@ -85,10 +86,11 @@ Sistem implementira sledeći tok obrade za svaki video:
 
 AI modeli se izvršavaju na serverless Modal platformi, što omogućava nulte troškove u mirovanju (scale-to-zero) i brzo skaliranje:
 
-*   **SenseVoice Large**: Govor-u-tekst (STT) model.
+*   **Faster-Whisper i SenseVoice-Small**: Govor-u-tekst (ASR/STT) modeli za transkripciju i arbitražu.
 *   **Demucs v4**: Separacija instrumenata i vokala.
-*   **OpenVoice v2 + MeloTTS**: Sinteza glasa i prenos stila.
+*   **Piper TTS & OpenVoice v2**: Sinteza glasa i prenos stila.
 *   **Qwen2-VL-7B-Instruct**: Mašinsko prevođenje.
+*   **Qwen Lektor**: Lektura, ekavizacija i arbitraža.
 
 ### 5.1. Analiza Troškova i Warmup Strategija
 *   **Troškovi**: Ukupna obrada 5 minuta videa (separacija, STT, translacija i klonirani TTS) na Modalu košta **manje od 0.03 USD** (oko 3 dinara), što platformu čini ekonomski izuzetno održivom.
@@ -114,7 +116,8 @@ Zajedničko pokretanje servisa vrši se kroz kontejnere:
 *   `sinhronizuj-frontend` (Nginx, port 3000 za produkciju, servira kontejnerizovane React/Vite resurse)
 
 ### 6.3. CI/CD GitHub Actions Workflows
-*   [backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml): Automatski pokreće Python pytest integracione testove prilikom svakog push-a.
+*   [backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml): Automatski pokreće Python pytest integracione testove prilikom svakog push-u.
 *   [frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml): Instalira zavisnosti i pokreće frontend unit testove (`npm run test:run`).
-*   [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml): Automatski gradi Docker slike nakon prolaska testova, radi push na GitHub Container Registry (GHCR), te na Hetzner VPS-u povlači slike (pull) i radi brzi deploy preko SSH-a, eliminišući lokalni build na serveru.
+*   [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml): Automatski gradi Docker slike nakon prolaska testova, vrši push na GHCR, te na Hetzner VPS-u povlači slike i radi deploy preko SSH.
+*   [release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml): Automatski kreira GitHub Release sa generisanim beleškama o izmenama na push-u na `main` granu.
 *   **Backup**: Cron posao svake noći u 02:00h vrši backup PostgreSQL baze i šalje ga na MinIO S3 bucket sa rotacijom i automatskim brisanjem arhiva starijih od 7 dana.

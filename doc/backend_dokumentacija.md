@@ -26,7 +26,7 @@ Glavna startna tačka je [backend/main.py](file:///home/gruya/Projektri/sinhroni
     *   `POST /api/v1/project/{project_id}/save`: Snimanje trenutnih modifikacija nad segmentima.
     *   `DELETE /api/v1/project/{project_id}`: Kaskadno brisanje projekta, segmenata i povezanih S3 fajlova.
 *   **Procesiranje Videa i Zvuka**:
-    *   `POST /api/v1/process-video`: Inicijalizuje Celery task za analizu (Demucs + SenseVoice STT + prevod).
+    *   `POST /api/v1/process-video`: Inicijalizuje Celery task za analizu (Demucs + Faster-Whisper/SenseVoice STT + prevod).
     *   `POST /api/v1/project/{project_id}/segment/{segment_id}/tts`: Generiše srpski TTS/OpenVoice audio za specifičan segment.
     *   `POST /api/v1/project/{project_id}/generate-all-tts`: Pokreće paralelnu sintezu za sve segmente u projektu.
     *   `POST /api/v1/project/{project_id}/render`: Inicijalizuje Celery task za sklapanje finalnog sinhronizovanog videa.

@@ -22,10 +22,10 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 *   **GPU zahtev**: Nvidia T4 (16GB VRAM) ili L4.
 *   **Funkcija**: Prihvata audio traku i vrši razdvajanje na čiste vokale (`vocals`) i prateću matricu (`no_vocals`).
 
-### 2.2. Prepoznavanje govora (`sensevoice_worker.py` / `stt_worker.py`)
-*   **Model**: Alibaba SenseVoice Large.
+### 2.2. Prepoznavanje govora (`stt_worker.py` / `sensevoice_worker.py`)
+*   **Modeli**: Faster-Whisper (large-v3) na `stt_worker.py` i Alibaba SenseVoice-Small na `sensevoice_worker.py`.
 *   **GPU zahtev**: Nvidia T4.
-*   **Karakteristike**: SenseVoice je izabran jer je višestruko brži od standardnog Whisper modela, a pored transkripcije nudi i detekciju bogatih akustičnih događaja (smeh, plač, muzika) i automatsku interpunkciju.
+*   **Karakteristike**: Faster-Whisper je primarni ASR model koji generiše transkript sa preciznim vremenskim kodovima na nivou reči (word-level timestamps). SenseVoice-Small je sekundarni ASR model bez vremenskih kodova, koji služi za transkripciju celog vokala i naknadnu LLM arbitražu radi ispravke grešaka.
 
 ### 2.3. Prevođenje (`translator_worker.py`)
 *   **Model**: Qwen2-VL-7B-Instruct-AWQ (Vision-Language model pokrenut preko vLLM OpenAI API-ja).
@@ -33,10 +33,10 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 *   **Funkcija**: Prevodi transkribovane segmente na srpski jezik uz očuvanje prirodnog tona govora.
 
 ### 2.4. Kloniranje i Sinteza glasa (`tts_openvoice.py` / `tts.py`)
-*   **Model**: OpenVoice v2 (razvijen od strane MyShell-a) u kombinaciji sa MeloTTS-om.
+*   **Modeli**: Piper TTS (srpski model Marko) i OpenVoice v2 (razvijen od strane MyShell-a).
 *   **GPU zahtev**: Nvidia L4 (24GB VRAM) ili A10G za brzu paralelnu sintezu.
 *   **Funkcija**:
-    *   `MeloTTS` generiše osnovni srpski govor na osnovu prevedenog teksta.
+    *   `Piper TTS` generiše osnovni srpski govor na osnovu prevedenog teksta (model Marko koji daje prirodan izgovor).
     *   `OpenVoice` uzima kratak uzorak originalnog glasa iz `vocals.wav` (oko 3-5 sekundi je dovoljno), izvlači stil (tone color converter) i primenjuje ga na generisani srpski govor. Krajnji rezultat je klonirani glas na srpskom jeziku koji zadržava jedinstvenu boju glasa originalnog govornika.
 
 ### 2.5. Lektura teksta (`lektor_worker.py`)
@@ -51,7 +51,7 @@ Na osnovu testiranja obavljenih na platformi, troškovi obrade su izuzetno optim
 | Zadatak | Hardver (Modal) | Vreme Izvršavanja (5 min video) | Cena po satu | Procenjena Cena po videu (5 min) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Demucs Separacija** | Nvidia T4 (GPU) | ~30 sekundi | $0.59 / h | ~$0.005 |
-| **SenseVoice STT** | Nvidia T4 (GPU) | ~15 sekundi | $0.59 / h | ~$0.003 |
+| **STT Transkripcija** | Nvidia T4 (GPU) | ~15 sekundi | $0.59 / h | ~$0.003 |
 | **Prevođenje** | Nvidia A10G (GPU) | ~10 sekundi | $1.10 / h | ~$0.003 |
 | **OpenVoice TTS (Kloniranje)**| Nvidia L4 (GPU) | ~60 sekundi (ukupno za sve segmente) | $1.25 / h | ~$0.021 |
 | **Sklapanje Videa (FFmpeg)** | CPU (Shared na hostu) | ~15 sekundi | - (Host resurs) | $0.000 |

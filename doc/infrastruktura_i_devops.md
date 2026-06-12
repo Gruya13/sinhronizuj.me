@@ -49,7 +49,7 @@ Za sprečavanje gubitka podataka, postavljen je automatski backup sistem koji se
 
 ## 4. CI/CD GitHub Actions Cevovodi (Workflows)
 
-Proces testiranja, izgradnje slika i isporuke je automatizovan i podeljen na tri specijalizovana YAML fajla u direktorijumu `.github/workflows/`:
+Proces testiranja, izgradnje slika i isporuke je automatizovan i podeljen na četiri specijalizovana YAML fajla u direktorijumu `.github/workflows/`:
 
 ```
                     [Korisnički Push na GitHub]
@@ -90,3 +90,7 @@ Proces testiranja, izgradnje slika i isporuke je automatizovan i podeljen na tri
     *   Radi `docker compose pull` da povuče pre-built slike sa GHCR-a na server.
     *   Radi `docker compose up -d` za brzu i bezbednu zamenu aktivnih kontejnera bez lokalnog opterećenja procesora.
     *   Izvršava Alembic migracije: `docker compose exec -T api alembic upgrade head`.
+
+### 4.4. Generisanje Release Changelog-a ([release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml))
+*   **Triger**: Push na granu `main`.
+*   **Koraci**: Automatski generiše oznaku verzije (tag na osnovu trenutnog datuma i vremena, npr. `v2026.06.12-0926`) i kreira GitHub Release sa automatski generisanim beleškama o izmenama (changelog).

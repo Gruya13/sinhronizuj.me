@@ -1,3 +1,24 @@
+## [2026-06-12 09:30:00] Usklađivanje i ispravljanje celokupne projektne dokumentacije
+- **Opis:**
+  Proverili smo i ažurirali sve datoteke dokumentacije u projektu kako bismo ih uskladili sa stvarnim stanjem programskog koda i otklonili netačne opise.
+  1. **FastAPI Inicijalizacija i Baza:**
+     - Korigovali smo opise startup logike u [doc/arhitektura_i_baza.md](file:///home/gruya/Projektri/sinhronizuj.me/doc/arhitektura_i_baza.md), [sicret doc/arhitektura_i_baza.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/arhitektura_i_baza.md) i [arhitektura_i_tok_podataka.md](file:///home/gruya/Projektri/sinhronizuj.me/arhitektura_i_tok_podataka.md).
+     - Precizirali smo da se tabele i SQLAlchemy veza vrše sinhrono, a da se prvi administrator kreira ručno preko endpointa `/api/v1/admin/create-first-admin` (umesto automatskog kreiranja iz `.env` na startu).
+  2. **Primarni STT i ASR Modeli:**
+     - Ispravili smo dokumentaciju ([README.md](file:///home/gruya/Projektri/sinhronizuj.me/README.md), [pipeline_tok.md](file:///home/gruya/Projektri/sinhronizuj.me/pipeline_tok.md), [doc/audio_i_video_procesiranje.md](file:///home/gruya/Projektri/sinhronizuj.me/doc/audio_i_video_procesiranje.md), [doc/modal_workers_i_ai.md](file:///home/gruya/Projektri/sinhronizuj.me/doc/modal_workers_i_ai.md)) da tačno navodi **Faster-Whisper (large-v3)** kao primarni STT model za dobijanje vremenskih kodova, dok **Alibaba SenseVoice-Small** služi kao sekundarni ASR za arbitražu i tekstualnu korekciju.
+  3. **Tehnologija Sinteze Glasa (TTS):**
+     - Uskladili smo opise TTS-a da tačno odražavaju kombinaciju **Piper TTS (srpski model Marko) + OpenVoice v2 + Resemble Enhance** za kloniranje i sintezu govora, uklanjajući netačne reference na MeloTTS i Fish Speech.
+  4. **LipSync i Time Stretching Parametri:**
+     - Ispravili smo lokaciju izvršavanja **Wav2Lip LipSync**-a koji se pokreće **lokalno na VPS serveru** kao podproces (a ne na Modalu sa A10G kako je ranije pisalo).
+     - Ažurirali smo maksimalni limit za usporavanje videa i time stretching u dokumentaciji na **1.05x** (umesto 1.15x) u skladu sa [merger.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/merger.py).
+  5. **Struktura i Workflows:**
+     - Dodali smo opis [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx) i direktorijuma `Landing` u dokumentaciju frontenda ([doc/frontend_dokumentacija.md](file:///home/gruya/Projektri/sinhronizuj.me/doc/frontend_dokumentacija.md)).
+     - Dodali smo opis novog workflow-a [release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml) za changelog/release oznake u dokumentaciju infrastrukture ([doc/infrastruktura_i_devops.md](file:///home/gruya/Projektri/sinhronizuj.me/doc/infrastruktura_i_devops.md)).
+  6. **Kopiranje u privatni direktorijum:**
+     - Sve izmenjene datoteke iz javnog foldera `doc/` su iskopirane i usklađene u privatnom folderu `sicret doc/`.
+  7. **Verifikacija:**
+     - Uspešno su pokrenuti i verifikovani backend testovi (15 passed) i frontend testovi (7 passed).
+
 ## [2026-06-11 21:25:00] Izrada izveštaja o troškovima Modal GPU radnika
 - **Opis:**
   Kreirali smo detaljan izveštaj [analiza_troskova_modal.md](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/analiza_troskova_modal.md) u tajnom dokumentacionom folderu `sicret doc`.

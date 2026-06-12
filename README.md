@@ -8,16 +8,17 @@
 
 ## 🚀 Ključne Karakteristike
 
-*   **Hibridna Cloud Arhitektura**: Kontrolna logika, baza podataka, asinhroni Celery radnik i S3 skladište nalaze se na Hetzner VPS-u, dok se teške AI operacije (separacija zvuka, STT, prevod, lektura i kloniranje glasa) izvršavaju serverless na **Modal.com** (T4, L4 i A10G GPU-ovi) uz model plaćanja po utrošku (scale-to-zero).
+*   **Hibridna Cloud Arhitektura**: Kontrolna logika, baza podataka, asinhroni Celery radnik i S3 skladište nalaze se na Hetzner VPS-u (gde se lokalno izvršava i Wav2Lip LipSync), dok se teške AI operacije (separacija zvuka, STT, prevod, lektura i kloniranje glasa) izvršavaju serverless na **Modal.com** (T4, L4 i A10G GPU-ovi) uz model plaćanja po utrošku (scale-to-zero).
 *   **Modularni Frontend (DAW Studio)**: Korisnički interfejs je kompletno refaktorisan u modularne komponente. Sadrži:
     *   `StudioTimeline`: Interaktivni prikaz vremenske linije sa waveform-om originalnog zvuka.
     *   `SegmentEditor`: Uređivanje prevoda, izbor glasa i kontrola brzine, jačine i visine tona po segmentu.
     *   `AudioMixer`: Slajderi integrisani u plejer za kontrolu nivoa jačine originala i sinhronizovanog glasa u realnom vremenu.
     *   `DashboardView`: Brz pregled projekata i upload videa sa pre-vizuelizacijom.
+    *   `LandingPage`: Uvodna prezentaciona stranica za neprijavljene korisnike.
 *   **Undo/Redo Mehanizam**: Ugrađen u `StudioContext.jsx` sa istorijskim stekom dubine do 50 koraka, omogućavajući klijentu lako poništavanje grešaka tokom editovanja u DAW-u.
 *   **Mobilna Responzivnost**: Aplikacija je optimizovana za mobilne uređaje uklanjanjem fiksne `100vh` visine (kroz klase `.studio-mode-active` i `.studio-mode-inactive`), preslaganjem kontrola u 2x2 mrežu i kompaktnim statusnim ikonama.
 *   **AI Lektor na klik (Magic Shorten)**: Integrisana opcija čarobnog štapića šalje zahtev Modal Qwen Lektoru da inteligentno skrati srpski prevod na optimalnu dužinu kako bi se uklopio u originalno trajanje videa.
-*   **Kloniranje Glasa i Audio Poboljšanje**: MeloTTS generiše bazni srpski govor, a **OpenVoice v2** vrši prenos boje glasa iz originalnog audio snimka (Speaker Embedding izvučen iz čistog originalnog audia). CFM model (Resemble Enhance) dodatno otklanja šum i podiže frekvenciju na 44.1kHz.
+*   **Kloniranje Glasa i Audio Poboljšanje**: **Piper TTS** (srpski model Marko) generiše bazni govor, a **OpenVoice v2** vrši prenos boje glasa iz originalnog audio snimka (Speaker Embedding izvučen iz čistog originalnog audia). CFM model (Resemble Enhance) dodatno otklanja šum i podiže frekvenciju na 44.1kHz.
 *   **Dinamičko Uklapanje vremena (`merger.py`)**: Ukoliko je izgenerisani srpski govor duži od originalnog segmenta, sistem automatski primenjuje ubrzavanje (`speedup_audio_file` preko FFmpeg-a) kako bi sprečio kolizije sa sledećim segmentima i desinhronizaciju videa.
 *   **Kompletan Admin Panel**: Administratorski interfejs sa praćenjem waitlist-a (zatvorene bete), upravljanjem korisnicima (dodeljivanje admin privilegija), zbirnom statistikom i live pretragom logova Celery radnika za svaki pojedinačni projekat.
 
@@ -45,15 +46,17 @@ flowchart TD
         Redis["sinhronizuj-redis (Message Broker)"]
         Postgres[(PostgreSQL Baza)]
         MinIO[(MinIO S3 Skladište)]
+        Wav2Lip["Wav2Lip (LipSync - Lokalni CPU/GPU)"]
         DockerDaemon["Docker Engine (Upravljanje Slikama)"]
     end
 
     subgraph ModalCloud ["Modal.com Serverless GPU AI"]
         Demucs["Demucs Worker (Separacija - T4 GPU)"]
-        SenseVoice["SenseVoice Worker (STT - T4 GPU)"]
+        STT["Faster-Whisper Worker (Primarni STT - T4 GPU)"]
+        SenseVoice["SenseVoice Worker (Sekundarni ASR - T4 GPU)"]
         Translator["Translator Worker (Qwen2-VL - A10G GPU)"]
-        Lektor["Lektor Worker (Qwen-3 - CPU)"]
-        TTS["TTS OpenVoice Worker (Sinteza - L4 GPU)"]
+        Lektor["Lektor Worker (Qwen Lektor - A10G GPU)"]
+        TTS["TTS OpenVoice Worker (Piper+OpenVoice - L4 GPU)"]
     end
 
     subgraph GitHubFlow ["CI/CD Pipeline"]
@@ -74,18 +77,22 @@ flowchart TD
     API --> Redis
     Redis --> Celery
 
-    %% Celery radnik i Modal veze
+    %% Celery radnik i Modal/Lokalne veze
     Celery --> Demucs
+    Celery --> STT
     Celery --> SenseVoice
     Celery --> Translator
     Celery --> Lektor
     Celery --> TTS
+    Celery --> Wav2Lip
 
     Demucs -.-> Celery
+    STT -.-> Celery
     SenseVoice -.-> Celery
     Translator -.-> Celery
     Lektor -.-> Celery
     TTS -.-> Celery
+    Wav2Lip -.-> Celery
 
     Celery --> MinIO
     Celery --> Postgres
@@ -104,8 +111,8 @@ flowchart TD
 | Sloj | Tehnologije i Modeli |
 | :--- | :--- |
 | **Frontend** | React (Vite), Vanilla CSS (Premium Glassmorphism), HTML5 Audio API |
-| **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker), PostgreSQL (Baza), MinIO S3 (Skladište) |
-| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **SenseVoice Large** (ASR/STT), **Qwen2-VL-7B** (Prevod), **Qwen-3** (Lektor), **OpenVoice v2 & MeloTTS** (Sinteza/Kloniranje) |
+| **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker), PostgreSQL (Baza), MinIO S3 (Skladište), **Wav2Lip** (Lokalni LipSync usana) |
+| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **Faster-Whisper** (Primarni STT), **SenseVoice Small** (Sekundarni ASR), **Qwen2-VL-7B** (Prevod), **Qwen Lektor** (Lektura i arbitraža), **Piper TTS (Marko) & OpenVoice v2** (Sinteza/Kloniranje) |
 
 ---
 
@@ -133,10 +140,11 @@ sinhronizuj.me/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx          # React ruter i globalni raspored
-│   │   ├── components/      # Modularne komponente (Dashboard, Studio, Admin, Auth, Common)
+│   │   ├── components/      # Modularne komponente (Dashboard, Studio, Admin, Auth, Common, Landing)
 │   │   │   ├── Studio/      # StudioTimeline, SegmentEditor, AudioMixer, MixerPanel
 │   │   │   ├── Dashboard/   # DashboardView, ProjectList
 │   │   │   ├── Admin/       # AdminPanel
+│   │   │   ├── Landing/     # LandingPage.jsx
 │   │   │   └── Common/      # Header, HardwareMonitor, Knob
 │   │   ├── context/         # StudioContext.jsx (globalno stanje i undo/redo stek)
 │   │   ├── services/        # api.js (integrisane klijentske API funkcije)
@@ -146,7 +154,7 @@ sinhronizuj.me/
 │   ├── demucs_worker.py     # Demucs separacija vokala (T4 GPU)
 │   ├── sensevoice_worker.py # SenseVoice STT transkripcija (T4 GPU)
 │   ├── translator_worker.py # Qwen2-VL prevodilac (A10G GPU)
-│   ├── tts_openvoice.py     # OpenVoice + MeloTTS kloniranje (L4 GPU)
+│   ├── tts_openvoice.py     # OpenVoice + Piper kloniranje (L4 GPU)
 │   └── lektor_worker.py     # Lektorisanje i skraćivanje teksta
 ├── sicret doc/              # [IGNORISANO] Tajna, detaljna tehnička dokumentacija
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, API)

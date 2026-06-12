@@ -38,7 +38,10 @@ Frontend je podeljen na modularne komponente grupisane po funkcionalnim oblastim
 *   [AudioMixer.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/AudioMixer.jsx): Klizači (sliders) za podešavanje jačine originalnog (vocals) i sintetizovanog zvuka (TTS) na globalnom nivou projekta.
 *   [MixerPanel.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/MixerPanel.jsx): Vizuelne kontrole i EQ/efekti za napredno miksovanje kanala u realnom vremenu.
 
-### 2.5. Zajedničke komponente (`Common/`)
+### 2.5. Landing Komponente (`Landing/`)
+*   [LandingPage.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Landing/LandingPage.jsx): Prezentaciona landing stranica koja upoznaje neprijavljene posetioce sa uslugom, prikazuje ključne funkcionalnosti i preusmerava ih na formu za prijavu/registraciju.
+
+### 2.6. Zajedničke komponente (`Common/`)
 *   [Header.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Header.jsx): Glavno stakleno zaglavlje aplikacije sa navigacijom, statusom ulogovanog korisnika i zaštićenim administratorskim tasterom (koji prikazuje i bedž sa brojem waitlist prijava na čekanju).
 *   [HardwareMonitor.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/HardwareMonitor.jsx): Kompaktna traka koja prikazuje status veze sa Redisom (sa opcijom brzog čišćenja keša za administratore), iskorišćenost resursa VPS servera i opterećenje Modal GPU radnika.
 *   [Knob.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Common/Knob.jsx): Rotirajući grafički kontroler (knob) koji služi za fino podešavanje parametara zvuka (npr. pitch, volume, speed) povlačenjem mišem (drag action).

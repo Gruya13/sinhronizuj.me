@@ -18,16 +18,16 @@ Proces obrade je visoko asinhron i podeljen na nekoliko koraka orkestriranih kro
        ▼ (Modal Demucs Worker)                   ▼ (Lokalni FFmpeg)
 [Vokali (.wav)]  [Muzika/Šum bez vokala (.wav)]  [Vizuelni frejmovi]
        │                       │
-       ▼ (Modal SenseVoice)    │
+       ▼ (Faster-Whisper)      │
 [Transkript sa tajminzima]     │
        │                       │
-       ▼ (Prevod + Glosari)    │
+       ▼ (Prevod + Lektor)     │
 [Srpski Segmenti (Postgres)]   │
        │                       │
        ▼ (Uređivanje u DAW-u)  │
 [Snimljeni Parametri]          │
        │                       │
-       ▼ (Modal OpenVoice TTS) │
+       ▼ (Piper + OpenVoice)   │
 [Sintetizovani Srpski Govor]   │
        │                       │
        └───────────────────────┼───────────────┐
@@ -49,12 +49,15 @@ Kako bi se izbeglo da pozadinska muzika i zvučni efekti ometaju proces prepozna
 
 ## 3. Transkripcija i Prevođenje sa Glosarima
 
-### 3.1. SenseVoice STT
-Za prepoznavanje govora koristi se **Alibaba SenseVoice Large** model na Modalu, koji podržava više jezika (engleski, ruski, španski, kineski, itd.) i pruža izuzetno brzu transkripciju sa milisekundnom preciznošću vremenskih kodova za svaki segment rečenice.
+### 3.1. Faster-Whisper i SenseVoice STT
+Za prepoznavanje govora koristi se hibridni pristup na Modalu:
+1.  **Faster-Whisper (large-v3)**: Pokreće se na Modalu ([stt_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/stt_worker.py)) i predstavlja primarni ASR model. On generiše transkript sa preciznim vremenskim kodovima na nivou reči (word-level timestamps).
+2.  **Alibaba SenseVoice-Small**: Pokreće se paralelno na Modalu ([sensevoice_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/sensevoice_worker.py)) i služi kao sekundarni ASR za detekciju interpunkcije, emocija i arbitražu.
+3.  **LLM Arbitraža**: Dobijeni transkripti se šalju Modal Lektoru koji vrši korekciju Whisper segmenata na osnovu SenseVoice transkripta.
 
 ### 3.2. Prevod i Zamena Glosara
 Nakon dobijanja izvornog transkripta, tekst prolazi kroz modul za prevođenje [backend/worker/translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py):
-1.  **Mašinsko prevođenje**: Tekst se prevodi na srpski jezik pomoću naprednih LLM modela na Modalu.
+1.  **Mašinsko prevođenje**: Tekst se prevodi na srpski jezik pomoću naprednih LLM modela na Modalu (Qwen2-VL-7B-Instruct).
 2.  **Primena Glosara**: Prevod se dodatno procesira kako bi se osigurala konzistentnost terminologije. Sistem čita:
     *   *Sistemski glosar* ([backend/worker/glossaries.json](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/glossaries.json)) za standardne termine.
     *   *Korisnički definisan glosar* iz baze podataka (tabela `glossaries` za trenutnog korisnika).
@@ -64,8 +67,9 @@ Nakon dobijanja izvornog transkripta, tekst prolazi kroz modul za prevođenje [b
 
 ## 4. Sinteza Govora i Kloniranje Glasa
 
-Za generisanje srpskog govora koristi se **OpenVoice v2** i **MeloTTS** tehnologija na Modalu:
-*   **Kloniranje Glasa (`clone` opcija)**: OpenVoice izdvaja akustički potpis (style embedding) iz originalnog `vocals.wav` fajla za odgovarajući segment. Zatim se taj stil primenjuje na sintetizovani srpski govor generisan preko MeloTTS-a. Rezultat je srpski glas koji zvuči identično kao govornik u originalnom videu.
+Za generisanje srpskog govora koristi se **Piper TTS** i **OpenVoice v2** tehnologija na Modalu:
+*   **Kloniranje Glasa (`clone` opcija)**: OpenVoice izdvaja akustički potpis (style embedding) iz originalnog `vocals.wav` fajla za odgovarajući segment. Zatim se taj stil primenjuje na generisani srpski govor generisan preko Piper-a (srpski model Marko). Rezultat je srpski glas koji zvuči slično kao govornik u originalnom videu.
+*   **Audio Poboljšanje (Resemble Enhance)**: CFM model (Resemble Enhance) dodatno otklanja šum i podiže frekvenciju na 44.1kHz.
 *   **Generički Glasovi**: Korisnik može izabrati i standardne, pre-definisane glasove (npr. muški ili ženski) ukoliko je originalni glas lošeg kvaliteta.
 *   **Parametri**: Kroz API se prenose parametri definisani od strane korisnika u DAW-u: jačina zvuka (`volume`), brzina (`speed`) i visina tona (`pitch`).
 
@@ -81,12 +85,14 @@ U modulu [backend/worker/merger.py](file:///home/gruya/Projektri/sinhronizuj.me/
 2.  **Automatska Kompresija Vremena (`speedup_audio_file`)**:
     Ako je generisani srpski audio duži od raspoloživog vremenskog okvira segmenta (od `start` do `end`), sistem izračunava potreban faktor ubrzanja:
     $$\text{faktor\_brzine} = \frac{\text{tts\_duration}}{\text{end} - \text{start}}$$
-    Zatim se poziva FFmpeg filter `atempo` (ili pydub ekvivalent) da se audio ubrza kako bi se savršeno uklopio u zadati vremenski prozor, sprečavajući preklapanje sa narednim segmentima.
+    Zatim se poziva FFmpeg filter `rubberband` (ili rubberband tempo alatka) da se audio ubrza kako bi se savršeno uklopio u zadati vremenski prozor, sprečavajući preklapanje sa narednim segmentima.
 3.  **Kreiranje Audio Matrice (Pydub AudioSegment)**:
     *   Inicijalizuje se prazan audio kanal dužine originalnog videa.
     *   Pozadinski zvuk bez vokala (`no_vocals.wav`) se uvozi i na njega se primenjuje globalno podešena jačina zvuka (`background_vol`).
     *   Svi pojedinačni srpski audio segmenti se lepe na svoje tačne vremenske pozicije (`start` * 1000 ms) sa definisanim parametrima jačine (`volume` i prigušenje pozadine `bg_volume`).
-4.  **FFmpeg Video Spajanje**:
+4.  **LipSync Sinhronizacija (Wav2Lip)**:
+    *   Ukoliko se detektuje dovoljno lica govornika, lokalno na VPS-u se pokreće **Wav2Lip** model koji modifikuje pokrete usana govornika prema srpskom audio zapisu.
+5.  **FFmpeg Video Spajanje**:
     Nakon što je kreirana finalna srpska audio traka, ona se spaja sa video trakom pomoću FFmpeg komande koja kopira video strim (bez rekompresije radi očuvanja kvaliteta i brzine) i mapira novi srpski audio:
     ```bash
     ffmpeg -y -i original_video.mp4 -i dubbed_audio.wav -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k final_output.mp4

@@ -15,6 +15,7 @@ graph TD
     API <-->|Redis Broker| Celery[Celery Backend Workers]
     Celery <-->|HTTP / API Call| Modal[Modal Serverless GPU Cluster]
     Celery <-->|FFmpeg / pydub| AudioMerge[Audio & Video Merger]
+    Celery <-->|Lokalni podproces| Wav2Lip[Wav2Lip LipSync - Lokalni CPU/GPU]
     Modal <-->|Upload / Download| S3[(MinIO S3 Object Storage)]
     Celery <-->|Upload / Download| S3
     API <-->|Upload / Download| S3
@@ -152,15 +153,14 @@ Evidentira korisnike koji su se prijavili za zatvorenu beta fazu projekta.
 
 ---
 
-## 4. Startup Logika FastAPI Aplikacije
+## 4. Startup Inicijalizacija i Baza Podataka
 
-U [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) implementiran je `lifespan` handler koji upravlja životnim ciklusom aplikacije i obezbeđuje kritične operacije na startu:
+U [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) se na samom startu servera (globalni nivo prilikom učitavanja modula) vrše sledeće kritične operacije:
 
-1.  **Povezivanje sa bazom podataka**: Inicijalizuje SQLAlchemy `async_engine` i proverava konekciju sa PostgreSQL-om.
-2.  **Inicijalizacija baze podataka (samo ako tabele ne postoje)**:
-    *   Poziva `Base.metadata.create_all()` kako bi kreirao nepostojeće tabele u slučaju čistog pokretanja.
-3.  **Inicijalizacija prvog Administratora**:
-    *   Sistem proverava da li u bazi postoji ijedan administrator. Ako ne postoji, automatski kreira podrazumevanog administratora na osnovu konfiguracionih promenljivih definisanih u `.env` fajlu (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+1.  **Povezivanje sa bazom podataka**: Inicijalizuje SQLAlchemy `engine` i uspostavlja sinhronu vezu sa PostgreSQL-om.
+2.  **Automatsko kreiranje tabela**: Poziva se `Base.metadata.create_all()` kako bi se osiguralo da sve SQLAlchemy tabele postoje u bazi podataka.
+3.  **Provera/Migracija kolona**: Pokreće se brza alter table komanda koja dodaje kolonu `is_admin` u tabelu `users` ukoliko ona već ne postoji.
+4.  **Kreiranje prvog Administratora**: Za razliku od automatskog kreiranja na startu, sistem nudi specijalnu administrativnu rutu `POST /api/v1/admin/create-first-admin`. Ova ruta je dozvoljena za pozivanje samo ako u bazi podataka ne postoji nijedan administrator sa privilegijom `is_admin=True`. Korisnik može poslati email i lozinku, te promovisati postojeći ili kreirati novi admin nalog.
 
 ---
 
