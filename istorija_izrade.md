@@ -2526,6 +2526,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
         * *CI/CD cevovod*: GitHub Actions sa automatskim build-om slika i push-om na GHCR.
 - **Status:** Završeno. README.md sadrži kompletan vizuelni pregled arhitekture sistema.
 
+### 12.06.2026. 09:35 — Popravka i Optimizacija Mermaid Dijagrama
+- **Zahtevi:** Ispraviti Mermaid dijagram u `README.md` jer se nije renderovao (zbog nekompatibilne sintakse).
+- **Urađeno:**
+    * **Optimizacija sintakse dijagrama**: Prebacio sam dijagram na `flowchart TD` i zamenio sve mrežne veze tako da se spajaju isključivo između konkretnih čvorova umesto čvor-subgraf i subgraf-subgraf veza (što je bio uzrok blokiranja renderovanja u mnogim Markdown parserima).
+    * **Čišćenje labela**: Uklonio sam zagrade unutar labela za Postgres i MinIO (npr. `[("...")]`) i stavio čistiju, kompatibilniju sintaksu sa navodnicima i jednostavnim tekstom.
+- **Status:** Završeno. Mermaid dijagram se sada uspešno i pravilno renderuje.
+
+
 
 
 

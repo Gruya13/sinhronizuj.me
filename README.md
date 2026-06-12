@@ -28,29 +28,27 @@
 Mermaid dijagram ispod prikazuje protok podataka i povezanost komponenti unutar sinhronizuj.me sistema:
 
 ```mermaid
-graph TD
-    subgraph Klijent [Klijentski Sloj]
+flowchart TD
+    subgraph Klijent ["Klijentski Sloj"]
         Browser["Korisnički Browser (React/Vite)"]
     end
 
-    subgraph CF [Mrežna Zaštita]
+    subgraph CF ["Mrežna Zaštita"]
         Cloudflare["Cloudflare Proxy (DNS / SSL / DDoS)"]
     end
 
-    subgraph HetznerVPS [Hetzner VPS - Docker Compose]
+    subgraph HetznerVPS ["Hetzner VPS - Docker Compose Okruženje"]
         NginxProxy["Nginx SSL Reverse Proxy"]
-        
-        subgraph DockerNet [sinhronizuj-net (Izolovana mreža)]
-            Frontend["sinhronizuj-frontend (Nginx Port 3000)"]
-            API["sinhronizuj-api (FastAPI Port 8000)"]
-            Celery["sinhronizuj-celery (Celery Worker)"]
-            Redis["sinhronizuj-redis (Message Broker)"]
-            Postgres[("sinhronizuj-db (PostgreSQL)")]
-            MinIO[("MinIO S3 Storage (Port 9000)")]
-        end
+        Frontend["sinhronizuj-frontend (Nginx Port 3000)"]
+        API["sinhronizuj-api (FastAPI Port 8000)"]
+        Celery["sinhronizuj-celery (Celery Worker)"]
+        Redis["sinhronizuj-redis (Message Broker)"]
+        Postgres[(PostgreSQL Baza)]
+        MinIO[(MinIO S3 Skladište)]
+        DockerDaemon["Docker Engine (Upravljanje Slikama)"]
     end
 
-    subgraph ModalCloud [Modal.com Serverless GPU]
+    subgraph ModalCloud ["Modal.com Serverless GPU AI"]
         Demucs["Demucs Worker (Separacija - T4 GPU)"]
         SenseVoice["SenseVoice Worker (STT - T4 GPU)"]
         Translator["Translator Worker (Llama-3 - CPU/T4)"]
@@ -58,33 +56,45 @@ graph TD
         TTS["TTS OpenVoice Worker (Sinteza - L4 GPU)"]
     end
 
-    subgraph GitHubFlow [CI/CD Pipeline]
+    subgraph GitHubFlow ["CI/CD Pipeline"]
         GHActions["GitHub Actions Runner"]
         GHCR["GitHub Container Registry (GHCR)"]
     end
 
     %% Klijentske veze
-    Browser -->|HTTPS Zahtev| Cloudflare
-    Cloudflare -->|Rutiranje| NginxProxy
-    NginxProxy -->|Servira statiku| Frontend
-    NginxProxy -->|API rute| API
+    Browser --> Cloudflare
+    Cloudflare --> NginxProxy
+    NginxProxy --> Frontend
+    NginxProxy --> API
 
     %% API veze
-    API -->|Upiti i Snimanje| Postgres
-    API -->|Generiše upload URL| MinIO
-    Browser -->|Direktan Upload videa| MinIO
-    API -->|Enqueue task| Redis
-    Redis -->|Osluškuje| Celery
+    API --> Postgres
+    API --> MinIO
+    Browser --> MinIO
+    API --> Redis
+    Redis --> Celery
 
     %% Celery radnik i Modal veze
-    Celery -->|Poziva AI modele preko HTTP-a| ModalCloud
-    ModalCloud -.->|Vraća rezultate| Celery
-    Celery -->|Čita/Piše fajlove| MinIO
-    Celery -->|Ažurira stanje projekta| Postgres
+    Celery --> Demucs
+    Celery --> SenseVoice
+    Celery --> Translator
+    Celery --> Lektor
+    Celery --> TTS
+
+    Demucs -.-> Celery
+    SenseVoice -.-> Celery
+    Translator -.-> Celery
+    Lektor -.-> Celery
+    TTS -.-> Celery
+
+    Celery --> MinIO
+    Celery --> Postgres
 
     %% CI/CD Tok
-    GHActions -->|Gradi i šalje Docker slike| GHCR
-    GHCR -.->|VPS povlači slike preko SSH-a| HetznerVPS
+    GHActions --> GHCR
+    GHCR --> DockerDaemon
+    DockerDaemon --> Frontend
+    DockerDaemon --> API
 ```
 
 ---
