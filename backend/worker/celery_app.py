@@ -7,6 +7,16 @@ from backend.core.config import settings
 # Zadatak 1: Eksplicitno učitavanje .env fajla za worker procese
 load_dotenv()
 
+import sentry_sdk
+
+# Inicijalizacija Sentry monitoringa za Celery (Sentry 2.x automatski integriše Celery)
+if getattr(settings, "SENTRY_DSN", None):
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=1.0,
+    )
+    print("[SENTRY INIT] Sentry monitoring je uspešno inicijalizovan za Celery.", flush=True)
+
 celery_app = Celery(
     "sinhronizuj_me_worker",
     broker=settings.REDIS_URL,

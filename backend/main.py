@@ -23,6 +23,17 @@ from backend.core.models import User, Project, Segment, Glossary, Waitlist
 from backend.core.auth import get_password_hash, verify_password, create_access_token, get_current_user, get_current_admin_user
 from botocore.config import Config
 
+import sentry_sdk
+
+# Inicijalizacija Sentry monitoringa (Sentry 2.x automatski integriše FastAPI)
+if getattr(settings, "SENTRY_DSN", None):
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+    print("[SENTRY INIT] Sentry monitoring je uspešno inicijalizovan za FastAPI.", flush=True)
+
 # Automatsko kreiranje tabela u bazi podataka pri startu servera
 from sqlalchemy import text
 Base.metadata.create_all(bind=engine)

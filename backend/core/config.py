@@ -40,4 +40,7 @@ class Settings:
     # Database Configuration
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://sinhronizuj_user:sinhronizuj_pass_2026@localhost:5432/sinhronizuj_db")
 
+    # Monitoring
+    SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+
 settings = Settings()

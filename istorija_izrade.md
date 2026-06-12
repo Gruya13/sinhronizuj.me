@@ -2497,3 +2497,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Analiza infrastrukture:** Pregledani su Dockerfiles, docker-compose konfiguracije za produkciju i lokalni razvoj, GitHub Actions workflow datoteke, backup skripte i mrežne postavke.
     * **Izrada DevOps izveštaja:** Kreiran je dokument `doc/devops_predlozi_unapredjenja.md` sa detaljnim objašnjenjima i rešenjima za build pipeline (uvođenje Docker Registry), bezbednost (skrivanje izloženih portova baze i Redis-a), backup (otpremanje na eksterni cloud storage umesto lokalnog MinIO), monitoring (Sentry, Uptime Kuma) i skaliranje Celery radnika.
 - **Status:** Završeno. DevOps izveštaj je uspešno kreiran i postavljen u doc folder.
+
+### 12.06.2026. 09:15 — DevOps Optimizacija Sistema i CI/CD Integracija sa GHCR
+- **Zahtevi:** Implementirati sve preporučene DevOps korake (kontejnerizacija frontenda, optimizacija docker-compose, integracija sa GHCR za brži deploy bez build-a na serveru, log rotacija, uvođenje healthcheck-ova, resursni limiti, zatvaranje internih portova, integracija Sentry SDK-a za monitoring).
+- **Urađeno:**
+    * **Kontejnerizacija frontenda:** Kreirani su `frontend/Dockerfile` (višefazna izgradnja) i `frontend/nginx.conf` (Nginx konfiguracija za SPA).
+    * **Docker Compose Optimizacija:** Ažuriran `infra/hetzner/docker-compose.prod.yml` sa zdravstvenim proverama (healthchecks) za Postgres i Redis, depends_on uslovima, resursnim limitima za API i radnike, log rotacijom i uklanjanjem javno izloženih portova 5432 i 6379. Dodata podrška za dinamički `IMAGE_TAG`.
+    * **GitHub Actions CI/CD:** Ažuriran `.github/workflows/deploy.yml` tako da Actions sada grade i šalju (push) Docker slike na GitHub Container Registry (GHCR), a na VPS-u se samo povlače gotove slike (`docker compose pull`) što eliminiše build opterećenje na serveru.
+    * **Monitoring (Sentry):** Dodat `sentry-sdk` u `requirements.txt`. Integrisan Sentry u `backend/main.py` i `backend/worker/celery_app.py` za automatsko praćenje i dojavu grešaka u realnom vremenu na FastAPI i Celery instancama.
+    * **Verifikacija:** Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15) i frontend testovi (`vitest` - 7/7).
+- **Status:** Završeno. Sve DevOps izmene su uspešno integrisane i testirane.
+
