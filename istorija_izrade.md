@@ -2572,6 +2572,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Ažuriranje AI dokumentacije**: Izmenjeni javni `doc/modal_workers_i_ai.md` i tajni `sicret doc/modal_workers_i_ai.md` u delu specifikacije modela i tabele troškova (ispravljeno sa CPU na Nvidia A10G i ažurirana cena na $1.10/h).
 - **Status:** Završeno. Sve reference na translator model su usklađene sa stvarnom implementacijom u kodu.
 
+### 12.06.2026. 14:15 — Detaljan Bezbednosni Audit i Analiza Rizika Sistema
+- **Zahtevi:** Izvršiti sveobuhvatan bezbednosni audit sistema (frontend, backend API, Modal serverless GPU radnici, baza podataka, MinIO skladište, backup mehanizmi i CI/CD) i kreirati detaljan izveštaj sa konkretnim akcionim predlozima.
+- **Urađeno:**
+    * **Bezbednosna analiza koda i infrastrukture:** Izvršen je detaljan pregled softverske arhitekture i infrastrukturnih datoteka (docker-compose, GitHub Actions workflows, FastAPI CORS postavke, JWT tokeni i skladištenje lozinki).
+    * **Identifikacija ključnih pretnji:** Detektovani su kritični bezbednosni rizici, uključujući nezaštićene serverless endpoints na Modalu (pretnja od visokih GPU troškova), nešifrovani HTTP prenos i javna izloženost portova MinIO storage-a, hardkodovane default lozinke u `config.py`, predugo trajanje JWT sesija (7 dana) bez mogućnosti opoziva, lokalno čuvanje backup-a (rizik od gubitka podataka) i nedostatak SSRF validacije kod preuzimanja videa.
+    * **Kreiranje bezbednosnog izveštaja:** Izrađen je sveobuhvatan dokument `bezbednosni_audit_izvestaj.md` na srpskom jeziku koji detaljno objašnjava svaki rizik, klasifikuje pretnje i pruža gotova programska i sistemska rešenja sa primerima koda za otklanjanje propusta. Dokument je uspešno sačuvan i kao sistemski artefakt sesije i u poverljivom direktorijumu `sicret doc/bezbednosni_audit_izvestaj.md`.
+- **Status:** Završeno. Bezbednosni audit je u potpunosti sproveden i dokumentovan.
+
+
 
 
 
