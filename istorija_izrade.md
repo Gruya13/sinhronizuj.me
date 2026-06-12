@@ -2477,6 +2477,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Kreiranje naloga:** Izračunao sam bcrypt heš lozinke sa slike (`E89120d9dfeB#`) direktno unutar API kontejnera pomoću funkcije `get_password_hash`. Zatim sam preko SQL upita kreirao novi nalog sa unetim emailom, generisanim hešom lozinke i dodelio mu administratorske privilegije (`is_admin=true`).
 - **Status:** Završeno. Administratorski nalog je uspešno kreiran na produkcijskom serveru i spreman je za prijavu.
 
+### 12.06.2026. 08:45 — Ispravka Oštećenog Heša Lozinke na Produkciji
+- **Zahtevi:** Dijagnostifikovati zašto se korisnik i dalje ne može ulogovati uprkos kreiranom nalogu i rešiti problem.
+- **Urađeno:**
+    * **Identifikacija kvara (Bcrypt Hash Corruption):** Proverom kolone `password_hash` u bazi na serveru utvrđeno je da je prethodni heš bio oštećen (`b2.u.98Cwx1LA...`). Razlog je što je daljinski shell na VPS-u interpretirao znakove `$` (kao što su `$2b` i `$12`) kao nepostojeće sistemske promenljive i uklonio ih iz heša.
+    * **Ispravka (Python DB Script):** Napisao sam i izvršio namenski Python skript unutar produkcijskog API kontejnera koji je direktno učitao SQLAlchemy session i bezbedno postavio ispravan heš lozinke (`$2b$12$BvzE07.bZUa/...`) bez uplitanja shell navodnika i eskapovanja.
+- **Status:** Završeno. Lozinka je ispravljena na bezbedan način, i login je sada u potpunosti operativan.
+
+
 
 
 
