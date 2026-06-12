@@ -231,21 +231,39 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         if duration_lektor > 0:
             add_phase_cost("lektor", "Lektura teksta (Qwen 32B AWQ)", "A10G", duration_lektor, 0.00033)
             
-        update_progress(completed_step="Prevedeno i lekturisano", percentage=100)
+        update_progress(completed_step="Prevedeno i lekturisano", percentage=85)
         
-        # Formatiranje segmenata za nacrt
-        draft_segments = []
+        # --- KORAK 5: Lokalna detekcija roda i govornika (diarizacija i ASD) ---
+        update_progress("Diarizacija i vizuelna analiza...", 90, detail="Analiziram govornike i pokrete usana na ekranu...")
+        
+        from backend.worker.audio_gender import detect_gender_from_audio
+        from backend.worker.active_speaker import is_speaker_active_on_screen
+        
+        processed_segments = []
         for i, s in enumerate(translation_result["translated_segments"]):
-            draft_segments.append({
+            update_progress(detail=f"Analiziram segment {i+1}/{len(translation_result['translated_segments'])}...")
+            
+            # Detektujemo rod iz audio trake
+            gender = detect_gender_from_audio(stable_vocals_path, s["start"], s["end"])
+            voice_type = "male" if gender == "male" else "clone"
+            
+            # Detektujemo da li se usne pomeraju na ekranu (aktivan govornik)
+            is_active = is_speaker_active_on_screen(stable_video_path, s["start"], s["end"])
+            
+            processed_segments.append({
                 "id": i,
                 "start": s["start"],
                 "end": s["end"],
                 "original": s.get("original_text", ""),
                 "translated": s["text"],
+                "voice_type": voice_type,
+                "active_speaker": is_active,
                 "tts_path": None,
                 "tts_duration": None,
                 "status": "draft"
             })
+            
+        update_progress(completed_step="Diarizacija i vizuelna analiza završene", percentage=100)
             
         # Inicijalni naziv i kreiranje datuma za metapodatke
         created_at_val = datetime.now().isoformat()
@@ -293,19 +311,20 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 # Brišemo stare segmente pre kreiranja novih
                 db.query(Segment).filter(Segment.project_id == effective_project_id).delete()
                 
-                for i, s in enumerate(translation_result["translated_segments"]):
+                for s in processed_segments:
                     db_seg = Segment(
                         project_id=effective_project_id,
-                        segment_id=i,
+                        segment_id=s["id"],
                         start=s["start"],
                         end=s["end"],
-                        original=s.get("original_text", ""),
-                        translated=s["text"],
-                        voice_type="clone",
+                        original=s["original"],
+                        translated=s["translated"],
+                        voice_type=s["voice_type"],
                         volume=0.0,
                         speed=1.0,
                         pitch=0.0,
                         bg_volume=0.0,
+                        active_speaker=s["active_speaker"],
                         tts_s3_key=None,
                         tts_duration=None,
                         status="draft"
@@ -326,13 +345,15 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         from backend.main import get_presigned_download_url
         
         redis_segments = []
-        for i, s in enumerate(translation_result["translated_segments"]):
+        for s in processed_segments:
             redis_segments.append({
-                "id": i,
+                "id": s["id"],
                 "start": s["start"],
                 "end": s["end"],
-                "original": s.get("original_text", ""),
-                "translated": s["text"],
+                "original": s["original"],
+                "translated": s["translated"],
+                "voice_type": s["voice_type"],
+                "active_speaker": s["active_speaker"],
                 "tts_path": None,
                 "tts_duration": None,
                 "status": "draft"
@@ -417,6 +438,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 "speed": s.speed,
                 "pitch": s.pitch,
                 "bg_volume": s.bg_volume,
+                "active_speaker": s.active_speaker,
                 "tts_s3_key": s.tts_s3_key,
                 "tts_duration": s.tts_duration,
                 "status": s.status
@@ -617,7 +639,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         
         # --- KORAK 3: Lip Sync ---
         update_progress("Lip Sync sinhronizacija...", 80, detail="Analiza i pokretanje Wav2Lip-a...")
-        from backend.worker.lipsync import has_sufficient_faces, apply_lip_sync
+        from backend.worker.lipsync import has_sufficient_faces, apply_selective_lip_sync
         
         t_start_lip = time.time()
         needs_lipsync = has_sufficient_faces(merge_result["final_video_path"], threshold_percentage=10.0)
@@ -625,7 +647,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         if needs_lipsync:
             update_progress("Lip Sync sinhronizacija...", 85, detail="Usklađivanje usana govornika (Wav2Lip)...")
             lip_vocals_path = merge_result["dubbed_audio_path"]
-            lip_result = apply_lip_sync(merge_result["final_video_path"], lip_vocals_path)
+            lip_result = apply_selective_lip_sync(merge_result["final_video_path"], lip_vocals_path, segments)
             final_output = lip_result["lipsync_video_path"] if lip_result["status"] != "error" else merge_result["final_video_path"]
         else:
             final_output = merge_result["final_video_path"]

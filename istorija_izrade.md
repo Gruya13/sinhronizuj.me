@@ -1,3 +1,22 @@
+## [2026-06-12 15:13:00] Implementacija hibridne diarizacije, FastAPI podrške i selektivnog Lip-Sync-a
+- **Opis:**
+  Uspesno smo implementirali celokupnu integraciju hibridne diarizacije, FastAPI podrške za `active_speaker` i selektivnog Lip-Sync algoritma:
+  1. **FastAPI izmene u main.py:**
+     - Ažurirali smo `SegmentItem` Pydantic model da sadrži polje `active_speaker: Optional[bool] = True`.
+     - Dodali smo mapiranje za `active_speaker` u ruti `get_project_draft` i podršku za njegovo čuvanje u bazu podataka u ruti `save_project_draft`.
+  2. **Integracija u tasks.py (Faza 1 - Analiza):**
+     - Integrisali smo lokalnu detekciju roda iz zvuka (`audio_gender.py`) i detekciju pokreta usana (`active_speaker.py`) u Celery task `analyze_video_task`.
+     - Ako je detektovan muški rod glasa (`median_pitch < 160Hz`), postavlja se `voice_type="male"`, u suprotnom `"clone"`.
+     - Rezultati se uspešno upisuju u Postgres bazu i Redis draft.
+  3. **Selektivni LipSync algoritam (lipsync.py):**
+     - Razvili smo `apply_selective_lip_sync` koji deli video na vremenske isečke, propušta kroz Wav2Lip isključivo delove gde je `active_speaker == True` (Wav2Lip delovi), dok pasivne i naratorske delove ostavlja u originalu.
+     - Spajanje isečaka se vrši ultra-brzo pomoću FFmpeg `concat` demuxer-a (`-c copy`), čime se dramatično ubrzava renderovanje i eliminišu anomalije deformisanja lica za naratora.
+  4. **Integracija u render task (Faza 2 - Render):**
+     - Integrisali smo `apply_selective_lip_sync` u Celery task `render_video_task` u `tasks.py`.
+  5. **Verifikacija:**
+     - Kreirali smo sveobuhvatne unit testove u [tests/test_worker_features.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_worker_features.py) koji pokrivaju sve tri nove funkcionalnosti sa mock-ovanjem OpenCV-a, MediaPipe-a i torchaudio-a.
+     - Pokrenuli smo pytest test suite (`pytest tests/`) i svi testovi (19/19) su uspešno prošli.
+
 ## [2026-06-12 15:05:00] Ispravka mešanja few-shot primera sa stvarnim prevodom u translator.py
 - **Opis:**
   Otklonili smo grešku gde su se rečenice iz primera za prevođenje (few-shot primeri) pojavljivale kao prevodi stvarnih video segmenata sa ID-evima 0 i 1.

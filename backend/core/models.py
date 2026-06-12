@@ -88,6 +88,7 @@ class Segment(Base):
     speed = Column(Float, default=1.0)
     pitch = Column(Float, default=0.0)
     bg_volume = Column(Float, default=0.0)
+    active_speaker = Column(Boolean, default=True, server_default="true")
     
     # S3 ključ za izgenerisani audio fajl
     tts_s3_key = Column(String, nullable=True)

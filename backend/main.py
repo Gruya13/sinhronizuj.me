@@ -131,6 +131,7 @@ class SegmentItem(BaseModel):
     speed: Optional[float] = 1.0
     pitch: Optional[float] = 0.0
     bg_volume: Optional[float] = 0.0
+    active_speaker: Optional[bool] = True
 
 class SaveProjectRequest(BaseModel):
     segments: List[SegmentItem]
@@ -433,6 +434,7 @@ def get_project_draft(project_id: str, current_user: User = Depends(get_current_
             "speed": s.speed,
             "pitch": s.pitch,
             "bg_volume": s.bg_volume,
+            "active_speaker": s.active_speaker,
             "tts_path": get_presigned_download_url(settings.MINIO_BUCKET, s.tts_s3_key) if s.tts_s3_key else None,
             "tts_duration": s.tts_duration,
             "status": s.status
@@ -480,6 +482,7 @@ def save_project_draft(project_id: str, request: SaveProjectRequest, current_use
             db_seg.speed = req_seg.speed if req_seg.speed is not None else 1.0
             db_seg.pitch = req_seg.pitch if req_seg.pitch is not None else 0.0
             db_seg.bg_volume = req_seg.bg_volume if req_seg.bg_volume is not None else 0.0
+            db_seg.active_speaker = req_seg.active_speaker if req_seg.active_speaker is not None else db_seg.active_speaker
             db_seg.status = "edited"
             
     db.commit()
