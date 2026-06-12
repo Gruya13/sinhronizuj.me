@@ -68,6 +68,8 @@ services:
     image: postgres:15-alpine
     container_name: sinhronizuj-db
     restart: always
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: sinhronizuj_user
       POSTGRES_PASSWORD: ${DB_PASSWORD:-sinhronizuj_pass_2026}

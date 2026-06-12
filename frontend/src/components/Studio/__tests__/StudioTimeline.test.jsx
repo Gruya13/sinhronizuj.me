@@ -1,6 +1,6 @@
 import { vi, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Timeline from '../Timeline';
+import StudioTimeline from '../StudioTimeline';
 import React from 'react';
 
 // Mock wavesurfer.js
@@ -51,20 +51,20 @@ vi.mock('../../../context/StudioContext', () => ({
   })
 }));
 
-describe('Timeline Component', () => {
+describe('StudioTimeline Component', () => {
   it('renders Timeline header correctly', () => {
-    render(<Timeline />);
+    render(<StudioTimeline />);
     expect(screen.getByText(/Vremenski Editor/i)).toBeInTheDocument();
   });
 
   it('renders active audio buttons', () => {
-    render(<Timeline />);
+    render(<StudioTimeline />);
     expect(screen.getAllByText(/Originalni ENG Vokal/i)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Srpski glas/i)[0]).toBeInTheDocument();
   });
 
   it('renders segments list', () => {
-    render(<Timeline />);
+    render(<StudioTimeline />);
     expect(screen.getByText('#1')).toBeInTheDocument();
     expect(screen.getByText('#2')).toBeInTheDocument();
   });

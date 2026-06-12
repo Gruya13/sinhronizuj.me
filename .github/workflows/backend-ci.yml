@@ -1,0 +1,39 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ development, main ]
+  pull_request:
+    branches: [ development, main ]
+  workflow_call:
+
+jobs:
+  backend-ci:
+    name: Backend Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Preuzimanje koda
+      uses: actions/checkout@v4
+
+    - name: Podešavanje Python okruženja
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalacija zavisnosti za testiranje
+      run: |
+        grep -v -E "torch|demucs" requirements.txt > requirements-ci.txt
+        python -m pip install --upgrade pip
+        pip install ruff pytest pytest-mock httpx
+        pip install -r requirements-ci.txt
+
+    - name: Provera sintakse koda (Ruff Linter)
+      run: |
+        ruff check --select=E9,F63,F7,F82 backend modal_workers
+
+    - name: Pokretanje integracionih testova
+      run: |
+        pip install pytest
+        pytest

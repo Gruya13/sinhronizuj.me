@@ -3,7 +3,7 @@ import { Film, Video, Mic, Volume2, Music } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import { useStudio } from '../../context/StudioContext';
 
-export default function Timeline() {
+export default function StudioTimeline() {
   const {
     project,
     setProject,

@@ -3,7 +3,7 @@ import { Mic, Loader2, Wand2 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import Knob from '../Common/Knob';
 
-export default function SegmentRow() {
+export default function SegmentEditor() {
   const {
     project,
     selectedSegmentId,

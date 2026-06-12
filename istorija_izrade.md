@@ -2409,4 +2409,23 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija koda:** Napisani su backend pytest testovi u `tests/test_admin.py` za proveru autorizacije i admin akcija. Svi testovi su uspešno prošli (4/4 pytest i 7/7 vitest testova). Uspešno je pokrenut i produkcioni build (`npm run build`).
 - **Status:** Završeno. Kompletan Admin Panel je uspešno implementiran i integrisan u sistem.
 
+### 12.06.2026. 07:55 — Refaktorisanje koda, CI/CD ažuriranje i Alembic migracije
+- **Zahtevi:** Izvršiti preporučene refaktorisane korake iz DevOps izveštaja: dekompozicija `App.jsx` na modularne komponente, integracija testova u GitHub workflows i uvođenje prve Alembic migracije sa čišćenjem legacy backend koda.
+- **Urađeno:**
+    * **Refaktorisanje Frontenda:**
+        * Kreirane nove modularne komponente: `AudioMixer.jsx` (kontrole jačine zvuka), `DashboardView.jsx` (lista projekata, upload videa i preview pre analize), `StudioTimeline.jsx` (vizuelni editor vremenske linije, preimenovan iz `Timeline.jsx`) i `SegmentEditor.jsx` (editor pojedinačnih i grupnih segmenata, preimenovan iz `SegmentRow.jsx`).
+        * Drastično smanjen monolitni fajl `App.jsx` koji sada služi isključivo kao ruter i čuvar globalnog rasporeda.
+        * Ažuriran i prilagođen test fajl `StudioTimeline.test.jsx`.
+    * **CI/CD Workflows:**
+        * Podeljen stari objedinjeni workflow `ci-cd.yml` na tri modularna fajla: `backend-ci.yml` (za pytest), `frontend-ci.yml` (za vitest i playwright testove) i `deploy.yml` (koji poziva oba CI workflow-a preko `workflow_call` pre deployment-a na staging/production VPS).
+    * **Backend Čišćenje i Migracije:**
+        * Uklonjen neaktivni legacy fajl `backend/core/orchestrator.py`.
+        * Uklonjen ključ `RUNPOD_API_KEY` iz konfiguracije `backend/core/config.py`.
+        * Eksponiran port `5432` u `docker-compose.yml` za bazu podataka radi lakšeg upravljanja migracijama sa hosta.
+        * Inicijalizovan Alembic u `backend` direktorijumu i uspešno kreirana prva automatska migracija za SQLAlchemy modele.
+    * **Verifikacija:**
+        * Uspešno pokrenuti i završeni svi frontend unit testovi (`npm run test:run` - 7/7 testova prošlo).
+        * Uspešno pokrenuti i završeni svi backend integracioni testovi (`pytest` - 15/15 testova prošlo).
+- **Status:** Završeno. Kod je refaktorisan, testovi su uspešno integrisani, a Alembic migracije su spremne.
+
 
