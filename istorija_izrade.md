@@ -2440,5 +2440,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Infrastruktura i DevOps (`sicret doc/infrastruktura_i_devops.md`):** Detaljno specifikovani Hetzner VPS serveri (Development na `116.202.103.35`, Production na `178.104.214.78`), Docker Compose lokalno i produkciono okruženje, noćni backup baze i medija sa rotacijom na MinIO S3 od 7 dana, i modularni GitHub Actions workflows (`backend-ci.yml`, `frontend-ci.yml`, `deploy.yml`).
 - **Status:** Završeno. Sveobuhvatna i podeljena dokumentacija je uspešno generisana i sačuvana u tajnom direktorijumu.
 
+### 12.06.2026. 08:20 — Izrada Novog i Modernizovanog README.md Fajla
+- **Zahtevi:** Napraviti novi, ažurirani `README.md` fajl projekta koji precizno odražava najnovije izmene, modularnu strukturu komponenti, novi CI/CD cevovod i lokalne test procedure.
+- **Urađeno:**
+    * **Ažuriranje README.md:** Kreiran je potpuno novi `README.md` u korenu projekta. Uklonjene su zastarele informacije o monolitnom `App.jsx` i uvrštene specifikacije novih komponenti (`StudioTimeline`, `SegmentEditor`, `AudioMixer`, `DashboardView`).
+    * **Tehnički Detalji:** Dokumentovane su nove modularne CI/CD GitHub Actions skripte (`backend-ci.yml`, `frontend-ci.yml`, `deploy.yml`), pokretanje testova za oba sloja (`pytest` i `npm run test:run`), nova struktura foldera i očišćene promenljive okruženja (bez legacy ključeva).
+- **Status:** Završeno. Novi README.md je uspešno integrisan u koren projekta.
+
+
 
 
