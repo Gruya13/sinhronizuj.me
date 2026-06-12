@@ -2653,12 +2653,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Svi testovi (15/15) uspešno prolaze preko lokalnog virtuelnog okruženja.
 - **Status:** Završeno. Optimizacije su uspešno integrisane i testovi su zeleni.
 
-
-
-
-
-
-
+### 12.06.2026. 17:12 — Resetovanje i Kreiranje Testnih Naloga (Lokalna i Produkciona Baza)
+- **Zahtevi:** Pomoći korisniku oko naloga za testiranje u lokalnom i produkcijskom okruženju pošto se ne seća kredencijala, i postaviti lozinku "Koliko123" za admin naloge.
+- **Urađeno:**
+    * **Kreiranje skripte za lozinke:** Napisao i pokrenuo skriptu `scratch/reset_user_passwords.py` za lokalnu bazu podataka.
+    * **Promena lozinki (Lokalno & Produkciono):** Postavio lozinku na `Koliko123` za nalog `grujovic.igor89@gmail.com` i kreirao `grujovic.igor@89gmail.com` (oba sa admin pravima) kako u lokalnoj PostgreSQL bazi, tako i direktno na produkcijskoj PostgreSQL bazi na Hetzner VPS serveru (kroz `docker exec -t sinhronizuj-db psql`).
+    * **Kreiranje običnog testnog korisnika:** Kreirao novi testni nalog `testuser@sinhronizuj.me` sa lozinkom `TestUser123!` u lokalu.
+- **Status:** Završeno. Nalozi su uspešno ažurirani i sinhronizovani na oba okruženja.
 
 
 
