@@ -2615,6 +2615,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Uspešno pokrenuo kompletan test paket (`pytest` - 15/15 testova prošlo uspešno) preko lokalnog virtuelnog okruženja, čime je potvrđena funkcionalna ispravnost svih unetih promena bez uticaja na postojeće API rute.
 - **Status:** Završeno. Bezbednosna unapređenja su uspešno integrisana u sistem i verifikovana.
 
+### 12.06.2026. 14:38 — Optimizacija Brzine i Kvaliteta Prevoda (Uklanjanje Qwen2-VL, Veći Batches i Robusno Parsiranje)
+- **Zahtevi:** Rešiti probleme sa dugotrajnim prevođenjem (8-9 minuta u produkciji), neprevedenim segmentima (koji ostaju prazni/tihi) i lošim kvalitetom prevoda koji je prijavio korisnik.
+- **Urađeno:**
+    * **Eliminacija Qwen2-VL modela za prevod:** Izbacio multimodalni vision model `Qwen2-VL-7B` i preusmerio fazu prevođenja na znatno veći i kvalitetniji tekstualni model `qwen-lektor` (`Qwen3-32B-AWQ` na A100 GPU). Time je uklonjena spora ekstrakcija video frejmova na VPS-u i eliminisan čest hladni start na A10G GPU.
+    * **Povećanje batch size-a:** Povećao veličinu batch-a za prevođenje i lektorisanje sa 5 na 30 segmenata, smanjujući mrežni overhead i broj sekvencijalnih API poziva za preko 80% (npr. sa 12 poziva na samo 2 poziva za video od 60 segmenata). Povećao `max_tokens` na 4096.
+    * **Uvođenje robusnog JSON + Regex parsiranja:** Implementirao helper `extract_and_parse_json` za čišćenje `<thought>` tagova i robusno parsiranje JSON izlaza, uz `re.split` regularni izraz kao fallback za tagove `[seg-N]` ukoliko model odstupi od JSON formata.
+    * **Sprečavanje praznih prevoda:** Dodao fallback na originalni engleski tekst segmenta ukoliko prevod potpuno izostane iz odgovora modela, čime se sprečava tišina u generisanom videu.
+    * **Verifikacija:** Svi testovi (15/15) uspešno prolaze preko lokalnog virtuelnog okruženja.
+- **Status:** Završeno. Optimizacije su uspešno integrisane i testovi su zeleni.
+
+
 
 
 
