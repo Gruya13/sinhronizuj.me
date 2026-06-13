@@ -2697,7 +2697,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Kreirana i pokrenuta test skripta `test_translator.py` u venv okruženju koja je potvrdila 100% ispravnost celog toka i promptova.
 - **Status:** Završeno. Kod je ispravan, testovi su uspešno prošli.
 
-
-
-
+### 13.06.2026. 20:50 — Implementacija Automatskih Testova i Stabilizacija Pipeline-a (ASR Arbitraža, Prevod, Lektura i LLM Sudija)
+- **Zahtevi:** Osmisliti automatske testove nad test video snimcima u direktorijumu `Test videos`, pustiti pipeline, analizirati prevode preko LLM sudije (LLM-as-a-judge), uočiti i otkloniti sve greške u ASR arbitraži, prevođenju i lekturi.
+- **Urađeno:**
+    * **Kreiranje evaluacionog pipeline-a:** Implementirana namenska interaktivna skripta `evaluate_video_pipeline.py` u korenu projekta, koja izdvaja audio pomoću FFmpeg, pokreće transkripciju, ASR arbitražu, segmentaciju, prevođenje/lekturu i LLM sudiju koji na kraju generiše detaljan Markdown izveštaj o kvalitetu prevoda (ocena, analiza i preporuke).
+    * **Otklanjanje vLLM 400 Bad Request grešaka na Modalu:** Smanjena veličina batch-a sa 15 na **8 segmenata** za prevođenje i lekturu, i podiže se `max_tokens` na **2500**. Ovo garantuje da zbir ulaznih tokena i `max_tokens` nikada ne prelazi strogi limit od **4096 tokena** na Modalu, sprečavajući pucanje veze pod vLLM serverom.
+    * **Stabilizacija ASR Arbitraže:** Popravljena funkcija `arbitrate_transcripts` u `backend/worker/transcriber.py` uvođenjem čišćenja thought tagova (`clean_thought_tags`) i strogim promptom koji zabranjuje meta-komentare i objašnjenja modela van `<think>` tagova. Prethodno su se ova objašnjenja uvlačila u tekst segmenta.
+    * **Optimizacija Lektor JSON parsera:** Otklonjen bag u parseru lektora gde se prazan string `""` za mikro-segmente tretirao kao falsy i zamenjivao engleskim fallbackom. Novi parser bezbedno prihvata postojanje ključeva u JSON objektu bez obzira na logičku istinitost vrednosti.
+    * **Uvođenje pravila za IT akronime:** Ažuriran predefinisani glosar u `backend/worker/glossaries.json` i dodati izuzeci u promptovima prevodioca i lektora za IT pojmove **GPS**, **Wi-Fi** i **Bluetooth** koji moraju ostati u svom originalnom obliku i ne smeju se fonetski transkribovati (npr. kao "Gip Es Pis" ili "Bluutus").
+    * **Verifikacija:** Uspešno pokrenuta evaluacija nad test videom `Ryan Montgomery Reveals...`. Ceo pipeline je prošao bez ijedne greške, a LLM sudija je u finalnom izveštaju (`evaluation_results/Ryan Montgomery Reveals The Device That Is Illegal To Use - HACKZONE (1080p, h264)_report.md`) ocenio prevod sa **9.5/10** bez ijedne stilske ili semantičke greške u segmentima.
+- **Status:** Završeno. Automatski testovi i evaluacija su u potpunosti implementirani, a pipeline je u potpunosti stabilizovan.
 

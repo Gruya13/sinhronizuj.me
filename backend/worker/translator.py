@@ -166,11 +166,21 @@ def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
     cap.release()
     return frames_b64
 
+def clean_thought_tags(text: str) -> str:
+    if not text:
+        return ""
+    # Podrška i za <think> (DeepSeek) i za <thought> (Qwen)
+    for tag in ["think", "thought"]:
+        text = re.sub(rf'<{tag}>.*?</{tag}>', '', text, flags=re.DOTALL)
+        if f"<{tag}>" in text:
+            text = text.split(f"<{tag}>")[0]
+    return text.strip()
+
 def extract_and_parse_json(text: str):
     if not text:
         return None
     # Čišćenje thought tagova ako ih model sa rezonovanjem vrati
-    text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL).strip()
+    text = clean_thought_tags(text)
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -223,13 +233,13 @@ def generate_video_summary(transcript_text: str) -> str:
         "model": "qwen-lektor",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
-        "max_tokens": 200
+        "max_tokens": 800
     }
     
     try:
         res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
         content = res["choices"][0]["message"]["content"].strip()
-        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        content = clean_thought_tags(content)
         return content
     except Exception as e:
         print(f"[SUMMARY ERROR] Greška pri generisanju sažetka: {e}", flush=True)
@@ -331,7 +341,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     full_glossary_dict = parse_glossary_to_dict(dynamic_glossary_str)
     confirmed_translations = {}
 
-    batch_size = 30
+    batch_size = 8
     parsed_dict = {}
     
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
@@ -400,65 +410,39 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
         prompt_text = (
             "Ti si vrhunski profesionalni prevodilac za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
+            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 100 reči). NIKADA nemoj objašnjavati segment po segment niti raditi analizu svakog segmenta pojedinačno u razmišljanju. Samo navedi opšti pristup i pređi na JSON odgovor.\n\n"
             "KONTEKST VIDEA (SAŽETAK):\n"
             f"{video_summary}\n\n"
             f"{glossary_prompt_section}"
             f"{history_section}"
             "PRAVILA ZA PREVOD:\n"
-            "1. ZNAČENJE, A NE BUKVALNI PREVOD: Prevod mora zvučati 100% prirodno. Koristi srpske idiome i termine (npr. 'articles of incorporation' su 'osnivački akti' ili 'registracioni dokumenti', a ne 'članci u korporaciju').\n"
-            "2. PRIPREMA TEKSTA ZA TTS (SINTEZU GLASA) - ZLATNA PRAVILA:\n"
-            "   - BROJEVI SLOVIMA: Sve brojeve, cifre i procente obavezno piši SLOVIMA (npr. 'sto hiljada dolara' umesto '100.000 dolara', 'tri godine' umesto '3 godine', 'pet minuta' umesto '5 minuta'). Godine (npr. 'dve hiljade dvadeset šesta') takođe piši slovima.\n"
-            "   - FONETSKI STRANI BRENDOVI, IMENA, KVARTOVI I NASLOVI: Sve strane brendove, platforme, lična imena, četvrti/kvartove (npr. 'Cow Hollow' -> 'Kau Holou') i naslove knjiga/projekata piši isključivo FONETSKI, tj. onako kako se izgovaraju na srpskom jeziku. NEMOJ prevoditi njihovo značenje na srpski (npr. 'Brave New World' piši kao 'Brejv Nju Vorld' a ne 'Vrli novi svet', 'Superintelligence' piši kao 'Superintelidžens' a ne 'Superinteligencija', 'Andon Labs' piši kao 'Endon Labs' a ne 'Endon laboratorije'). Ne ostavljaj engleski pravopis niti crtice u akronimima (nikada ne piši 'Ej-Aj' sa crticom verujući da to TTS model bolje čita, piši 'Ej Aj').\n"
-            "   - PREVOD ZA AI: Skraćenicu 'AI' uvek prevodi i piši kao 'Ej Aj' (sa razmakom, bez crtice). Nemoj koristiti izraz 'veštačka inteligencija' niti ostavljati 'AI', već koristi isključivo 'Ej Aj'. OBAVEZNO dekliniraj izraz 'Ej Aj' u zavisnosti od konteksta rečenice i predloga:\n"
-            "     * predlog 'sa' zahteva instrumental -> 'sa Ej Ajem' (npr. 'nema veze sa Ej Ajem', 'rad sa Ej Ajem')\n"
-            "     * predlog 'o' zahteva lokativ -> 'o Ej Aju' (npr. 'govorimo o Ej Aju', 'najnovije o Ej Aju')\n"
-            "     * predlog 'od' zahteva genitiv -> 'od Ej Aja' (npr. 'razvoj od strane Ej Aja', 'strah od Ej Aja')\n"
-            "     * predlog 'u' zahteva lokativ/akuzativ -> 'u Ej Aju' / 'u Ej Aj'\n"
-            "     * predlog 'za' zahteva akuzativ -> 'za Ej Aj'\n"
-            "     Nikada nemoj pomešati ove padeže niti ostaviti 'Ej Aj' u nominativu ako smisao rečenice zahteva drugi padež.\n"
-            "3. GRAMATIKA, PRAVOPIS I VERODOSTOJNOST:\n"
-            "   - GLAGOLSKO VREME: Prevod mora strogo pratiti glagolsko vreme iz originala. Ako je rečenica u prezentu (sadašnjem vremenu), prevod mora biti u prezentu (npr. 'I have no face' -> 'Nemam lice', nikako u prošlom 'Nisam imala lice'). Ako je u prošlom ili budućem vremenu, prevod mora to verno pratiti.\n"
-            "   - ROD GOVORNIKA (GENDER): Obrati pažnju na rod govornika (ako je iz konteksta jasno). Ako je govornik muško ili se radi o opštem/neutralnom rodu, koristi muški rod u prošlom vremenu (npr. 'bio sam', 'rekao sam'). Ako je u pitanju ženski govornik, koristi ženski rod (npr. 'bila sam', 'rekla sam').\n"
-            "   - DOSLEDNO OBRAĆANJE (T/V): Obraćanje mora biti gramatički i stilski dosledno u celoj rečenici. Koristi isključivo jedninsko neformalno obraćanje 'ti' (npr. 'ako želiš da ostaneš... prati za više') jer su video snimci modernog i prisnog formata. Nemoj mešati jedninu 'ti' sa množinom 'vi' (npr. 'želiš ... pratite').\n"
-            "   - DEKLINACIJA ROBOTIKE: Oblast 'robotics' je na srpskom 'robotika' koja se koristi isključivo u jednini (u padežima 'robotici' ili 'robotikom', nikada množinski oblici 'robotike' ili 'robotikama'). Frazu 'latest in AI and robotics' prevedi prirodno kao 'najnovijem o Ej Aju i robotici' ili 'najnovijim dešavanjima iz sveta Ej Aja i robotike', nikako nužno 'najnovijim o Ej Aj i robotikama'.\n"
-            "   - Glagol 'raditi' u 3. licu množine prezenta je isključivo 'RADE' (nikada 'radu').\n"
-            "   - Množina imenice 'intervju' u akuzativu je 'INTERVJUE' (nikada 'intervjuove').\n"
-            "   - Ne izmišljaj reči niti koristi rogobatne prevode (npr. 'komisionirala muralistu' -> 'angažovala slikara da naslika mural', 'unajmiti/angažovati' umesto 'naimeniti', 'naslikati' umesto 'namalovati', 'ljudima koji brinu' umesto 'ljudima brinućima').\n"
-            "   - Prevedi sve engleske izraze u potpunosti na srpski (npr. 'preoccupied with AI risk' prevedi kao 'zabrinutim zbog rizika od Ej Aja' ili 'zaokupljenim Ej Aj rizicima', nikako ne ostavljaj reči na engleskom).\n"
-            "   - Strana imena i gradove prilagodi srpskom pravopisu (npr. 'u San Francisku' umesto 'u San Franciscu').\n"
-            "   - DEKLINACIJA STRANIH IMENA I BRENDOVA: Obavezno dekliniraj strana imena i brendove kroz padeže u srpskom jeziku (npr. 'nazvao ga Luna' ali 'koji je stvorio Lunu' (akuzativ), 'razgovarao sa Klodom' (instrumental), 'preko Zuma', 'na Linkedinu'). Nikada ne ostavljaj ime u nominativu ako smisao rečenice zahteva promenu.\n"
-            "   - PREVOD REČI 'FUTURE': Reč 'future' kao imenica se uvek prevodi kao 'budućnost' (npr. 'this future' -> 'tu budućnost' / 'takvu budućnost', nikako 'to buduće').\n"
-            "   - LOGIČKA FRAZA 'NOT NECESSARILY BECAUSE': Rečenice koje sadrže 'not doing this necessarily because they want...' prevodi ispravno kao 'ne rade ovo nužno zato što žele...' (logički smisao je da oni to čine, ali razlog nije nužno taj). Izbegavaj pogrešan prevod poput 'ne rade to jer ne žele'.\n"
-            "4. POŠTOVANJE GRANICE DUŽINE (LIMIT KARAKTERA):\n"
-            "   - Za svaki segment ti je prosleđen LIMIT u broju karaktera (uključujući razmake). Tvoj prevod (translated_text) MORA biti kraći ili jednak tom limitu kako bi mogao da se izgovori u predviđenom vremenu bez prevelikog ubrzavanja govora. Ako je prevod predugačak, koristi kraće sinonime, sažmi rečenicu ili izostavi suvišne reči, ali sačuvaj osnovni smisao.\n"
-            "5. LOKALIZACIJA TERMINA: Reč 'store' prevodi kao 'prodavnica' ili 'radnja' / 'lokal'. 'Retail lease' je 'zakup lokala' ili 'zakup prostora'. Frazu 'they'd rather' prevedi kao 'oni bi radije' ili 'radije bi'. 'Retail experience' je 'iskustvo u maloprodaji' ili 'iskustvo u trgovini'.\n"
-            "6. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
-            "7. STROGO ODRŽAVANJE GRANICA SEGMENATA: Prevedi svaki red nezavisno i vrati prevod pod tačnim [seg-ID] tagom tog reda. Nikada nemoj spajati dva reda u jedan, niti preskakati redove. Svaki ulazni red mora imati tačno jedan odgovarajući izlazni red sa istim tagom. Ako se rečenica proteže kroz više redova, prevedi delove rečenice unutar tih istih redova bez njihovog spajanja.\n\n"
+            "1. PRIRODAN PREVOD: Prevod mora zvučati 100% prirodno. Koristi srpske idiome i termine.\n"
+            "2. PRIPREMA ZA TTS (SINTEZU GLASA):\n"
+            "   - Sve brojeve, cifre i procente piši SLOVIMA (npr. 'sto hiljada dolara', 'tri godine', 'dve hiljade dvadeset šesta').\n"
+            "   - Strana lična imena, brendove i naslove piši FONETSKI, kako se izgovaraju na srpskom (npr. 'Brejv Nju Vorld', 'Endon Labs', 'Ej Aj').\n"
+            "   - Izuzetak: Uobičajene IT akronime i tehnologije poput GPS, Wi-Fi i Bluetooth piši u njihovom originalnom obliku (GPS, Wi-Fi, Bluetooth) i nemoj ih pisati fonetski.\n"
+            "   - Reč 'AI' prevodi kao 'Ej Aj' (bez crtice) i obavezno je dekliniraj kroz padeže ('sa Ej Ajem', 'o Ej Aju', 'od Ej Aja', 'za Ej Aj').\n"
+            "3. GRAMATIKA I PRAVOPIS:\n"
+            "   - Strogo prati glagolsko vreme iz originala (prezent za prezent, prošlo za prošlo).\n"
+            "   - Prilagodi rod govornika (muški rod za neutralan/muški, ženski rod za ženski).\n"
+            "   - Koristi isključivo jedninsko neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj', 'zavari').\n"
+            "   - Prilagodi strana imena i gradove srpskom pravopisu i deklinaciji (npr. 'u San Francisku', 'sa Klodom', 'preko Zuma').\n"
+            "   - Prevedi sve engleske izraze u potpunosti (nemoj ostavljati engleske reči).\n"
+            "4. POŠTOVANJE LIMITA KARAKTERA:\n"
+            "   - Tvoj prevod (translated_text) za svaki segment mora biti kraći ili jednak prosleđenom LIMITU kako bi se izgovorio u predviđenom vremenu. Koristi kraće sinonime ili sažmi rečenicu ako je potrebno.\n"
+            "5. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove.\n\n"
             "FORMAT ODGOVORA:\n"
-            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati:\n"
-            "1. 'segments': listu gde svaki segment ima ključeve:\n"
-            "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
-            "  - 'analysis': tvoje razmišljanje i lingvistička analiza idiomatskih izraza, roda govornika, padeža ili drugih specifičnosti u ovom segmentu.\n"
-            "  - 'translated_text': korigovan i očišćen prevod na srpskom jeziku koji obavezno poštuje zadati limit karaktera\n"
-            "2. 'used_terms': rečnik (objekat) gde su ključevi engleski stručni termini/entiteti iz glosara koji su se pojavili u ovom batch-u, a vrednosti su tačni srpski prevodi (ili njihovi prilagođeni/deklinirani oblici) koje si stvarno upotrebio u rečenicama (npr. {\"neural network\": \"neuronske mreže\"}). Ako nema takvih termina, vrati prazan rečnik {}.\n\n"
-            "PRIMER TRANSLACIJE:\n"
-            "Izlaz:\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica):\n"
             "{\n"
             "  \"segments\": [\n"
             "    {\n"
             "      \"id\": 9999,\n"
-            "      \"analysis\": \"Broj 100,000 i 3 godine moraju biti slovima. AI prevodimo kao 'Ej Aj'. Lokacija San Francisco mora biti fonetski i u lokativu 'u San Francisku'.\",\n"
-            "      \"translated_text\": \"Ova kompanija je dala Ej Aj agentu sto hiljada dolara, kreditnu karticu i trogodišnji zakup lokala u San Francisku kako bi videli da li može da vodi prodavnicu.\"\n"
-            "    },\n"
-            "    {\n"
-            "      \"id\": 99999,\n"
-            "      \"analysis\": \"Brend 'Andon Labs' pišemo fonetski. Ime 'Luna' dekliniramo u akuzativ 'Lunu'. 'Claude' je 'Klod' u lokativu 'na Klodu'.\",\n"
-            "      \"translated_text\": \"Endon Labs je kreirao ovaj Ej Aj i nazvao ga Luna (zasnovan na Klodu).\"\n"
+            "      \"analysis\": \"Kratka analiza padeža, roda i skraćenica.\",\n"
+            "      \"translated_text\": \"Prevedeni tekst na srpskom jeziku koji poštuje limit karaktera.\"\n"
             "    }\n"
             "  ],\n"
             "  \"used_terms\": {\n"
-            "    \"neural network\": \"neuronsku mrežu\",\n"
-            "    \"Claude\": \"Klodom\"\n"
+            "    \"engleski_pojam\": \"srpski_prevod\"\n"
             "  }\n"
             "}\n\n"
             f"TRANSKRIPT ZA PREVOD:\n{transcript_text}"
@@ -468,7 +452,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "model": "qwen-lektor",
             "messages": [{"role": "user", "content": prompt_text}],
             "temperature": 0.1,
-            "max_tokens": 4096
+            "max_tokens": 2500
         }
         
         try:
@@ -495,14 +479,18 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     for item in segments_list:
                         if isinstance(item, dict):
                             idx = item.get("id")
-                            text = item.get("translated_text") or item.get("refined_text") or item.get("text")
+                            text = None
+                            for key in ["translated_text", "refined_text", "text"]:
+                                if key in item:
+                                    text = item[key]
+                                    break
                             if idx is not None and text is not None:
                                 batch_parsed[int(idx)] = str(text).strip()
                                 
             # Ako JSON parsiranje nije dalo sve segmente iz ovog batch-a, koristimo regex tag fallback
             if len(batch_parsed) < len(batch_segments):
                 print(f"[TRANSLATOR] JSON parser vratio {len(batch_parsed)} od {len(batch_segments)} segmenata. Pokrećem regex tag fallback...", flush=True)
-                parts = re.split(r'\[seg[- ]*(\d+)\]', raw_output)
+                parts = re.split(r'\[seg[- ]*(\d+)\]', clean_thought_tags(raw_output))
                 if len(parts) > 1:
                     for k in range(1, len(parts), 2):
                         try:
@@ -684,13 +672,13 @@ def detect_topic_and_terms(transcript_text: str) -> dict:
         "model": "qwen-lektor",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
-        "max_tokens": 400
+        "max_tokens": 1000
     }
     
     try:
         res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
         content = res["choices"][0]["message"]["content"].strip()
-        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        content = clean_thought_tags(content)
         if content.startswith("```"):
             content = re.sub(r'^```(?:json)?\n', '', content)
             content = re.sub(r'\n```$', '', content)
@@ -731,13 +719,13 @@ def translate_terms_to_serbian(terms: list) -> dict:
         "model": "qwen-lektor",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
-        "max_tokens": 500
+        "max_tokens": 1000
     }
     
     try:
         res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
         content = res["choices"][0]["message"]["content"].strip()
-        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        content = clean_thought_tags(content)
         if content.startswith("```"):
             content = re.sub(r'^```(?:json)?\n', '', content)
             content = re.sub(r'\n```$', '', content)
@@ -803,7 +791,7 @@ def get_dynamic_glossary(transcript_text: str) -> str:
 def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0, dynamic_glossary_str=None, video_summary=None, user_avg_speedup: float = 1.0):
     """
     Druga faza: Qwen 2.5/3.0 Lektor lekturiše grubi prevod sa programskom deduplikacijom i dinamičkim glosarom.
-    Optimizovano: batch_size = 30, max_tokens = 4096, robusno JSON + Regex parsiranje.
+    Optimizovano: batch_size = 30, max_tokens = 1000, robusno JSON + Regex parsiranje.
     Dodatno: podrška za prosleđeni globalni sažetak, glosar i klizni prozor memorije.
     """
     lektor_duration = 0.0
@@ -867,7 +855,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             print(f"[WARNING] Greška pri kreiranju dinamičkog glosara: {e}. Koristim prazan glosar.")
             dynamic_glossary_str = "Nema specifičnih termina za ovaj video."
 
-    batch_size = 30
+    batch_size = 8
     parsed_lektor_dict = {}
     lektor_duration = 0.0
     
@@ -908,55 +896,32 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             )
 
         lektor_prompt = (
-            "Ti si glavni urednik, prevodilac i lektor za srpski jezik (ekavica). Tvoj zadatak je da detaljno pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš sve greške i vratiš tečan, potpuno prirodan srpski prevod na ekavici i latinici.\n\n"
+            "Ti si glavni urednik i lektor za srpski jezik. Tvoj zadatak je da pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš greške i vratiš tečan srpski prevod na ekavici i latinici.\n\n"
+            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 100 reči). NIKADA nemoj raditi analizu segment po segment niti objašnjavati svaki segment pojedinačno. Samo navedi opšti pristup i pređi na JSON odgovor.\n\n"
             "KONTEKST VIDEA (SAŽETAK):\n"
             f"{video_summary}\n\n"
             f"{history_section}"
-            "OBAVEZNA PRAVILA ZA PREVOĐENJE I UREĐIVANJE:\n\n"
-            "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM:\n"
-            "   - Celokupan tvoj izlaz mora biti na srpskoj latinici (nikada ćirilica i nikada mešavina pisama).\n\n"
-            "2. GLOSAR I ZAMENA TERMINOLOGIJE (KORISTI OVE PREVODE, ALI IH GRAMATIČKI PRILAGODI KONTEKSTU):\n"
-            "   - Koristi ponuđeni prevod za stručni termin, ali ga gramatički prilagodi rečenici (npr. promeni padež, rod, broj, ili ga pretvori u odgovarajući glagolski oblik ako je u pitanju radnja, kako bi rečenica bila prirodna, npr. 'tack weld' -> 'heftati'/'heftaš'/'punktirati'/'punktiraš', a ne bukvalno imenica 'heftanje' ako ne odgovara).\n"
+            "PRAVILA ZA UREĐIVANJE:\n"
+            "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM (nikada ćirilica).\n"
+            "2. GLOSAR: Koristi ponuđeni prevod za stručni termin, ali ga gramatički prilagodi rečenici (padež, rod, broj):\n"
             f"{dynamic_glossary_str}\n\n"
-            "3. STRIKTNA EKAVICA I PRAVOPIS (BEZ DIJALEKATA, IJEKAVICE I STRANIH REČI):\n"
-            "   - Zameni sve makedonske/bugarske/hrvatske/češke reči srpskim ekavskim rečima.\n"
-            "   - NIKADA ne koristi ijekavske reči kao što su:\n"
-            "     * \"smije\", \"smie\" -> smeje\n"
-            "     * \"dijela\", \"dijelovi\" -> dela, delovi\n"
-            "     * \"dijel\" -> deo\n"
-            "     * \"vidio\" -> video\n"
-            "     * \"rješenje\" -> rešenje\n"
-            "     * \"točke\", \"točka\" -> tačke, tačka\n"
-            "     * \"štorme\", \"štormovi\", \"oluhami\" -> oluje, olujama\n"
-            "     * \"zavariť\" -> zavariti\n"
-            "     * \"poroditi se\" -> pariti se\n"
-            "     * \"zaostrili\" -> zabrinuli\n"
-            "     * \"korisnena\" -> korišćena\n"
-            "     * \"ispuskači\" -> pustiti\n"
-            "     * \"nacrtai\" -> nacrtaj\n"
-            "     * \"stricno\" -> striktno\n"
-            "     * \"zaštića\" -> štiti\n"
-            "     * \"matiču\" -> maticu\n\n"
-            "4. POŠTOVANJE GRANICE DUŽINE (LIMIT KARAKTERA):\n"
-            "   - Za svaki segment ti je prosleđen LIMIT u broju karaktera (uključujući razmake). Tvoj lekturisani prevod (refined_text) MORA biti kraći ili jednak tom limitu kako bi mogao da se izgovori u predviđenom vremenu bez prevelikog ubrzavanja govora. Ako je prevod predugačak, koristi kraće sinonime, sažmi rečenicu ili izostavi suvišne reči, ali sačuvaj osnovni smisao i tačnost.\n"
-            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!).\n\n"
-            "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
-            "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\").\n"
-            "   - Koristi ispravne imperativne oblike: \"Poravnaj\", \"Zavari\", \"Iseci\", \"Nacrtaj\".\n\n"
-            "6. LINGVISTIČKA SAMOKONTROLA (IZUZETNO VAŽNO):\n"
-            "   - Pre nego što doneseš konačan prevod, u polju 'analysis' (CoT) obavezno razloži značenje teških fraza u kontekstu i proveri gramatičko slaganje (rod, broj, padež).\n"
-            "   - NIKADA ne koristi nepravilne prevode poput:\n"
-            "     * \"where it gets crazy\" -> \"postaje ludo\"\n"
-            "     * \"It turns out...\" -> \"Ispostavilo se\"\n"
-            "     * \"laughs\" -> \"smeje se\"\n"
-            "     * \"cracked\" (u kontekstu metala/cevi) -> \"napuklo\"\n"
-            "     * \"patience\" -> \"strpljenje\"\n"
-            "     * \"rubs a dark paste\" -> \"maže tamnu pastu\"\n\n"
+            "3. STRIKTNA EKAVICA I PRAVOPIS:\n"
+            "   - Zameni sve strane, dijalekatske i ijekavske reči srpskim ekavskim rečima (npr. 'smeje' umesto 'smije', 'dela'/'delovi' umesto 'dijela'/'dijelovi', 'deo' umesto 'dijel', 'video' umesto 'vidio', 'rešenje' umesto 'rješenje', 'tačke' umesto 'točke').\n"
+            "   - Izuzetak: Uobičajene IT akronime i tehnologije poput GPS, Wi-Fi i Bluetooth piši u njihovom originalnom obliku (GPS, Wi-Fi, Bluetooth) i nemoj ih pisati fonetski ili menjati.\n"
+            "4. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
+            "5. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
+            "6. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
             "FORMAT ODGOVORA:\n"
-            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
-            "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
-            "  - 'analysis': kratko obrazloženje odluka (npr. 'Trajanje < 0.5s, vraćam prazan string.')\n"
-            "  - 'refined_text': korigovan i očišćen prevod na srpskom jeziku\n\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica):\n"
+            "{\n"
+            "  \"segments\": [\n"
+            "    {\n"
+            "      \"id\": 9999,\n"
+            "      \"analysis\": \"Kratka analiza lekture.\",\n"
+            "      \"refined_text\": \"Lekturisani i skraćeni srpski prevod.\"\n"
+            "    }\n"
+            "  ]\n"
+            "}\n\n"
             f"TEKST ZA LEKTURU:\n{lektor_input}"
         )
 
@@ -965,7 +930,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.1,
-                "max_tokens": 4096,
+                "max_tokens": 2500,
                 "presence_penalty": 0.5
             }
             
@@ -982,7 +947,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 lektor_raw = str(lektor_output)
 
             # Čišćenje thought tagova ako ih model sa rezonovanjem vrati
-            lektor_raw_clean = re.sub(r'<thought>.*?</thought>', '', lektor_raw, flags=re.DOTALL).strip()
+            lektor_raw_clean = clean_thought_tags(lektor_raw)
             print(f"[DEBUG] BATCH {batch_idx + 1} LEKTOR CLEANED OUTPUT:\n{lektor_raw_clean}", flush=True)
             
             # Parsiranje pomoću našeg novog robusnog json parsera
@@ -994,7 +959,11 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                     for item in segments_list:
                         if isinstance(item, dict):
                             idx = item.get("id")
-                            text = item.get("refined_text") or item.get("translated_text") or item.get("text")
+                            text = None
+                            for key in ["refined_text", "translated_text", "text"]:
+                                if key in item:
+                                    text = item[key]
+                                    break
                             if idx is not None and text is not None:
                                 batch_parsed_lektor[int(idx)] = str(text).strip()
                                 

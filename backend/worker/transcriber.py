@@ -3,6 +3,15 @@ import base64
 import re
 from backend.core.config import settings
 
+def clean_thought_tags(text: str) -> str:
+    if not text:
+        return ""
+    for tag in ["think", "thought"]:
+        text = re.sub(rf'<{tag}>.*?</{tag}>', '', text, flags=re.DOTALL)
+        if f"<{tag}>" in text:
+            text = text.split(f"<{tag}>")[0]
+    return text.strip()
+
 def segment_by_sentences(segments):
     if not segments:
         return []
@@ -103,7 +112,8 @@ def arbitrate_transcripts(whisper_segments: list, sensevoice_text: str) -> list:
         "CRITICAL FORMAT RULES:\n"
         "1. Output exactly one line per segment in the format: [seg-ID] Corrected text\n"
         f"2. You must output exactly {len(whisper_segments)} lines (from [seg-0] to [seg-{len(whisper_segments)-1}]).\n"
-        "3. Do not include any introduction, explanation, or code blocks. Just the [seg-ID] text lines.\n\n"
+        "3. Do not include any introduction, explanation, or code blocks outside the reasoning block. Just the [seg-ID] text lines.\n"
+        "4. Under no circumstances should you output any explanation, commentary, or reasoning outside the <think></think> tags. The output outside <think> must contain ONLY the formatted [seg-ID] lines, one per line.\n\n"
         f"FULL SENSEVOICE TRANSCRIPT:\n{sensevoice_text}\n\n"
         f"WHISPER SEGMENTS FOR CORRECTION:\n{whisper_input}"
     )
@@ -114,7 +124,7 @@ def arbitrate_transcripts(whisper_segments: list, sensevoice_text: str) -> list:
             "model": "qwen-lektor",
             "messages": [{"role": "user", "content": arbitration_prompt}],
             "temperature": 0.1,
-            "max_tokens": 1500
+            "max_tokens": 2000
         }
         url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
         
@@ -131,6 +141,7 @@ def arbitrate_transcripts(whisper_segments: list, sensevoice_text: str) -> list:
         except (KeyError, IndexError):
             raw_output = str(output)
             
+        raw_output = clean_thought_tags(raw_output)
         print(f"[DEBUG] ARBITRATION OUTPUT: {raw_output[:500]}...", flush=True)
         
         # Parsiranje rezultata
