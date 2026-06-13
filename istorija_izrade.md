@@ -2661,6 +2661,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Kreiranje običnog testnog korisnika:** Kreirao novi testni nalog `testuser@sinhronizuj.me` sa lozinkom `TestUser123!` u lokalu.
 - **Status:** Završeno. Nalozi su uspešno ažurirani, hešovani i sinhronizovani na oba okruženja.
 
+### 13.06.2026. 14:52 — Unapređenje kvaliteta prevoda i lekture (Qwen 32B)
+- **Zahtevi:** Podići kvalitet i tačnost prevoda i lekture primenom naprednih tehnika na Qwen 32B modelu (uvođenje globalnog konteksta/sažetka, napredne detekcije entiteta i fonetske transkripcije, kliznog prozora memorije i Chain-of-Thought analize).
+- **Urađeno:**
+    * **Globalni sažetak videa (A):** Dodata funkcija `generate_video_summary` koja pre prevođenja generiše kratak opis celog videa na engleskom i prosleđuje ga kao kontekst prevodiocu i lektoru.
+    * **Napredna detekcija entiteta (E):** Proširene funkcije `detect_topic_and_terms` i `translate_terms_to_serbian` za detekciju specifičnih entiteta (imena, brendovi, lokacije, akronimi) i njihovu tačnu fonetsku transkripciju na srpski na početku procesa.
+    * **Klizni prozor konteksta (B):** Implementirana istorija od 5 prethodnih segmenata za prenos memorije između batch-eva u fazama prevođenja i lekture.
+    * **Chain-of-Thought (D):** Integrisano polje `analysis` u prvoj fazi prevođenja radi logičkog rezonovanja modela o teškim idiomima i rodovima govornika pre generisanja srpskog prevoda.
+    * **Verifikacija:** Kreirana i pokrenuta test skripta `test_translator.py` u venv okruženju koja je potvrdila 100% ispravnost celog toka i promptova.
+- **Status:** Završeno. Kod je ispravan, testovi su uspešno prošli.
+
+
 
 
 
