@@ -2708,3 +2708,15 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Uspešno pokrenuta evaluacija nad test videom `Ryan Montgomery Reveals...`. Ceo pipeline je prošao bez ijedne greške, a LLM sudija je u finalnom izveštaju (`evaluation_results/Ryan Montgomery Reveals The Device That Is Illegal To Use - HACKZONE (1080p, h264)_report.md`) ocenio prevod sa **9.5/10** bez ijedne stilske ili semantičke greške u segmentima.
 - **Status:** Završeno. Automatski testovi i evaluacija su u potpunosti implementirani, a pipeline je u potpunosti stabilizovan.
 
+### 13.06.2026. 21:18 — Evaluacija Drugog Videa (Biološka Tema), Lektorska Optimizacija i Uklanjanje Ijekavizama/Pasiva
+- **Zahtevi:** Nastaviti automatsko testiranje i evaluaciju nad drugim videom iz foldera `Test videos` (Google Mosquito Army), analizirati izveštaj LLM sudije, uočiti stilske i gramatičke nedostatke i rešiti ih.
+- **Urađeno:**
+    * **Pokretanje i uspešan završetak evaluacije za Video 2:** Pokrenut pipeline nad videom `Google's Plan to Build a Mosquito Army...` sa najnovijim, stabilnim batch parametrima. Ceo tok (ekstrakcija, transkripcija, arbitraža, segmentacija, prevođenje, lektura i LLM-as-a-judge) je uspešno završen.
+    * **Regex Fallback uspešnost:** Potvrđena stabilnost sistema jer je u Batch-u 4 lektora JSON parser bezbedno detektovao grešku i pokrenuo regex fallback koji je u potpunosti rekonstruisao sve segmente bez prekida rada.
+    * **Automatsko prepoznavanje i otklanjanje ijekavskog futura I:** Implementiran robustan regularni izraz u `clean_translation_text` koji automatski prepoznaje i spaja hrvatske/ijekavske oblike futura I (npr. `spajat će` -> `spajaće`, `raditi će` -> `radiće`, `bit će` -> `biće`).
+    * **Proširenje glosara i to_latin zamena:** U `to_latin` tabelu replacements dodati česti ijekavski glagolski oblici (`vidjeti` -> `videti`, `vidjeće` -> `videće`, `donijeti` -> `doneti`, `razumjeti` -> `razumeti`) i uočene ASR/LLM anomalije poput `ukuju` -> `bodu` i `ukuje` -> `bode`.
+    * **Unapređenje Promptova za Prirodnost i Aktivni Stil:** Ažurirani promptovi za prevodioca i lektora sa strogim smernicama za izbegavanje pasiva ("od strane" konstrukcije) i neprirodnih bukvalnih prevoda poput "hope is" -> "nadam se" (za opšte ciljeve) i populacijskog "collapses" -> "da se sruši" (zamenjeno sa "nestane", "uruši se" ili "propadne").
+    * **Verifikacija:** Pokrenut kompletan test paket (`pytest`) sa svih 19/19 uspešno položenih testova, čime je potvrđeno da ove izmene nisu narušile stabilnost niti funkcije sistema.
+- **Status:** Završeno. Druga evaluacija je uspešno završena, a uočeni lingvistički i stilski problemi su sistemski otklonjeni.
+
+

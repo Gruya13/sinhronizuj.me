@@ -1,0 +1,197 @@
+{
+  "video_name": "Google's Plan to Build a Mosquito Army - TheFeedski (1080p, h264).mp4",
+  "evaluation_time": "2026-06-13T21:15:36.583582",
+  "pipeline_durations": {
+    "asr_sec": 50.01865339279175,
+    "translation_sec": 210.2927701473236,
+    "total_sec": 285.162460565567
+  },
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 5.96,
+      "text": "Google želi da pusti vojsku od 32 miliona komaraca da boravi protiv drugih komaraca i spasi živote.",
+      "original_text": "Google wants to release an army of 32 million mosquitoes to battle other mosquitoes and save lives."
+    },
+    {
+      "id": 1,
+      "start": 5.96,
+      "end": 11.04,
+      "text": "Ali ljudi su zabrinuti jer je poslednji put kad je to urađeno, izgleda da je stvoren super komarac.",
+      "original_text": "But people are worried, because the last time this was done, a sort of super mosquito was bred."
+    },
+    {
+      "id": 2,
+      "start": 11.04,
+      "end": 14.82,
+      "text": "Ljudi se pitaše zašto tehnološka kompanija radi ovo?",
+      "original_text": "And people are also wondering, why is a tech company doing this?"
+    },
+    {
+      "id": 3,
+      "start": 14.82,
+      "end": 16.4,
+      "text": "Dakle, je li panika opravdana?",
+      "original_text": "So is the panic justified?"
+    },
+    {
+      "id": 4,
+      "start": 16.4,
+      "end": 18.49,
+      "text": "Evo svega što trebaš da znaš.",
+      "original_text": "Well, here's everything you need to know."
+    },
+    {
+      "id": 5,
+      "start": 18.49,
+      "end": 21.45,
+      "text": "Googleov plan je da uzgaja mužjake komaraca koji",
+      "original_text": "Google's plan is to mass breed male mosquitoes that",
+      "confidence_score": 5
+    },
+    {
+      "id": 6,
+      "start": 21.45,
+      "end": 24.65,
+      "text": "inficiranih specifičnim bakterijama i ispušta ih.",
+      "original_text": "are infected with a specific bacteria and release them.",
+      "confidence_score": 5
+    },
+    {
+      "id": 7,
+      "start": 24.65,
+      "end": 29.41,
+      "text": "Samo ženke komaraca ukuju, što znači da su jedine koje mogu prenositi bolesti ljudima.",
+      "original_text": "Only female mosquitoes bite, meaning they're the only ones that can transmit diseases to humans.",
+      "confidence_score": 4
+    },
+    {
+      "id": 8,
+      "start": 29.41,
+      "end": 33.9,
+      "text": "Bakterija inficirane u mužjake komaraca deluje kao kontraceptiv.",
+      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "confidence_score": 5
+    },
+    {
+      "id": 9,
+      "start": 33.9,
+      "end": 35.71,
+      "text": "Spajat će se sa divljim ženkama,",
+      "original_text": "They will mate with wild females,",
+      "confidence_score": 4
+    },
+    {
+      "id": 10,
+      "start": 35.71,
+      "end": 36.86,
+      "text": "Jaje neće da izleće",
+      "original_text": "the eggs won't hatch,",
+      "confidence_score": 5
+    },
+    {
+      "id": 11,
+      "start": 36.86,
+      "end": 41.96,
+      "text": "Nadam se da će konkretan komarac koji prenosi dengu i žutu groznicu da se sruši",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever collapses.",
+      "confidence_score": 5
+    },
+    {
+      "id": 12,
+      "start": 41.96,
+      "end": 47.54,
+      "text": "Ova tehnika je primenjivana od strane vladama decenijama, sa nekim uspehom i nekom katastrofom",
+      "original_text": "Now, this technique has been done by governments for decades, with some success and some disaster.",
+      "confidence_score": 4
+    },
+    {
+      "id": 13,
+      "start": 47.54,
+      "end": 51.5,
+      "text": "Google je industrijski razvio uzgoj pomoću AI",
+      "original_text": "But Google has industrialized the breeding process with AI",
+      "confidence_score": 5
+    },
+    {
+      "id": 14,
+      "start": 51.5,
+      "end": 54.77,
+      "text": "I robotiku na razmeri koju samo tehnički giganat može",
+      "original_text": "and robotics at a scale only a tech giant could.",
+      "confidence_score": 5
+    },
+    {
+      "id": 15,
+      "start": 54.77,
+      "end": 56.01,
+      "text": "Slični projekti proizvedu neopasne komarce koji prenose bolesti ljudima.",
+      "original_text": "Similar projects produced harmless mosquitoes that can transmit diseases to humans."
+    },
+    {
+      "id": 16,
+      "start": 56.01,
+      "end": 58.12,
+      "text": "Bakterija inficirane u mužjake komaraca deluje kao kontraceptiv.",
+      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "confidence_score": 5
+    },
+    {
+      "id": 17,
+      "start": 58.12,
+      "end": 58.94,
+      "text": "Spajat će se sa divljim ženkama,",
+      "original_text": "They will mate with wild females,",
+      "confidence_score": 4
+    },
+    {
+      "id": 18,
+      "start": 58.94,
+      "end": 59.46,
+      "text": "Jaje neće da izleće",
+      "original_text": "the eggs won't hatch,",
+      "confidence_score": 5
+    },
+    {
+      "id": 19,
+      "start": 59.46,
+      "end": 61.53,
+      "text": "Nadamo se specifičnom komarcu koji prenosi dengu i žutu groznicu.",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever."
+    },
+    {
+      "id": 20,
+      "start": 61.53,
+      "end": 63.79,
+      "text": "Kontrola hibridnih komaraca u Brazilu izazvala je porast denga groznice u Portoriku.",
+      "original_text": "So is the control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico,"
+    },
+    {
+      "id": 21,
+      "start": 63.79,
+      "end": 65.03,
+      "text": "Ali bilo je i izuzetno efikasno u Singapuru.",
+      "original_text": "but it was also incredibly effective in Singapore."
+    },
+    {
+      "id": 22,
+      "start": 65.03,
+      "end": 65.72,
+      "text": "5. jun.",
+      "original_text": "On June 5th,"
+    },
+    {
+      "id": 23,
+      "start": 65.72,
+      "end": 71.56,
+      "text": "EPA odlučuje da li će Google puštanje komaraca u Kaliforniji i Floridi.",
+      "original_text": "the EPA decides whether or not Google will be releasing those mosquitoes over California and Florida.",
+      "confidence_score": 5
+    }
+  ],
+  "metrics": {
+    "translator_duration": 115.36001110076904,
+    "lektor_duration": 94.92431426048279
+  }
+}

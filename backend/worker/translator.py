@@ -119,7 +119,37 @@ def to_latin(text: str) -> str:
         r'\bserežeš\b': 'isečeš',
         r'\bsereže\b': 'iseče',
         r'\bserezati\b': 'iseći',
-        r'\bsrezati\b': 'iseći'
+        r'\bsrezati\b': 'iseći',
+        r'\bvidjeti\b': 'videti',
+        r'\bvidjeće\b': 'videće',
+        r'\bvidjećeš\b': 'videćeš',
+        r'\bvidjećemo\b': 'videćemo',
+        r'\bvidjećete\b': 'videćete',
+        r'\bdonijeti\b': 'doneti',
+        r'\bdonijeće\b': 'doneće',
+        r'\bdonijećeš\b': 'donećeš',
+        r'\bdonijećemo\b': 'donećemo',
+        r'\bdonijećete\b': 'donećete',
+        r'\bdijeliti\b': 'deliti',
+        r'\bdijeliće\b': 'deliće',
+        r'\bdijelićeš\b': 'delićeš',
+        r'\bdijelićemo\b': 'delićemo',
+        r'\bdijelićete\b': 'delićete',
+        r'\bhtjeti\b': 'hteti',
+        r'\bhtjeće\b': 'hteće',
+        r'\bhtjećeš\b': 'htećeš',
+        r'\bhtjećemo\b': 'htećemo',
+        r'\bhtjećete\b': 'htećete',
+        r'\briješiti\b': 'rešiti',
+        r'\briješiće\b': 'rešiće',
+        r'\briješeno\b': 'rešeno',
+        r'\bpromijeniti\b': 'promeniti',
+        r'\bpromijeniće\b': 'promeniće',
+        r'\bpromijenjeno\b': 'promenjeno',
+        r'\brazumjeti\b': 'razumeti',
+        r'\brazumjeće\b': 'razumeće',
+        r'\bukuju\b': 'bodu',
+        r'\bukuje\b': 'bode'
     }
     
     for pattern, repl in replacements.items():
@@ -341,7 +371,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     full_glossary_dict = parse_glossary_to_dict(dynamic_glossary_str)
     confirmed_translations = {}
 
-    batch_size = 8
+    batch_size = 5
     parsed_dict = {}
     
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
@@ -362,10 +392,10 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             limit_char = max(15, int(duration * factor))
             transcript_text += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) {s['text']}\n"
             
-        # Klizni prozor konteksta (poslednjih 5 segmenata iz prethodnog batch-a)
+        # Klizni prozor konteksta (poslednjih 2 segmenta iz prethodnog batch-a)
         history_text = ""
         if batch_idx > 0:
-            history_start = max(0, batch_start - 5)
+            history_start = max(0, batch_start - 2)
             history_segments = segments[history_start:batch_start]
             history_lines = []
             for prev_idx, prev_seg in enumerate(history_segments):
@@ -410,9 +440,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
         prompt_text = (
             "Ti si vrhunski profesionalni prevodilac za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
-            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 100 reči). NIKADA nemoj objašnjavati segment po segment niti raditi analizu svakog segmenta pojedinačno u razmišljanju. Samo navedi opšti pristup i pređi na JSON odgovor.\n\n"
-            "KONTEKST VIDEA (SAŽETAK):\n"
-            f"{video_summary}\n\n"
+            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi ekstremno kratak (maksimalno 50 reči ukupno). NIKADA nemoj objašnjavati segment po segment niti raditi analizu svakog segmenta pojedinačno u razmišljanju. Samo ukratko navedi strategiju u dve rečenice i pređi na JSON odgovor.\n\n"
             f"{glossary_prompt_section}"
             f"{history_section}"
             "PRAVILA ZA PREVOD:\n"
@@ -428,6 +456,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "   - Koristi isključivo jedninsko neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj', 'zavari').\n"
             "   - Prilagodi strana imena i gradove srpskom pravopisu i deklinaciji (npr. 'u San Francisku', 'sa Klodom', 'preko Zuma').\n"
             "   - Prevedi sve engleske izraze u potpunosti (nemoj ostavljati engleske reči).\n"
+            "   - Izbegavaj pasivne konstrukcije sa 'od strane' (npr. umesto 'primenjena od strane vlada' koristi aktiv 'koju su vlade primenile').\n"
+            "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije ili sistema prevodi kao 'nestane', 'propadne' ili 'se uruši', a ne 'da se sruši'.\n"
             "4. POŠTOVANJE LIMITA KARAKTERA:\n"
             "   - Tvoj prevod (translated_text) za svaki segment mora biti kraći ili jednak prosleđenom LIMITU kako bi se izgovorio u predviđenom vremenu. Koristi kraće sinonime ili sažmi rečenicu ako je potrebno.\n"
             "5. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove.\n\n"
@@ -452,7 +482,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "model": "qwen-lektor",
             "messages": [{"role": "user", "content": prompt_text}],
             "temperature": 0.1,
-            "max_tokens": 2500
+            "max_tokens": 1500
         }
         
         try:
@@ -629,7 +659,10 @@ def clean_translation_text(text: str) -> str:
     # 16. Ispravka "pratite za više" -> "prati za više" (usklađivanje ti/vi obraćanja)
     text = re.sub(r'\bpratite za više\b', 'prati za više', text, flags=re.IGNORECASE)
 
-    # 17. Dupli razmaci i čišćenje
+    # 17. Ispravka futura I sa "će" (hrvatski / ijekavski oblici: radit će -> radiće, raditi će -> radiće)
+    text = re.sub(r'\b([a-zA-ZđžćčšĐŽĆČŠ]+)ti?\s+će(š|mo|te)?\b', r'\1će\2', text, flags=re.IGNORECASE)
+
+    # 18. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -855,7 +888,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             print(f"[WARNING] Greška pri kreiranju dinamičkog glosara: {e}. Koristim prazan glosar.")
             dynamic_glossary_str = "Nema specifičnih termina za ovaj video."
 
-    batch_size = 8
+    batch_size = 5
     parsed_lektor_dict = {}
     lektor_duration = 0.0
     
@@ -878,7 +911,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         # Klizni prozor konteksta za lektora
         history_text = ""
         if batch_idx > 0:
-            history_start = max(0, batch_start - 5)
+            history_start = max(0, batch_start - 2)
             history_segments = unique_segments[history_start:batch_start]
             history_lines = []
             for prev_idx, prev_seg in enumerate(history_segments):
@@ -897,9 +930,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
         lektor_prompt = (
             "Ti si glavni urednik i lektor za srpski jezik. Tvoj zadatak je da pregledaš grubi prevod (SRB) u odnosu na originalni engleski tekst (ENG) i trajanje segmenta, ispraviš greške i vratiš tečan srpski prevod na ekavici i latinici.\n\n"
-            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 100 reči). NIKADA nemoj raditi analizu segment po segment niti objašnjavati svaki segment pojedinačno. Samo navedi opšti pristup i pređi na JSON odgovor.\n\n"
-            "KONTEKST VIDEA (SAŽETAK):\n"
-            f"{video_summary}\n\n"
+            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi ekstremno kratak (maksimalno 50 reči ukupno). NIKADA nemoj raditi analizu segment po segment niti objašnjavati svaki segment pojedinačno. Samo ukratko navedi strategiju u dve rečenice i pređi na JSON odgovor.\n\n"
             f"{history_section}"
             "PRAVILA ZA UREĐIVANJE:\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM (nikada ćirilica).\n"
@@ -908,6 +939,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "3. STRIKTNA EKAVICA I PRAVOPIS:\n"
             "   - Zameni sve strane, dijalekatske i ijekavske reči srpskim ekavskim rečima (npr. 'smeje' umesto 'smije', 'dela'/'delovi' umesto 'dijela'/'dijelovi', 'deo' umesto 'dijel', 'video' umesto 'vidio', 'rešenje' umesto 'rješenje', 'tačke' umesto 'točke').\n"
             "   - Izuzetak: Uobičajene IT akronime i tehnologije poput GPS, Wi-Fi i Bluetooth piši u njihovom originalnom obliku (GPS, Wi-Fi, Bluetooth) i nemoj ih pisati fonetski ili menjati.\n"
+            "   - Izbegavaj pasivne konstrukcije sa 'od strane' (npr. umesto 'primenjena od strane vlada' koristi aktiv 'vlade su primenile').\n"
+            "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije prevodi kao 'nestane' ili 'se uruši', a ne 'da se sruši'.\n"
             "4. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
             "5. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
             "6. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
@@ -930,7 +963,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "model": "qwen-lektor",
                 "messages": [{"role": "user", "content": lektor_prompt}],
                 "temperature": 0.1,
-                "max_tokens": 2500,
+                "max_tokens": 1500,
                 "presence_penalty": 0.5
             }
             
