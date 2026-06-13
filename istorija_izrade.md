@@ -2719,4 +2719,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija:** Pokrenut kompletan test paket (`pytest`) sa svih 19/19 uspešno položenih testova, čime je potvrđeno da ove izmene nisu narušile stabilnost niti funkcije sistema.
 - **Status:** Završeno. Druga evaluacija je uspešno završena, a uočeni lingvistički i stilski problemi su sistemski otklonjeni.
 
+### 13.06.2026. 22:05 — Masovna Evaluacija Svih Test Videa i Kompilacija Zbirnog Izveštaja
+- **Zahtevi:** Pokrenuti automatsku evaluaciju za sve preostale test video snimke u folderu `Test videos` i kompajlirati ukupne rezultate za sve testove u jedan zbirni izveštaj.
+- **Urađeno:**
+    * **Automatizacija procesa masovne evaluacije:** Napisao namensku skriptu `scratch/run_all_evaluations.py` koja pronalazi sve dostupne video fajlove na sistemu, preskače one koji već imaju generisane sirove podatke (kako bi se uštedeli resurse) i pokreće pipeline za preostale.
+    * **Otklanjanje grešaka u LLM Sudiji za duge kontekste (400 Bad Request):** Uočio sam da su video snimci sa velikim brojem segmenata (video 5 ima 47 segmenata, a video 3 ima 31 segment) izazvali `400 Bad Request` grešku jer je ukupan broj tokena sa `max_tokens` od 2000 prešao limit od 4096. Popravio sam ovo u `evaluate_video_pipeline.py` tako što sam:
+        1. Promenio format segmenta koji se šalje sudiji u kompaktniji linijski oblik (smanjenje veličine za ~20%).
+        2. Smanjio `max_tokens` za odgovor na 1200, čime je osigurano da zbir nikada ne pređe 4096.
+        3. Napisao skriptu `scratch/re_evaluate_failed.py` koja uspešno re-evaluira samo neuspele sudijske izveštaje iz postojećih JSON podataka bez ponovnog prevođenja.
+    * **Kompilacija zbirnog izveštaja:** Skripta je uspešno kreirala zajednički Markdown izveštaj `summary_report.md` u folderu `evaluation_results/` koji sumira rezultate svih 5 videa (ASR trajanje, prevod trajanje, ukupan broj segmenata, ocena sudije od 1 do 10, i rezime sa ključnim preporukama).
+    * **Verifikacija i slanje na GitHub:** Svi izveštaji i popravke su uspešno verifikovani i poslati (`git push`) na granu `development` na GitHub-u.
+- **Status:** Završeno. Svi testovi su uspešno pokrenuti i kompajlirani u zajednički zbirni izveštaj.
+
+
 
