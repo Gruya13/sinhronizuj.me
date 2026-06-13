@@ -260,7 +260,30 @@ def parse_glossary_to_dict(glossary_str: str) -> dict:
                     glossary_dict[eng] = srb
     return glossary_dict
 
-def translate_segments(segments: list, video_path: str = None, progress_callback=None) -> dict:
+def calculate_dynamic_factor(seg: dict, user_avg_speedup: float = 1.0) -> float:
+    base_factor = 14.0
+    speed = seg.get("speed", 1.0)
+    if speed is None:
+        speed = 1.0
+    voice_type = seg.get("voice_type", "male")
+    if voice_type is None:
+        voice_type = "male"
+        
+    voice_correction = {
+        "clone": 0.92,
+        "male": 1.0,
+        "female": 0.95
+    }
+    correction = voice_correction.get(voice_type, 1.0)
+    
+    factor = base_factor * speed * correction
+    
+    if user_avg_speedup > 1.1:
+        factor = factor / user_avg_speedup
+        
+    return factor
+
+def translate_segments(segments: list, video_path: str = None, progress_callback=None, user_avg_speedup: float = 1.0) -> dict:
     """
     Poziva Modal Serverless Lektor (Qwen3-32B) za tekstualni prevod visoke tačnosti.
     Optimizovano: bez slika, bez hladnog starta na A10G, batch size = 30.
@@ -325,7 +348,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         for j, s in enumerate(batch_segments):
             global_idx = batch_start + j
             duration = s["end"] - s["start"]
-            limit_char = max(15, int(duration * 14))
+            factor = calculate_dynamic_factor(s, user_avg_speedup)
+            limit_char = max(15, int(duration * factor))
             transcript_text += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) {s['text']}\n"
             
         # Klizni prozor konteksta (poslednjih 5 segmenata iz prethodnog batch-a)
@@ -411,10 +435,12 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "6. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
             "7. STROGO ODRŽAVANJE GRANICA SEGMENATA: Prevedi svaki red nezavisno i vrati prevod pod tačnim [seg-ID] tagom tog reda. Nikada nemoj spajati dva reda u jedan, niti preskakati redove. Svaki ulazni red mora imati tačno jedan odgovarajući izlazni red sa istim tagom. Ako se rečenica proteže kroz više redova, prevedi delove rečenice unutar tih istih redova bez njihovog spajanja.\n\n"
             "FORMAT ODGOVORA:\n"
-            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati:\n"
+            "1. 'segments': listu gde svaki segment ima ključeve:\n"
             "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
             "  - 'analysis': tvoje razmišljanje i lingvistička analiza idiomatskih izraza, roda govornika, padeža ili drugih specifičnosti u ovom segmentu.\n"
-            "  - 'translated_text': korigovan i očišćen prevod na srpskom jeziku koji obavezno poštuje zadati limit karaktera\n\n"
+            "  - 'translated_text': korigovan i očišćen prevod na srpskom jeziku koji obavezno poštuje zadati limit karaktera\n"
+            "2. 'used_terms': rečnik (objekat) gde su ključevi engleski stručni termini/entiteti iz glosara koji su se pojavili u ovom batch-u, a vrednosti su tačni srpski prevodi (ili njihovi prilagođeni/deklinirani oblici) koje si stvarno upotrebio u rečenicama (npr. {\"neural network\": \"neuronske mreže\"}). Ako nema takvih termina, vrati prazan rečnik {}.\n\n"
             "PRIMER TRANSLACIJE:\n"
             "Izlaz:\n"
             "{\n"
@@ -429,7 +455,11 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "      \"analysis\": \"Brend 'Andon Labs' pišemo fonetski. Ime 'Luna' dekliniramo u akuzativ 'Lunu'. 'Claude' je 'Klod' u lokativu 'na Klodu'.\",\n"
             "      \"translated_text\": \"Endon Labs je kreirao ovaj Ej Aj i nazvao ga Luna (zasnovan na Klodu).\"\n"
             "    }\n"
-            "  ]\n"
+            "  ],\n"
+            "  \"used_terms\": {\n"
+            "    \"neural network\": \"neuronsku mrežu\",\n"
+            "    \"Claude\": \"Klodom\"\n"
+            "  }\n"
             "}\n\n"
             f"TRANSKRIPT ZA PREVOD:\n{transcript_text}"
         )
@@ -488,12 +518,23 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 if batch_start <= idx < batch_start + len(batch_segments):
                     parsed_dict[idx] = text
                     
-            # Ažuriranje confirmed_translations na osnovu prevedenog teksta u ovom batchu
-            for s in batch_segments:
-                text_lower = s["text"].lower()
-                for eng_term, srb_term in full_glossary_dict.items():
-                    if eng_term.lower() in text_lower:
-                        confirmed_translations[eng_term] = srb_term
+            # Ažuriranje confirmed_translations na osnovu used_terms koji je model vratio
+            used_terms_found = False
+            if isinstance(data, dict):
+                used_terms = data.get("used_terms")
+                if isinstance(used_terms, dict):
+                    for eng, srb in used_terms.items():
+                        if eng and srb:
+                            confirmed_translations[eng] = srb
+                            used_terms_found = True
+                            
+            # Fallback: ako model nije vratio used_terms, koristimo staru logiku prepoznavanja
+            if not used_terms_found:
+                for s in batch_segments:
+                    text_lower = s["text"].lower()
+                    for eng_term, srb_term in full_glossary_dict.items():
+                        if eng_term.lower() in text_lower:
+                            confirmed_translations[eng_term] = srb_term
                     
         except Exception as batch_err:
             print(f"[ERROR] Greška pri prevođenju batcha {batch_idx + 1}: {batch_err}", flush=True)
@@ -525,7 +566,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             progress_callback=progress_callback, 
             translator_duration=translator_duration,
             dynamic_glossary_str=dynamic_glossary_str,
-            video_summary=video_summary
+            video_summary=video_summary,
+            user_avg_speedup=user_avg_speedup
         )
     except Exception as e:
         import traceback
@@ -758,7 +800,7 @@ def get_dynamic_glossary(transcript_text: str) -> str:
     print(f"[GLOSSARY] Formiran dinamički glosar sa {len(final_glossary)} stavki.", flush=True)
     return glossary_str
 
-def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0, dynamic_glossary_str=None, video_summary=None):
+def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0, dynamic_glossary_str=None, video_summary=None, user_avg_speedup: float = 1.0):
     """
     Druga faza: Qwen 2.5/3.0 Lektor lekturiše grubi prevod sa programskom deduplikacijom i dinamičkim glosarom.
     Optimizovano: batch_size = 30, max_tokens = 4096, robusno JSON + Regex parsiranje.
@@ -841,7 +883,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         for j, seg in enumerate(batch_translated):
             global_idx = batch_start + j
             duration = seg["duration"]
-            limit_char = max(15, int(duration * 14))
+            factor = calculate_dynamic_factor(seg, user_avg_speedup)
+            limit_char = max(15, int(duration * factor))
             lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) ENG: {seg['orig_text']} | SRB: {to_latin(seg['translated_text'])}\n"
             
         # Klizni prozor konteksta za lektora
@@ -980,11 +1023,60 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                         except ValueError:
                             continue
                             
-            # Spajanje u parsed_lektor_dict
+            # Spajanje u parsed_lektor_dict i proračun metrika
             for idx, text in batch_parsed_lektor.items():
                 if batch_start <= idx < batch_start + len(batch_translated):
                     parsed_lektor_dict[idx] = text
                     print(f"[LEKTOR] Segment {idx} lekturisan: {text[:60]}...", flush=True)
+                    
+                    # Pronalaženje originalnog segmenta za proračun limita i logovanje
+                    idx_int = int(idx)
+                    orig_seg = None
+                    for u_seg in unique_segments:
+                        if u_seg["unique_id"] == idx_int:
+                            orig_seg = u_seg
+                            break
+                    if orig_seg:
+                        duration = orig_seg["duration"]
+                        factor = calculate_dynamic_factor(orig_seg, user_avg_speedup)
+                        limit_char = max(15, int(duration * factor))
+                        
+                        # Pokušavamo da izvučemo 'analysis' polje iz parsed JSON-a ako postoji
+                        analysis = ""
+                        if data and isinstance(data, dict):
+                            s_list = data.get("segments", [])
+                            if isinstance(s_list, list):
+                                for item in s_list:
+                                    if isinstance(item, dict) and item.get("id") == idx_int:
+                                        analysis = item.get("analysis") or ""
+                                        break
+                                        
+                        # Kalkulacija confidence skora
+                        confidence = 5
+                        confidence_triggers = ["idiom", "unclear", "ambiguous", "colloquial", "cultural reference", "wordplay", "humor", "slang"]
+                        for trigger in confidence_triggers:
+                            if trigger in str(analysis).lower():
+                                confidence -= 1
+                        
+                        overshoot = len(str(text)) / limit_char
+                        if overshoot > 1.2:
+                            confidence -= 1
+                        confidence = max(1, confidence)
+                        
+                        orig_seg["confidence_score"] = confidence
+                        
+                        # Monitoring & Logging
+                        import logging
+                        compliance_logger = logging.getLogger("translation_compliance")
+                        compliance_stats = {
+                            "segment_id": idx_int,
+                            "duration": duration,
+                            "limit_char": limit_char,
+                            "actual_char": len(str(text)),
+                            "compliance": len(str(text)) <= limit_char,
+                            "overshoot_pct": max(0.0, (len(str(text)) - limit_char) / limit_char * 100)
+                        }
+                        compliance_logger.info(f"[COMPLIANCE] {json.dumps(compliance_stats)}")
                     
         except Exception as batch_err:
             print(f"[WARNING] Greška u Lektor batchu {batch_idx + 1}: {batch_err}")
@@ -997,6 +1089,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             unique_idx = orig_to_unique_map.get(i)
             if unique_idx is not None and unique_idx in parsed_lektor_dict:
                 seg["text"] = parsed_lektor_dict[unique_idx]
+                u_seg = unique_segments[unique_idx]
+                seg["confidence_score"] = u_seg.get("confidence_score", 5)
         
     for seg in translated_segments:
         if "text" in seg:

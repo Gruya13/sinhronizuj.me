@@ -1,3 +1,15 @@
+## [2026-06-13 15:15:00] Implementacija naprednih optimizacija prevodioca, feedback petlje, pametne segmentacije i confidence scoring-a
+- **Opis:**
+  Uspešno smo implementirali i verifikovali svih 7 predloženih naprednih optimizacija u prevodilačkom i miks modulu:
+  1. **Feedback petlja i automatsko re-prevođenje:** U `tasks.py` i `merger.py` implementiran je mehanizam povratne sprege. FFmpeg merger vraća informaciju o stvarnom ubrzanju audio zapisa (`speech_speedups`). Ako je bilo koji segment ubrzan preko 1.15x, automatski se u Celery render petlji pokreće re-prevođenje tog segmenta sa strožim limitom karaktera (`stricter_factor = 14 / actual_speed_factor`), generiše se novi TTS i ponovo miksuje, sa zaštitom od beskonačne petlje.
+  2. **Kalibracija faktora dužine:** Implementiran dinamički proračun faktora karaktera u sekundi u `calculate_dynamic_factor` na osnovu smera podešavanja brzine segmenta, tipa glasa (klonirani, muški, ženski) i istorijskih korekcija brzine za tog korisnika.
+  3. **Pametna segmentacija:** Kreiran modul `segment_optimizer.py` koji spaja prekratke segmente (<1.0s) i deli preduge segmente (>6.0s) na interpunkcijskim pauzama pre slanja na prevođenje.
+  4. **Running Glossary Alignment:** Unapređena integracija glosara tako što LLM (Qwen3-32B) u istom JSON pozivu vraća stvarno upotrebljene oblike reči kroz `"used_terms"`, koji se dalje prenose u naredne batch-eve bez dodatnih API poziva.
+  5. **Confidence Scoring & Compliance Logging:** Lektor računa ocenu pouzdanosti (1-5) analizirajući reči u CoT obrazloženju (poput "idiom", "ambiguous") i u strukturiranom logu prati stopu usaglašenosti (compliance) sa limitom karaktera.
+  6. **Cross-project učenje:** Dodat pozadinski Celery task `learn_user_glossary_task` koji se pokreće prilikom čuvanja nacrta projekta, poredi staru i novu rečenicu, te automatski uči i čuva korisnički prilagođene prevode stručnih termina u glosaru.
+  7. **Frontend Vizuelizacija:** U `SegmentEditor.jsx` dodata vizuelna narandžasta traka upozorenja sa porukom o niskoj pouzdanosti prevoda ukoliko je skor 1 ili 2.
+  8. **Verifikacija:** Kreirana test skripta `test_advanced_features.py` u scratch folderu koja verifikuje sve uvedene backend optimizacije (dinamički faktor, segmentacija, confidence score, used terms). Svi testovi su uspešno prošli, a migracije baze su uspešno izvršene na lokalnoj bazi podataka.
+
 ## [2026-06-13 15:02:00] Implementacija dužinske svesnosti i running glossary-ja u prevođenju i lekturi
 - **Opis:**
   Uspešno smo završili i verifikovali implementaciju dužinske svesnosti i running glossary-ja u translator.py za Qwen3-32B model:

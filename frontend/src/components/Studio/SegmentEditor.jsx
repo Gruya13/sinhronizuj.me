@@ -295,6 +295,24 @@ export default function SegmentEditor() {
         </span>
       </div>
 
+      {/* Prikaz upozorenja za nisku pouzdanost prevoda */}
+      {activeSegment.confidence_score !== undefined && activeSegment.confidence_score <= 2 && (
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '8px', 
+          padding: '8px 12px', 
+          background: 'rgba(249, 115, 22, 0.1)', 
+          border: '1px solid rgba(249, 115, 22, 0.25)', 
+          borderRadius: '10px', 
+          color: '#fdba74', 
+          fontSize: '0.8rem',
+          fontWeight: '500'
+        }}>
+          <span>⚠️ Niska pouzdanost prevoda (skor: {activeSegment.confidence_score}/5)</span>
+        </div>
+      )}
+
       {/* Navigacija tabova */}
       <div className="segment-tabs-container">
         <button

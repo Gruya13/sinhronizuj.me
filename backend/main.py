@@ -38,14 +38,17 @@ if getattr(settings, "SENTRY_DSN", None):
 from sqlalchemy import text
 Base.metadata.create_all(bind=engine)
 
-# Pokretanje alter table migracije za is_admin u PostgreSQL ili SQLite
+# Pokretanje alter table migracije za is_admin u PostgreSQL ili SQLite i nove kolone u segments
 with engine.connect() as conn:
     try:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;"))
+        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS needs_retranslation BOOLEAN DEFAULT FALSE;"))
+        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS actual_speed_factor DOUBLE PRECISION DEFAULT 1.0;"))
+        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS confidence_score INTEGER DEFAULT 5;"))
         conn.commit()
-        print("[STARTUP MIGRATION SUCCESS] Kolona is_admin je proverena/kreirana u tabeli users.", flush=True)
+        print("[STARTUP MIGRATION SUCCESS] Kolona is_admin i nove kolone za segments su proverene/kreirane.", flush=True)
     except Exception as e:
-        print(f"[STARTUP MIGRATION WARNING] Greška pri dodavanju is_admin kolone: {e}.", flush=True)
+        print(f"[STARTUP MIGRATION WARNING] Greška pri startup migraciji: {e}.", flush=True)
 
 # Inicijalizacija Rate Limiter-a sa Redis storage-om za deljenje stanja i perzistenciju
 limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
@@ -437,7 +440,10 @@ def get_project_draft(project_id: str, current_user: User = Depends(get_current_
             "active_speaker": s.active_speaker,
             "tts_path": get_presigned_download_url(settings.MINIO_BUCKET, s.tts_s3_key) if s.tts_s3_key else None,
             "tts_duration": s.tts_duration,
-            "status": s.status
+            "status": s.status,
+            "confidence_score": s.confidence_score if s.confidence_score is not None else 5,
+            "needs_retranslation": s.needs_retranslation if s.needs_retranslation is not None else False,
+            "actual_speed_factor": s.actual_speed_factor if s.actual_speed_factor is not None else 1.0
         })
         
     project_data = {
@@ -476,7 +482,10 @@ def save_project_draft(project_id: str, request: SaveProjectRequest, current_use
     for req_seg in request.segments:
         db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == req_seg.id).first()
         if db_seg:
-            db_seg.translated = req_seg.translated
+            if db_seg.translated != req_seg.translated:
+                from backend.worker.tasks import learn_user_glossary_task
+                learn_user_glossary_task.delay(str(current_user.id), db_seg.original, db_seg.translated, req_seg.translated)
+                db_seg.translated = req_seg.translated
             db_seg.voice_type = req_seg.voice_type or "clone"
             db_seg.volume = req_seg.volume if req_seg.volume is not None else 0.0
             db_seg.speed = req_seg.speed if req_seg.speed is not None else 1.0

@@ -94,6 +94,9 @@ class Segment(Base):
     tts_s3_key = Column(String, nullable=True)
     tts_duration = Column(Float, nullable=True)
     status = Column(String, default="edited") # edited, previewed
+    needs_retranslation = Column(Boolean, default=False, server_default="false")
+    actual_speed_factor = Column(Float, default=1.0, server_default="1.0")
+    confidence_score = Column(Integer, default=5, server_default="5")
 
     project = relationship("Project", back_populates="segments")
 

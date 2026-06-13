@@ -214,8 +214,11 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         stable_video_path = os.path.join(original_temp_workspace, video_filename)
         shutil.copy2(result["video_path"], stable_video_path)
         
+        from backend.worker.segment_optimizer import optimize_segments_for_translation
+        optimized_segments = optimize_segments_for_translation(transcription_result["segments"])
+        
         translation_result = translate_segments(
-            transcription_result["segments"],
+            optimized_segments,
             video_path=stable_video_path,
             progress_callback=lambda detail: update_progress(detail=detail)
         )
@@ -633,7 +636,177 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         duration_merge = time.time() - t_start_merge
         if merge_result["status"] == "error":
             return merge_result
+
+        # --- FEEDBACK PETLJA POREĐENJA BRZINA GOVORA ---
+        # Računamo prosečan istorijski speedup korisnika za potrebe kalibracije limita
+        db = SessionLocal()
+        user_avg_speedup = 1.0
+        try:
+            proj_obj = db.query(Project).filter(Project.id == project_id).first()
+            if proj_obj:
+                user_id = proj_obj.user_id
+                from sqlalchemy import func
+                avg_val = db.query(func.avg(Segment.actual_speed_factor))\
+                            .join(Project)\
+                            .filter(Project.user_id == user_id, Segment.actual_speed_factor > 1.0)\
+                            .scalar()
+                if avg_val is not None:
+                    user_avg_speedup = float(avg_val)
+        except Exception as e:
+            print(f"[WARNING] Greška pri dobijanju prosečnog speedup-a za korisnika: {e}", flush=True)
+        finally:
+            db.close()
+
+        speech_speedups = merge_result.get("speech_speedups", {})
+        problem_ids = []
+        for s_id, speedup in speech_speedups.items():
+            if speedup > 1.15:
+                problem_ids.append((s_id, speedup))
+                
+        # Pokrećemo re-translation samo ako ima problema i ako nismo već odradili retranslation u ovom tasku
+        if problem_ids and not locals().get("retranslation_done", False):
+            print(f"[FEEDBACK LOOP] Detektovano {len(problem_ids)} segmenata sa brzinom preko 1.15x: {problem_ids}", flush=True)
             
+            db = SessionLocal()
+            try:
+                # 1. Upisujemo needs_retranslation i actual_speed_factor u bazu
+                for s_id, speedup in problem_ids:
+                    db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == s_id).first()
+                    if db_seg:
+                        db_seg.needs_retranslation = True
+                        db_seg.actual_speed_factor = speedup
+                db.commit()
+                
+                # 2. Re-prevedemo oštećene segmente sa strožim vremenskim limitima
+                db_segs_to_retranslate = db.query(Segment).filter(Segment.project_id == project_id, Segment.needs_retranslation == True).all()
+                segments_to_retranslate = []
+                for s in db_segs_to_retranslate:
+                    segments_to_retranslate.append({
+                        "id": s.segment_id,
+                        "start": s.start,
+                        "end": s.end,
+                        "text": s.original,
+                        "speed": s.speed,
+                        "voice_type": s.voice_type,
+                        "actual_speed_factor": s.actual_speed_factor
+                    })
+                
+                if segments_to_retranslate:
+                    print(f"[FEEDBACK LOOP] Pokrećem re-prevođenje za {len(segments_to_retranslate)} segmenata sa faktorom {user_avg_speedup:.2f}...", flush=True)
+                    from backend.worker.translator import translate_segments
+                    
+                    retrans_res = translate_segments(
+                        segments_to_retranslate,
+                        video_path=local_video_path,
+                        progress_callback=None,
+                        user_avg_speedup=user_avg_speedup
+                    )
+                    
+                    if retrans_res["status"] != "error":
+                        # Ažuriramo prevode u bazi i resetujemo flagove
+                        for s_res in retrans_res["translated_segments"]:
+                            db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == s_res["id"]).first()
+                            if db_seg:
+                                db_seg.translated = s_res["text"]
+                                db_seg.needs_retranslation = False
+                                db_seg.confidence_score = s_res.get("confidence_score", 5)
+                        db.commit()
+                        
+                        # 3. Regenerišemo TTS samo za te re-prevedene segmente
+                        print(f"[FEEDBACK LOOP] Ponovo generišem TTS za re-prevedene segmente...", flush=True)
+                        db_segs_to_tts = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id.in_([s["id"] for s in segments_to_retranslate])).all()
+                        
+                        from backend.worker.tts_engine import synthesize_audio
+                        from backend.worker.utils import apply_audio_modifiers
+                        
+                        tts_list = [{
+                            "id": s.segment_id,
+                            "start": s.start,
+                            "end": s.end,
+                            "text": s.translated,
+                            "original_text": s.original
+                        } for s in db_segs_to_tts]
+                        
+                        all_segs_db = db.query(Segment).filter(Segment.project_id == project_id).all()
+                        
+                        tts_result = synthesize_audio(
+                            local_vocals_path,
+                            tts_list,
+                            voice_type=voice_type,
+                            disable_openvoice=settings.DISABLE_OPENVOICE,
+                            disable_enhance=settings.DISABLE_ENHANCE,
+                            all_segments=[{"id": s.segment_id, "start": s.start, "end": s.end, "original": s.original, "translated": s.translated} for s in all_segs_db]
+                        )
+                        
+                        if tts_result["status"] != "error":
+                            for res_seg in tts_result.get("tts_segments", []):
+                                local_raw_path = res_seg["path"]
+                                db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == res_seg["id"]).first()
+                                if db_seg:
+                                    local_processed_path = local_raw_path.replace(".wav", "_processed.wav")
+                                    apply_audio_modifiers(
+                                        local_raw_path,
+                                        local_processed_path,
+                                        volume=db_seg.volume,
+                                        speed=db_seg.speed,
+                                        pitch=db_seg.pitch
+                                    )
+                                    tts_s3_key = f"projects/{project_id}/tts_seg_{res_seg['id']}.wav"
+                                    upload_file_to_s3(local_processed_path, settings.MINIO_BUCKET, tts_s3_key)
+                                    
+                                    if os.path.exists(local_raw_path):
+                                        os.remove(local_raw_path)
+                                    
+                                    db_seg.tts_s3_key = tts_s3_key
+                                    
+                                    from pydub import AudioSegment
+                                    try:
+                                        aud = AudioSegment.from_wav(local_processed_path)
+                                        db_seg.tts_duration = len(aud) / 1000.0
+                                    except Exception:
+                                        db_seg.tts_duration = res_seg["duration"]
+                                        
+                                    for mem_seg in segments:
+                                        if mem_seg["id"] == res_seg["id"]:
+                                            mem_seg["tts_path"] = local_processed_path
+                                            mem_seg["tts_duration"] = db_seg.tts_duration
+                                            break
+                            db.commit()
+                            
+                            # 4. Ponovo pokrećemo FFmpeg merger sa novim kraćim audio zapisima
+                            print(f"[FEEDBACK LOOP] Ponovo pokrećem dynamic time stretching sa novim audio zapisima...", flush=True)
+                            re_merger_segments = [{
+                                "id": s["id"],
+                                "path": s["tts_path"],
+                                "duration": s["tts_duration"],
+                                "start": s["start"],
+                                "end": s["end"],
+                                "bg_volume": s.get("bg_volume", 0.0)
+                            } for s in segments]
+                            
+                            if os.path.exists(merge_result["final_video_path"]):
+                                os.remove(merge_result["final_video_path"])
+                            if os.path.exists(merge_result["dubbed_audio_path"]):
+                                os.remove(merge_result["dubbed_audio_path"])
+                                
+                            merge_result = merge_audio_and_video_dynamic(
+                                local_video_path,
+                                local_no_vocals_path,
+                                re_merger_segments,
+                                background_vol=background_vol,
+                                dubbed_vol=dubbed_vol
+                            )
+                            if merge_result["status"] == "error":
+                                return merge_result
+                                
+                            retranslation_done = True
+                            print("[FEEDBACK LOOP] Automatska optimizacija završena!", flush=True)
+            except Exception as loop_err:
+                db.rollback()
+                print(f"[FEEDBACK LOOP ERROR] Greška tokom automatske optimizacije: {loop_err}", flush=True)
+            finally:
+                db.close()
+                
         add_phase_cost("merger", "Audio-video miksovanje (Lokalno)", "Lokalni VPS", duration_merge, 0.0)
         update_progress(completed_step="Miks završen")
         
@@ -813,3 +986,86 @@ def cleanup_old_files():
                         os.remove(item_path)
             except Exception as e:
                 print(f"[CLEANUP] Greška pri brisanju {item_path}: {e}")
+
+
+@celery_app.task(name="learn_user_glossary_task")
+def learn_user_glossary_task(user_id: str, original: str, old_translated: str, new_translated: str):
+    """
+    Pozadinski Celery task koji poredi stari i novi prevod i uči korisničke preferencije
+    tako što ih automatski dodaje u korisnički glosar.
+    """
+    if not settings.MODAL_LEKTOR_URL:
+        return
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        "Korisnik je ručno ispravio prevod rečenice u našoj aplikaciji za sinhronizaciju videa.\n"
+        "Tvoj zadatak je da utvrdiš da li je korisnik ispravio prevod nekog specifičnog stručnog pojma ili termina, "
+        "i da izvučeš taj par (originalni engleski pojam i korisnikov novi srpski prevod).\n\n"
+        f"Originalni engleski tekst: \"{original}\"\n"
+        f"Prethodni automatski prevod: \"{old_translated}\"\n"
+        f"Novi ručno korigovani prevod: \"{new_translated}\"\n\n"
+        "PRAVILA ZA EKSTRAKCIJU:\n"
+        "1. Ako je korisnik samo preformulisao rečenicu (npr. promenio red reči, promenio rod/padež bez promene prevoda ključnih reči), vrati prazan rečnik {}.\n"
+        "2. Ako je korisnik promenio prevod neke konkretne engleske imenice, fraze ili stručnog termina (npr. promenio 'welding machine' sa 'mašina za varenje' na 'aparat za zavarivanje'), izvuci taj termin.\n"
+        "3. Srpski prevod u rečniku treba da bude u svom osnovnom obliku (nominativ), ako je moguće.\n\n"
+        "Odgovori isključivo u validnom JSON formatu kao jednostavan rečnik gde su ključevi engleske reči, a vrednosti srpski prevodi, bez ikakvog dodatnog teksta ili uvoda:\n"
+        "{\n"
+        "  \"english term\": \"serbian translation\"\n"
+        "}"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 150
+    }
+    
+    try:
+        from backend.worker.utils import call_modal_endpoint
+        from backend.core.database import SessionLocal
+        from backend.core.models import Glossary
+        import json
+        
+        res = call_modal_endpoint(url=url, payload=payload)
+        content = res["choices"][0]["message"]["content"].strip()
+        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```(?:json)?\n', '', content)
+            content = re.sub(r'\n```$', '', content)
+            
+        data = json.loads(content)
+        if isinstance(data, dict) and data:
+            db = SessionLocal()
+            try:
+                for eng, srb in data.items():
+                    if not eng or not srb:
+                        continue
+                    eng_clean = eng.strip().lower()
+                    srb_clean = srb.strip().lower()
+                    
+                    # Provera da li već postoji taj par za korisnika
+                    existing = db.query(Glossary).filter(
+                        Glossary.user_id == user_id,
+                        Glossary.source_word == eng_clean
+                    ).first()
+                    
+                    if existing:
+                        existing.target_word = srb_clean
+                    else:
+                        new_g = Glossary(
+                            user_id=user_id,
+                            source_word=eng_clean,
+                            target_word=srb_clean
+                        )
+                        db.add(new_g)
+                db.commit()
+                print(f"[CROSS-PROJECT LEARNING] Uspešno naučeni termini za korisnika {user_id}: {data}", flush=True)
+            except Exception as e:
+                db.rollback()
+                print(f"[CROSS-PROJECT LEARNING ERROR] {e}", flush=True)
+            finally:
+                db.close()
+    except Exception as e:
+        print(f"[CROSS-PROJECT LEARNING ERROR] Greška pri pozivu LLM-a: {e}", flush=True)

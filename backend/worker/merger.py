@@ -163,6 +163,7 @@ def merge_audio_and_video_dynamic(
                 
             blocks.append({
                 "type": "speech",
+                "id": seg["id"],
                 "start": start,
                 "end": end,
                 "stretch_factor": video_stretch,
@@ -196,6 +197,7 @@ def merge_audio_and_video_dynamic(
         concat_voc_labels = []
         
         temp_files_to_clean = []
+        speech_speedups = {}
         
         for idx, block in enumerate(blocks):
             start = block["start"]
@@ -217,6 +219,7 @@ def merge_audio_and_video_dynamic(
                 audio_mix_filters.append(f"[1:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[{a_bg_out}]")
                 
             if block["type"] == "speech":
+                speech_speedups[block["id"]] = block["audio_speedup"]
                 tts_path = block["tts_path"]
                 # Ako je potrebno blago ubrzanje glasa
                 if block["audio_speedup"] > 1.01:
@@ -315,7 +318,8 @@ def merge_audio_and_video_dynamic(
         return {
             "status": "success",
             "final_video_path": final_video_path,
-            "dubbed_audio_path": final_vocals_path
+            "dubbed_audio_path": final_vocals_path,
+            "speech_speedups": speech_speedups
         }
         
     except Exception as e:
