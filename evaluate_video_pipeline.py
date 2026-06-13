@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import subprocess
+import re
 from datetime import datetime
 
 # Dodavanje korena projekta u sys.path
@@ -57,14 +58,14 @@ def extract_audio(video_path, audio_path):
 def run_llm_evaluation(segments, video_name):
     print("[*] Pokrećem LLM-as-a-judge evaluaciju prevoda...")
     
-    # Formiranje teksta segmenata za prompt
+    # Formiranje teksta segmenata za prompt - optimizovana dužina da ne pređe 4096 limit
     segments_text_list = []
     for s in segments:
         duration = s["end"] - s["start"]
+        eng = s.get('original_text') or s.get('text') or ""
+        srb = s.get('text') or ""
         segments_text_list.append(
-            f"[Segment {s['id']}] ({duration:.2f}s, pouzdanost: {s.get('confidence_score', 5)}/5)\n"
-            f"  ENG: \"{s.get('original_text', s.get('text'))}\"\n"
-            f"  SRB: \"{s.get('text')}\"\n"
+            f"[Seg {s['id']}] ({duration:.1f}s) ENG: {eng} | SRB: {srb}"
         )
     segments_text = "\n".join(segments_text_list)
     
@@ -93,7 +94,7 @@ def run_llm_evaluation(segments, video_name):
         "model": "qwen-lektor",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 2000
+        "max_tokens": 1200
     }
     
     try:
