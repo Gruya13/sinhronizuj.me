@@ -235,11 +235,37 @@ def generate_video_summary(transcript_text: str) -> str:
         print(f"[SUMMARY ERROR] Greška pri generisanju sažetka: {e}", flush=True)
         return "Failed to generate video summary."
 
+def parse_glossary_to_dict(glossary_str: str) -> dict:
+    """
+    Parsira tekstualni glosar (dobijen iz get_dynamic_glossary) u Python rečnik.
+    """
+    glossary_dict = {}
+    if not glossary_str:
+        return glossary_dict
+    for line in glossary_str.split("\n"):
+        line = line.strip()
+        if not line or not line.startswith("-"):
+            continue
+        # Tražimo format: - "eng" -> "srb"
+        match = re.search(r'-\s*"([^"]+)"\s*->\s*"([^"]+)"', line)
+        if match:
+            glossary_dict[match.group(1).strip()] = match.group(2).strip()
+        else:
+            # Fallback za slučaj da nema navodnika: - eng -> srb
+            parts = line[1:].split("->")
+            if len(parts) == 2:
+                eng = parts[0].strip().strip('"')
+                srb = parts[1].strip().strip('"')
+                if eng and srb:
+                    glossary_dict[eng] = srb
+    return glossary_dict
+
 def translate_segments(segments: list, video_path: str = None, progress_callback=None) -> dict:
     """
     Poziva Modal Serverless Lektor (Qwen3-32B) za tekstualni prevod visoke tačnosti.
     Optimizovano: bez slika, bez hladnog starta na A10G, batch size = 30.
-    Uvedeni: globalni sažetak, klizni prozor konteksta, i Chain-of-Thought analiza.
+    Uvedeni: globalni sažetak, klizni prozor konteksta, Chain-of-Thought analiza,
+             dužinska svesnost i running glossary za konzistentnost.
     """
     import time
     translator_duration = 0.0
@@ -278,6 +304,10 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         video_summary = "No context available."
         dynamic_glossary_str = "Nema specifičnih termina za ovaj video."
 
+    # Inicijalizacija running glossary mehanizma
+    full_glossary_dict = parse_glossary_to_dict(dynamic_glossary_str)
+    confirmed_translations = {}
+
     batch_size = 30
     parsed_dict = {}
     
@@ -290,10 +320,13 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         if progress_callback:
             progress_callback(detail=f"Prevođenje batcha {batch_idx + 1}...")
             
+        # Generisanje transkripta sa limitom karaktera (dužinska svesnost)
         transcript_text = ""
         for j, s in enumerate(batch_segments):
             global_idx = batch_start + j
-            transcript_text += f"[seg-{global_idx}] {s['text']}\n"
+            duration = s["end"] - s["start"]
+            limit_char = max(15, int(duration * 14))
+            transcript_text += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) {s['text']}\n"
             
         # Klizni prozor konteksta (poslednjih 5 segmenata iz prethodnog batch-a)
         history_text = ""
@@ -315,12 +348,37 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 f"{history_text}\n\n"
             )
             
+        # Formiranje running glossary sekcija za ovaj batch
+        confirmed_lines = []
+        proposed_lines = []
+        batch_eng_text = " ".join([s["text"].lower() for s in batch_segments])
+        
+        for eng_term, srb_term in full_glossary_dict.items():
+            if eng_term.lower() in batch_eng_text:
+                if eng_term in confirmed_translations:
+                    confirmed_lines.append(f'- "{eng_term}" -> "{confirmed_translations[eng_term]}"')
+                else:
+                    proposed_lines.append(f'- "{eng_term}" -> "{srb_term}"')
+                    
+        glossary_prompt_section = ""
+        if confirmed_lines:
+            glossary_prompt_section += (
+                "POTVRĐENI PREVODI IZ PRETHODNIH SEGMENATA (OBAVEZNO koristi tačno ove srpske prevode radi konzistentnosti):\n"
+                + "\n".join(confirmed_lines) + "\n\n"
+            )
+        if proposed_lines:
+            glossary_prompt_section += (
+                "PREDLOŽENI GLOSAR ZA NOVE ENTITETE (Prilagodi ih gramatički kontekstu rečenice):\n"
+                + "\n".join(proposed_lines) + "\n\n"
+            )
+        if not glossary_prompt_section:
+            glossary_prompt_section = "Nema specifičnih termina za ovaj batch.\n\n"
+
         prompt_text = (
             "Ti si vrhunski profesionalni prevodilac za srpski jezik. Tvoj zadatak je da prevedeš priloženi transkript sa engleskog na SRPSKI jezik (EKAVICA).\n\n"
             "KONTEKST VIDEA (SAŽETAK):\n"
             f"{video_summary}\n\n"
-            "GLOSAR I TRANNSKRIPCIJA ENTITETA (Koristi ove prevode i fonetske oblike, ali ih gramatički prilagodi rečenici):\n"
-            f"{dynamic_glossary_str}\n\n"
+            f"{glossary_prompt_section}"
             f"{history_section}"
             "PRAVILA ZA PREVOD:\n"
             "1. ZNAČENJE, A NE BUKVALNI PREVOD: Prevod mora zvučati 100% prirodno. Koristi srpske idiome i termine (npr. 'articles of incorporation' su 'osnivački akti' ili 'registracioni dokumenti', a ne 'članci u korporaciju').\n"
@@ -347,14 +405,16 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "   - DEKLINACIJA STRANIH IMENA I BRENDOVA: Obavezno dekliniraj strana imena i brendove kroz padeže u srpskom jeziku (npr. 'nazvao ga Luna' ali 'koji je stvorio Lunu' (akuzativ), 'razgovarao sa Klodom' (instrumental), 'preko Zuma', 'na Linkedinu'). Nikada ne ostavljaj ime u nominativu ako smisao rečenice zahteva promenu.\n"
             "   - PREVOD REČI 'FUTURE': Reč 'future' kao imenica se uvek prevodi kao 'budućnost' (npr. 'this future' -> 'tu budućnost' / 'takvu budućnost', nikako 'to buduće').\n"
             "   - LOGIČKA FRAZA 'NOT NECESSARILY BECAUSE': Rečenice koje sadrže 'not doing this necessarily because they want...' prevodi ispravno kao 'ne rade ovo nužno zato što žele...' (logički smisao je da oni to čine, ali razlog nije nužno taj). Izbegavaj pogrešan prevod poput 'ne rade to jer ne žele'.\n"
-            "4. LOKALIZACIJA TERMINA: Reč 'store' prevodi kao 'prodavnica' ili 'radnja' / 'lokal'. 'Retail lease' je 'zakup lokala' ili 'zakup prostora'. Frazu 'they'd rather' prevedi kao 'oni bi radije' ili 'radije bi'. 'Retail experience' je 'iskustvo u maloprodaji' ili 'iskustvo u trgovini'.\n"
-            "5. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
-            "6. STROGO ODRŽAVANJE GRANICA SEGMENATA: Prevedi svaki red nezavisno i vrati prevod pod tačnim [seg-ID] tagom tog reda. Nikada nemoj spajati dva reda u jedan, niti preskakati redove. Svaki ulazni red mora imati tačno jedan odgovarajući izlazni red sa istim tagom. Ako se rečenica proteže kroz više redova, prevedi delove rečenice unutar tih istih redova bez njihovog spajanja.\n\n"
+            "4. POŠTOVANJE GRANICE DUŽINE (LIMIT KARAKTERA):\n"
+            "   - Za svaki segment ti je prosleđen LIMIT u broju karaktera (uključujući razmake). Tvoj prevod (translated_text) MORA biti kraći ili jednak tom limitu kako bi mogao da se izgovori u predviđenom vremenu bez prevelikog ubrzavanja govora. Ako je prevod predugačak, koristi kraće sinonime, sažmi rečenicu ili izostavi suvišne reči, ali sačuvaj osnovni smisao.\n"
+            "5. LOKALIZACIJA TERMINA: Reč 'store' prevodi kao 'prodavnica' ili 'radnja' / 'lokal'. 'Retail lease' je 'zakup lokala' ili 'zakup prostora'. Frazu 'they'd rather' prevedi kao 'oni bi radije' ili 'radije bi'. 'Retail experience' je 'iskustvo u maloprodaji' ili 'iskustvo u trgovini'.\n"
+            "6. KONTEKST CELINE: Transkript je jedna povezana priča. Razumi ceo kontekst pre nego što prevedeš pojedinačni red.\n"
+            "7. STROGO ODRŽAVANJE GRANICA SEGMENATA: Prevedi svaki red nezavisno i vrati prevod pod tačnim [seg-ID] tagom tog reda. Nikada nemoj spajati dva reda u jedan, niti preskakati redove. Svaki ulazni red mora imati tačno jedan odgovarajući izlazni red sa istim tagom. Ako se rečenica proteže kroz više redova, prevedi delove rečenice unutar tih istih redova bez njihovog spajanja.\n\n"
             "FORMAT ODGOVORA:\n"
             "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. JSON mora sadržati listu 'segments' gde svaki segment ima ključeve:\n"
             "  - 'id': ceo broj (identifikator segmenta iz ulaza)\n"
             "  - 'analysis': tvoje razmišljanje i lingvistička analiza idiomatskih izraza, roda govornika, padeža ili drugih specifičnosti u ovom segmentu.\n"
-            "  - 'translated_text': korigovan i očišćen prevod na srpskom jeziku\n\n"
+            "  - 'translated_text': korigovan i očišćen prevod na srpskom jeziku koji obavezno poštuje zadati limit karaktera\n\n"
             "PRIMER TRANSLACIJE:\n"
             "Izlaz:\n"
             "{\n"
@@ -423,10 +483,17 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                         except ValueError:
                             continue
                             
-            # Spajanje u glavni rečnik
+            # Spajanje u glavni rečnik i ažuriranje running glossary-ja
             for idx, text in batch_parsed.items():
                 if batch_start <= idx < batch_start + len(batch_segments):
                     parsed_dict[idx] = text
+                    
+            # Ažuriranje confirmed_translations na osnovu prevedenog teksta u ovom batchu
+            for s in batch_segments:
+                text_lower = s["text"].lower()
+                for eng_term, srb_term in full_glossary_dict.items():
+                    if eng_term.lower() in text_lower:
+                        confirmed_translations[eng_term] = srb_term
                     
         except Exception as batch_err:
             print(f"[ERROR] Greška pri prevođenju batcha {batch_idx + 1}: {batch_err}", flush=True)
@@ -437,7 +504,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     # Pravljenje finalne liste segmenata
     final_segments = []
     for i, orig in enumerate(segments):
-        # Pametan fallback: ako nema prevoda, koristi originalni tekst umesto praznog stringa da sprečimo tišinu
         t_text = parsed_dict.get(i, "").strip()
         if not t_text:
             print(f"[WARNING] Segment {i} nema prevod. Koristim originalni engleski tekst kao fallback.", flush=True)
@@ -775,7 +841,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         for j, seg in enumerate(batch_translated):
             global_idx = batch_start + j
             duration = seg["duration"]
-            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s) ENG: {seg['orig_text']} | SRB: {to_latin(seg['translated_text'])}\n"
+            limit_char = max(15, int(duration * 14))
+            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) ENG: {seg['orig_text']} | SRB: {to_latin(seg['translated_text'])}\n"
             
         # Klizni prozor konteksta za lektora
         history_text = ""
@@ -827,10 +894,9 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "     * \"stricno\" -> striktno\n"
             "     * \"zaštića\" -> štiti\n"
             "     * \"matiču\" -> maticu\n\n"
-            "4. BEZ SKRAĆIVANJA PREMA DUŽINI SEGMENTA (OSIM MIKRO-SEGMENATA):\n"
-            "   - U ovoj fazi tvoj prioritet je potpunost, bogatstvo i gramatička tačnost prevoda. NIKADA ne skraćuj rečenicu niti izbacuj detalje samo da bi se uklopio u vremenski limit. Prevedi kompletnu misao iz engleskog teksta prirodno i tačno na srpski.\n"
-            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!).\n"
-            "   - Za sve ostale segmente, bez obzira na trajanje, vrati pun, bogat prevod.\n\n"
+            "4. POŠTOVANJE GRANICE DUŽINE (LIMIT KARAKTERA):\n"
+            "   - Za svaki segment ti je prosleđen LIMIT u broju karaktera (uključujući razmake). Tvoj lekturisani prevod (refined_text) MORA biti kraći ili jednak tom limitu kako bi mogao da se izgovori u predviđenom vremenu bez prevelikog ubrzavanja govora. Ako je prevod predugačak, koristi kraće sinonime, sažmi rečenicu ili izostavi suvišne reči, ali sačuvaj osnovni smisao i tačnost.\n"
+            "   - MIKRO-SEGMENTI (trajanje < 0.5s): Ako je trajanje segmenta kraće od 0.5 sekundi (npr. 0.1s, 0.2s, 0.3s, 0.4s), refined_text MORA biti potpuno prazan string `\"\"` (bez izuzetaka!).\n\n"
             "5. DOSLEDNA TI-FORMA (NEFORMALNO OBRAĆANJE):\n"
             "   - Obraćaj se isključivo sa \"ti\" (npr. \"Ako imaš\", a ne \"Ako imate\"; \"Poravnaj\", a ne \"Poravnajte\").\n"
             "   - Koristi ispravne imperativne oblike: \"Poravnaj\", \"Zavari\", \"Iseci\", \"Nacrtaj\".\n\n"

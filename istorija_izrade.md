@@ -1,3 +1,17 @@
+## [2026-06-13 15:02:00] Implementacija dužinske svesnosti i running glossary-ja u prevođenju i lekturi
+- **Opis:**
+  Uspešno smo završili i verifikovali implementaciju dužinske svesnosti i running glossary-ja u translator.py za Qwen3-32B model:
+  1. **Dužinska svesnost u prevođenju i lekturi:**
+     - Implementiran je dinamički proračun maksimalnog broja karaktera u prevodu na osnovu trajanja segmenta po formuli `limit_char = max(15, int(duration * 14))`.
+     - Limit je integrisan u segmentne šablone i za primarno prevođenje (`translate_segments`) i za fazu lekture (`lektor_segments`) kao `LIMIT: {limit_char} karaktera`.
+     - Ažurirali smo pravilo 4 u Lektor promptu da zahteva poštovanje granice dužine segmenta umesto pređašnjeg pravila o zabrani skraćivanja.
+  2. **Running Glossary za terminološku konzistentnost:**
+     - Tokom prevođenja, potvrđeni prevodi entiteta iz dinamičkog glosara se čuvaju u rečnik `confirmed_translations` na osnovu obrađenih segmenata iz prethodnih batch-eva.
+     - Ovi potvrđeni prevodi se automatski prosleđuju u promptove narednih batch-eva pod sekcijom `POTVRĐENI PREVODI IZ PRETHODNIH SEGMENATA`, obavezujući LLM da zadrži istu terminologiju.
+  3. **Verifikacija:**
+     - Ažurirali smo i proširili testnu skriptu [test_translator.py](file:///home/gruya/.gemini/antigravity/brain/755cfcc2-6b32-484e-8661-deccc271b3e0/scratch/test_translator.py) da verifikuje i prenošenje running glossary entiteta i postojanje limita karaktera u lektor promptovima.
+     - Pokrenuli smo test suite i svi testovi su prošli uspešno.
+
 ## [2026-06-12 15:13:00] Implementacija hibridne diarizacije, FastAPI podrške i selektivnog Lip-Sync-a
 - **Opis:**
   Uspesno smo implementirali celokupnu integraciju hibridne diarizacije, FastAPI podrške za `active_speaker` i selektivnog Lip-Sync algoritma:
