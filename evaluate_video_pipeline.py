@@ -79,13 +79,14 @@ def run_llm_evaluation(segments, video_name):
         "4. Segment Length & Speech Tempo (Are there segments that are too long to be spoken comfortably within their duration? Remember, Serbian translations are often 20-30% longer than English.)\n\n"
         "Here are the translated segments with their duration, original English text, and translated Serbian text:\n"
         f"{segments_text}\n\n"
-        "Provide a detailed report in Serbian language, including:\n"
-        "- Rezime kvaliteta prevoda (Summary of translation quality)\n"
-        "- Detaljna analiza po kriterijumima (Accuracy, Tone/Naturalness, Glossary, Tempo) sa konkretnim primerima dobrih i loših prevoda\n"
-        "- Spisak specifičnih segmenata koji imaju greške (sa ID segmenta, trenutnim prevodom, uočenim problemom i predloženom ispravkom)\n"
-        "- Ukupna ocena kvaliteta (Quality Score) od 1 do 10\n"
-        "- Preporuke za unapređenje prompta prevodioca/lektora ili parametara aplikacije.\n\n"
-        "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 100 reči). NIKADA nemoj detaljno analizirati segment po segment unutar <think> tagova, već to uradi direktno u samom Markdown izveštaju.\n\n"
+        "Provide a report in Serbian language.\n"
+        "Your response MUST start with the quality score section: '## Ocena kvaliteta: X/10' (e.g. 8.5/10).\n"
+        "Then include the following sections:\n"
+        "- ## Rezime kvaliteta prevoda\n"
+        "- ## Detaljna analiza po kriterijumima (Budi sažet, maksimalno 1-2 primera po kriterijumu)\n"
+        "- ## Spisak segmenata sa najvažnijim greškama (Navedi maksimalno 3 najvažnija segmenta sa greškama da bi izveštaj stao u limit tokena)\n"
+        "- ## Preporuke za unapređenje\n\n"
+        "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi izuzetno kratak (do 50 reči). NIKADA nemoj detaljno analizirati segment po segment unutar <think> tagova.\n\n"
         "Write your response in Markdown format. Do not include any tags like <thought> or markdown code blocks around the report itself, just start writing the markdown content."
     )
     
@@ -94,7 +95,7 @@ def run_llm_evaluation(segments, video_name):
         "model": "qwen-lektor",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.2,
-        "max_tokens": 1200
+        "max_tokens": 1100
     }
     
     try:

@@ -1,10 +1,10 @@
 {
   "video_name": "Ryan Montgomery Reveals The Device That Is Illegal To Use - HACKZONE (1080p, h264).mp4",
-  "evaluation_time": "2026-06-13T15:59:38.199110",
+  "evaluation_time": "2026-06-14T04:09:38.922450",
   "pipeline_durations": {
-    "asr_sec": 27.49839973449707,
-    "translation_sec": 126.32883405685425,
-    "total_sec": 175.6772539615631
+    "asr_sec": 145.86683559417725,
+    "translation_sec": 63.4221134185791,
+    "total_sec": 231.23151302337646
   },
   "segments": [
     {
@@ -17,62 +17,57 @@
     {
       "id": 1,
       "start": 1.74,
-      "end": 3.92,
-      "text": "Ovaj uređaj može izazvati ozbiljan problem.",
-      "original_text": "This device can cause a serious problem."
+      "end": 5.12,
+      "text": "Ovaj uređaj može izazvati ozbiljan problem i pitaš se šta zapravo radi?",
+      "original_text": "This device can cause a serious problem and you're like what does this actually do What does this actually do?"
     },
     {
       "id": 2,
-      "start": 3.92,
-      "end": 5.12,
-      "text": "Šta ovo zapravo radi?",
-      "original_text": "What does this actually do?"
-    },
-    {
-      "id": 3,
       "start": 5.12,
       "end": 6.32,
-      "text": "Zove se ometač.",
+      "text": "Ovo se zove ometač.",
       "original_text": "This is called a jammer."
     },
     {
-      "id": 4,
+      "id": 3,
       "start": 6.32,
       "end": 8.51,
-      "text": "Nije ilegalno ih imati, ali je ilegalno ih koristiti.",
+      "text": "Nisu ilegalni da poseduješ, ali je ilegalno ih koristiti.",
       "original_text": "They're not illegal to own, but they're illegal to use."
     },
     {
-      "id": 5,
+      "id": 4,
       "start": 8.51,
       "end": 13.38,
-      "text": "Funkcioniše tako što će isključiti svaki mobilni telefon u celom zgradi.",
+      "text": "Kako to radi? Ovo će isključiti svaki mobilni telefon u ovoj zgradi.",
       "original_text": "How does that work? What this does is it's going to shut down every single cell phone in this entire building."
     },
     {
-      "id": 6,
+      "id": 5,
       "start": 13.38,
       "end": 15.78,
-      "text": "Isključiće GPS, Wi-Fi, Bluetooth.",
-      "original_text": "It's going to turn off GPS, Wi-Fi, Bluetooth."
+      "text": "Isključiće GPS, Vaj-Fi, Bluetooth.",
+      "original_text": "It's going to turn off GPS, Wi-Fi, Bluetooth.",
+      "confidence_score": 5
     },
     {
-      "id": 7,
+      "id": 6,
       "start": 15.78,
       "end": 21.43,
       "text": "Bežične kamere neće raditi.",
-      "original_text": "Your wireless cameras are not going to work."
+      "original_text": "Your wireless cameras are not going to work.",
+      "confidence_score": 5
     },
     {
-      "id": 8,
+      "id": 7,
       "start": 21.43,
       "end": 24.49,
-      "text": "Ne možeš da zoveš 911.",
+      "text": "Ne možeš pozvati 911.",
       "original_text": "You can't call 911.",
       "confidence_score": 5
     },
     {
-      "id": 9,
+      "id": 8,
       "start": 24.49,
       "end": 29.84,
       "text": "Nema rešenja za ovaj problem.",
@@ -81,7 +76,7 @@
     }
   ],
   "metrics": {
-    "translator_duration": 69.44441795349121,
-    "lektor_duration": 56.88008904457092
+    "translator_duration": 40.3153178691864,
+    "lektor_duration": 23.098021984100342
   }
 }

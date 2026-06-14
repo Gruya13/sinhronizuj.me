@@ -2741,5 +2741,14 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Verifikacija i slanje na GitHub:** Svi izveštaji i popravke su uspešno verifikovani i poslati (`git push`) na granu `development` na GitHub-u.
 - **Status:** Završeno. Svi testovi su uspešno pokrenuti i kompajlirani u zajednički zbirni izveštaj.
 
+### 14.06.2026. 04:25 — Druga Runda Masovne Evaluacije Prevoda i Uporedni Izveštaj
+- **Zahtevi:** Pokrenuti novu rundu automatske evaluacije za sve test video snimke nakon implementacije 5 unapređenja, generisati nove izveštaje LLM sudije i sastaviti detaljan uporedni izveštaj sa prethodnom rundom.
+- **Urađeno:**
+    * **Pokretanje kompletne evaluacije:** Pokrenuta pozadinska skripta `run_all_evaluations.py` koja je uspešno izvršila ASR transkripciju, pametnu segmentaciju, prevođenje i lekturu na Modalu za sve test video snimke na čistom skladištu (prethodno obrisani svi stari izveštaji).
+    * **Stabilizacija i re-evaluacija LLM Sudije:** Zbog problema sa 400 Bad Request greškom na najdužem videu (Welding hacks sa 47 segmenata), smanjio sam `max_tokens` za LLM sudiju na 1100 i postavio ocenu na sam početak prompta da bi se izbeglo prekoračenje konteksta i omogućilo uspešno parsiranje. Pokrenuo sam `scratch/re_evaluate_failed.py` i uspešno generisao sve Markdown izveštaje.
+    * **Kreiranje Uporednog Izveštaja:** Sastavljen je i snimljen detaljan uporedni izveštaj `izvestaj_poredjenja.md` koji prikazuje ocene pre i posle unapređenja. Zabeleženo je značajno poboljšanje kvaliteta za umetničko-zanatske teme (Video 3: sa 6.5 na 7.5) zbog uspešnog rada novog glosara i to_latin zamena ("drvenog komad" -> "drveni komad", "rđavo drvo" -> "crvenkasto drvo", "šljofanje" -> "brušenje"). Ostale ocene su ostale stabilne oko 7.5 - 8.5/10.
+    * **Zajednički sumarni izveštaj:** Ažuriran je fajl `evaluation_results/summary_report.md` sa novim i kompletnim ocenama za svih 5 test video snimaka.
+- **Status:** Završeno. Druga runda evaluacije je u potpunosti sprovedena, a uporedni izveštaj je uspešno generisan.
+
 
 

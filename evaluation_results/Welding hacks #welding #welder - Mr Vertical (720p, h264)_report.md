@@ -1,54 +1,52 @@
 # Izveštaj o Evaluaciji Prevoda Videa
 
 **Video:** `Welding hacks #welding #welder - Mr Vertical (720p, h264).mp4`
-**Datum evaluacije:** 2026-06-13 22:03:14
-**Trajanje obrade:** ASR: 79.2s | Prevođenje: 332.2s | Ukupno: 465.6s
+**Datum evaluacije:** 2026-06-14 04:22:42
+**Trajanje obrade:** ASR: 59.1s | Prevođenje: 526.5s | Ukupno: 638.2s
 
 ---
 
 <think>
-Okay, let's start by looking at the translation quality. The user wants an evaluation based on accuracy, tone, glossary alignment, and segment length. 
+Okay, let's see. I need to evaluate this English-to-Serbian translation based on four criteria: accuracy, tone and naturalness, glossary alignment, and segment length. 
 
-First, checking accuracy. The main points seem to be translated correctly. For example, "hidden welding hacks" becomes "skriveni zavarivački trikovi," which is accurate. But I notice in Seg 10, "200 years of experience" is translated as "200 godina iskustva." That's correct, but maybe "200 godina iskustva" is a bit awkward. Maybe "200 godina iskustva" is okay, but I'll note it.
+First, accuracy. I'll check if the meaning is preserved. For example, in Seg 0, "hidden welding hack" becomes "Skriveni trikovi zavarivanja." That seems okay. But in Seg 10, "200 years" is translated as "dvadeset godina," which is 20 years, not 200. That's a mistranslation. Also, Seg 16 says "tačka" instead of "trik," which is a mistake.
 
-Next, tone and naturalness. The Serbian translation should sound natural. For example, "sun real welders seem to know" is translated as "stvarni zavarivači znaju ovo." The original might be a typo ("sun" instead of "such"), but the translation is okay. However, "hefni" is a term used in welding, which is correct. But in Seg 6, "tack weld" is translated as "hefni," which is correct. 
+Tone and naturalness: The translation should sound natural in Serbian. Seg 1 says "Zavarivači znaju kako da urade." Maybe "Zavarivači znaju kako da urade to" would be better. Some segments are a bit awkward, like Seg 5 where "poravnaj donju ivicu veće cevi" doesn't match the original instruction.
 
-Glossary alignment: Technical terms like "angle irons" become "ugaoni profili," which is correct. "Threaded rod" is "navojna šipka," which is accurate. But in Seg 22, "threaded rod assembly" is translated as "navojni štap montaža," which might be better as "montažni štap sa navojem" for clarity.
+Glossary alignment: Technical terms like "angle irons" are translated as "ugaoni profili," which is correct. But "welding rods" is "elektrode za zavarivanje," which is right. However, "tack weld" is translated as "heftaj," which is correct, but in Seg 29 it's "heftanje," which is consistent.
 
-Segment length and speech tempo: Serbian is longer than English, so checking the durations. Seg 0 is 2.0s, which is short. Seg 2 is 4.3s, which is okay. But Seg 34 is 4.7s, which might be a bit long. Also, Seg 36 is 5.2s, which could be challenging for natural speech. 
+Segment length: Serbian is longer, so check if the segments are too long. Seg 31 is 3.3s, which is okay. But Seg 36 is 5.2s, which might be a bit long for natural speech. Also, Seg 27 is empty, which is an error.
 
-Looking for specific errors: Seg 27 is empty in Serbian, which is a problem. Seg 42 is also empty. Seg 10's "200 godina iskustva" might be better as "200 godina iskustva" but maybe "200 godina iskustva" is correct. 
-
-Overall, the translation is mostly accurate, but there are some minor issues with naturalness and segment lengths. The glossary terms are mostly correct. The empty segments need to be addressed. The quality score would be around 8/10, with some improvements needed.
+Now, compiling the report. The main issues are the mistranslations in Seg 10 and 16, and the empty segment. Also, some segments are awkward. The score would be around 7.5/10.
 </think>
 
-# Izveštaj o kvalitetu prevoda
+## Ocena kvaliteta: 7.5/10
 
-## Rezime kvaliteta prevoda
-Prevod je u većem delu tačan i tehnički korektan, ali postoji nekoliko grešaka u prirodnosti jezika, dužini rečenica i nedostajućim segmentima. Tehnički termini su u većem delu ispravno prevedeni, ali postoje mali problemi u stilu i ritmu.
+## Rezime kvaliteta prevoda  
+Prevod je u većem delu tačan i tehnički korektan, ali postoji nekoliko grešaka u brojevima, izrazima i segmentima. Tonalnost je prirodna za tehnički kontekst, ali neki segmenti imaju nezgrapne formulacije. Dužina rečenica je u većem delu prihvatljiva, ali postoje segmenti koji su preduzmi ili imaju prazne sadržaje.
 
-## Detaljna analiza
+## Detaljna analiza po kriterijumima  
+1. **Tačnost**  
+   - Greška u broju: "200 years" → "dvadeset godina" (Seg 10).  
+   - Mistranslacija: "trick" → "tačka" (Seg 16).  
 
-### 1. Tačnost (Accuracy)
-- **Dobri primeri**:  
-  - [Seg 2] "Kako zavariti tanke kvadratne cevi različitih veličina?" tačno prenosi originalni značenje.  
-  - [Seg 18] "Označena linija postaje 45-stepeni bisektor." ispravno koristi geometrijski termin.  
-- **Loši primeri**:  
-  - [Seg 10] "200 godina iskustva" bi bilo prirodnije kao "200 godina iskustva" (dodavanje "iskustva" na kraju).  
-  - [Seg 22] "navojni štap montaža" je gramatički nekorektan; bolje bi bilo "montažni štap sa navojem".
+2. **Tonalnost i prirodnost**  
+   - Nezgrapna formulacija: "poravnaj donju ivicu veće cevi" (Seg 5) ne odgovara originalnoj instrukciji.  
+   - Nedostatak fleksibilnosti: "heftaj kritične tačke" (Seg 6) bi moglo biti "prvo zavari kritične tačke" za bolju prirodnost.  
 
-### 2. Ton i prirodnost (Tone/Naturalness)
-- **Dobri primeri**:  
-  - [Seg 6] "Prvo hefni kritične tačke." prirodno koristi tehnički termin "hefni".  
-  - [Seg 14] "postignut je savršeni var" zvuči prirodno u kontekstu zavarivanja.  
-- **Loši primeri**:  
-  - [Seg 1] "Stvarni zavarivači znaju ovo." zvuči mehanički; bolje bi bilo "Zavarivači to znaju".  
-  - [Seg 25] "Zavar je glatko" bi bilo prirodnije kao "Zavar je glatko izgleda".
+3. **Glossarijum**  
+   - Tehnički termini su korektni (npr. "ugaoni profili", "elektrode za zavarivanje").  
+   - Neujednačenost: "heftaj" vs. "heftanje" (Seg 6 i 29) – biće konsistentniji kao "heftanje".  
 
-### 3. Uklapanje rečnika (Glossary Alignment)
-- **Ispravno prevedeni termini**:  
-  - "angle irons" → "ugaoni profili"  
-  - "threaded rod" → "navojna šipka"  
-- **Nepreciznosti**:  
-  - [Seg 22] "navojni štap montaža" → preporučuje se "montažni štap sa navojem"  
-  - [Seg 3
+4. **Dužina segmenta**  
+   - Preduzmi segment: Seg 36 (5.2s) – potrebno razbiti u dva kraća dela.  
+   - Prazan segment: Seg 27 (nema prevoda).  
+
+## Spisak segmenata sa najvažnijim greškama  
+1. **Seg 10**: "dvadeset godina" umesto "dvadeset hiljada godina" (moguća greška u broju).  
+2. **Seg 16**: "tačka" umesto "trik".  
+3. **Seg 27**: Prazan segment (nedostaje prevod za "Four.").  
+
+## Preporuke za unapređenje  
+- **Korekcija brojeva i izraza**: Proveriti brojeve (npr. "200 years") i zamenu "tačka" → "trik".  
+- **Optimizacija segmenta**: Razbiti duže rečenice (npr
