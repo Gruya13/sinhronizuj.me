@@ -193,26 +193,384 @@ def to_latin(text: str) -> str:
     
     # Determinističke zamene ijekavizama, makedonizama i čestih grešaka modela
     replacements = {
+        # Ijekavizmi - deo
+        r'\bdio\b': 'deo',
+        r'\bdijel\b': 'deo',
+        r'\bdijela\b': 'dela',
+        r'\bdijelu\b': 'delu',
+        r'\bdijelom\b': 'delom',
         r'\bdijelovi\b': 'delovi',
         r'\bdijelove\b': 'delove',
-        r'\bdijela\b': 'dela',
-        r'\bdijelom\b': 'delom',
-        r'\bdijel\b': 'deo',
+        r'\bdijelova\b': 'delova',
+        r'\bdijelovima\b': 'delovima',
+        
+        # spriječiti
+        r'\bspriječiti\b': 'sprečiti',
+        r'\bspriječio\b': 'sprečio',
+        r'\bspriječila\b': 'sprečila',
+        r'\bspriječilo\b': 'sprečilo',
+        r'\bspriječeno\b': 'sprečeno',
+        r'\bspriječeni\b': 'sprečeni',
+        r'\bspriječili\b': 'sprečili',
+        r'\bspriječi\b': 'spreči',
+        r'\bspriječe\b': 'spreče',
+        r'\bspriječivši\b': 'sprečivši',
+        r'\bspriječite\b': 'sprečite',
+        
+        # dvjesto
+        r'\bdvjesto\b': 'dvesta',
+        
+        # tijekom
+        r'\btijekom\b': 'tokom',
+        
+        # tjedan i fraze
+        r'\bu ovom tjednu\b': 'u ovoj nedelji',
+        r'\bu tom tjednu\b': 'u toj nedelji',
+        r'\bovom tjednu\b': 'ovoj nedelji',
+        r'\bovog tjedna\b': 'ove nedelje',
+        r'\btog tjedna\b': 'te nedelje',
+        r'\bprošlog tjedna\b': 'prošle nedelje',
+        r'\bprošlom tjednu\b': 'prošle nedelje',
+        r'\bsledećeg tjedna\b': 'sledeće nedelje',
+        r'\bsljedećeg tjedna\b': 'sledeće nedelje',
+        r'\bsledećem tjednu\b': 'sledeće nedelje',
+        r'\bsljedećem tjednu\b': 'sledeće nedelje',
+        r'\bidućeg tjedna\b': 'sledeće nedelje',
+        r'\bidućem tjednu\b': 'sledeće nedelje',
+        r'\btjedan\b': 'nedelja',
+        r'\btjedna\b': 'nedelje',
+        r'\btjednu\b': 'nedelji',
+        r'\btjednom\b': 'nedeljom',
+        r'\btjedni\b': 'nedeljni',
+        r'\btjedne\b': 'nedelje',
+        r'\btjedana\b': 'nedelja',
+        r'\btjednima\b': 'nedeljama',
+        
+        # sustav
+        r'\bsustav\b': 'sistem',
+        r'\bsustava\b': 'sistema',
+        r'\bsustavu\b': 'sistemu',
+        r'\bsustavom\b': 'sistemom',
+        r'\bsustavi\b': 'sistemi',
+        r'\bsustavima\b': 'sistemima',
+        r'\bsustave\b': 'sisteme',
+        
+        # uvjet
+        r'\buvjet\b': 'uslov',
+        r'\buvjeta\b': 'uslova',
+        r'\buvjetu\b': 'uslovu',
+        r'\buvjetom\b': 'uslovom',
+        r'\buvjeti\b': 'uslovi',
+        r'\buvjetima\b': 'uslovima',
+        r'\buvjete\b': 'uslove',
+        
+        # utjecaj
+        r'\butjecaj\b': 'uticaj',
+        r'\butjecaja\b': 'uticaja',
+        r'\butjecaju\b': 'uticaju',
+        r'\butjecajem\b': 'uticajem',
+        r'\butjecaji\b': 'uticaji',
+        r'\butjecajima\b': 'uticajima',
+        r'\butjecaje\b': 'uticaje',
+        
+        # učinkovit
+        r'\bučinkovit\b': 'efikasan',
+        r'\bučinkovita\b': 'efikasna',
+        r'\bučinkovito\b': 'efikasno',
+        r'\bučinkovite\b': 'efikasne',
+        r'\bučinkoviti\b': 'efikasni',
+        r'\bučinkovitih\b': 'efikasnih',
+        r'\bučinkovitom\b': 'efikasnom',
+        r'\bučinkovitost\b': 'efikasnost',
+        r'\bučinkovitosti\b': 'efikasnosti',
+        r'\bučinkovitostima\b': 'efikasnostima',
+        
+        # tvrtka
+        r'\btvrtka\b': 'firma',
+        r'\btvrtke\b': 'firme',
+        r'\btvrtki\b': 'firmi',
+        r'\btvrtku\b': 'firmu',
+        r'\btvrtkom\b': 'firmom',
+        r'\btvrtkama\b': 'firmama',
+        
+        # sučelje
+        r'\bsučelje\b': 'interfejs',
+        r'\bsučelju\b': 'interfejsu',
+        r'\bsučeljem\b': 'interfejsom',
+        r'\bsučeljima\b': 'interfejsima',
+        r'\bsučelja\b': 'interfejsa',
+        r'\bkorisnička sučelja\b': 'korisnički interfejsi',
+        r'\bkorisničkih sučelja\b': 'korisničkih interfejsa',
+        
+        # zaslon
+        r'\bzaslon\b': 'ekran',
+        r'\bzaslona\b': 'ekrana',
+        r'\bzaslonu\b': 'ekranu',
+        r'\bzaslonom\b': 'ekranom',
+        r'\bzasloni\b': 'ekrani',
+        r'\bzaslonima\b': 'ekranima',
+        r'\bzaslone\b': 'ekrane',
+        
+        # tipkovnica
+        r'\btipkovnica\b': 'tastatura',
+        r'\btipkovnice\b': 'tastature',
+        r'\btipkovnici\b': 'tastaturi',
+        r'\btipkovnicu\b': 'tastaturu',
+        r'\btipkovnicom\b': 'tastaturom',
+        r'\btipkovnicama\b': 'tastaturama',
+        
+        # poveznica
+        r'\bpoveznica\b': 'link',
+        r'\bpoveznicu\b': 'link',
+        r'\bpoveznice\b': 'linkovi',
+        r'\bpoveznici\b': 'linku',
+        r'\bpoveznicom\b': 'linkom',
+        r'\bpoveznicama\b': 'linkovima',
+        
+        # tisuća
+        r'\btisuća\b': 'hiljada',
+        r'\btisuću\b': 'hiljadu',
+        r'\btisuće\b': 'hiljade',
+        r'\btisućom\b': 'hiljadom',
+        r'\btisućama\b': 'hiljadama',
+        
+        # meseci
+        r'\bsiječanj\b': 'januar',
+        r'\bsiječnja\b': 'januara',
+        r'\bsiječnju\b': 'januaru',
+        r'\bveljača\b': 'februar',
+        r'\bveljače\b': 'februara',
+        r'\bveljači\b': 'februaru',
+        r'\božujak\b': 'mart',
+        r'\božujka\b': 'marta',
+        r'\božujku\b': 'martu',
+        r'\btravanj\b': 'april',
+        r'\btravnja\b': 'aprila',
+        r'\btravnju\b': 'aprilu',
+        r'\bsvibanj\b': 'maj',
+        r'\bsvibnja\b': 'maja',
+        r'\bsvibnju\b': 'maju',
+        r'\blipanj\b': 'jun',
+        r'\blipnja\b': 'juna',
+        r'\blipnju\b': 'junu',
+        r'\bsrpanj\b': 'jul',
+        r'\bsrpnja\b': 'jula',
+        r'\bsrpnju\b': 'julu',
+        r'\bkolovoz\b': 'avgust',
+        r'\bkolovoza\b': 'avgusta',
+        r'\bkolovozu\b': 'avgustu',
+        r'\brujan\b': 'septembar',
+        r'\brujna\b': 'septembra',
+        r'\brujnu\b': 'septembru',
+        r'\blistopad\b': 'oktobar',
+        r'\blistopada\b': 'oktobru', # ispravljeno
+        r'\blistopadu\b': 'oktobru',
+        r'\bstudeni\b': 'novembar',
+        r'\bstudenog\b': 'novembra',
+        r'\bstudenom\b': 'novembru',
+        r'\bprosinac\b': 'decembar',
+        r'\bprosinca\b': 'decembra',
+        r'\bprosincu\b': 'decembru',
+        
+        # rješenje
         r'\brješenje\b': 'rešenje',
         r'\brješenja\b': 'rešenja',
+        r'\brješenju\b': 'rešenju',
         r'\brješenjem\b': 'rešenjem',
         r'\brješenjima\b': 'rešenjima',
+        
+        # vještački
         r'\bvještački\b': 'veštački',
         r'\bvještačka\b': 'veštačka',
         r'\bvještačko\b': 'veštačko',
         r'\bvještačke\b': 'veštačke',
         r'\bvještačkih\b': 'veštačkih',
+        
+        # vidio
         r'\bvidio\b': 'video',
+        
+        # smije
         r'\bsmije\b': 'smeje',
+        r'\bsmejte\b': 'smeje',
+        r'\bsmejne\b': 'smeje',
+        
+        # dolje
         r'\bdolje\b': 'dole',
         r'\bgdje\b': 'gde',
         r'\bnijesu\b': 'nisu',
         r'\busmjeruju\b': 'usmeravaju',
+        r'\buvijek\b': 'uvek',
+        
+        # polovica
+        r'\bpolovicu\b': 'polovinu',
+        r'\bpolovica\b': 'polovina',
+        r'\bpolovice\b': 'polovine',
+        r'\bpolovici\b': 'polovini',
+        
+        # svijet
+        r'\bsvijet\b': 'svet',
+        r'\bsvijeta\b': 'sveta',
+        r'\bsvijetu\b': 'svetu',
+        r'\bsvijetom\b': 'svetom',
+        r'\bsvjetovi\b': 'svetovi',
+        r'\bsvjetova\b': 'svetova',
+        r'\bsvjetovima\b': 'svetovima',
+        
+        # dijete
+        r'\bdijete\b': 'dete',
+        r'\bdjeteta\b': 'deteta',
+        r'\bdjetetu\b': 'detetu',
+        r'\bdjetetom\b': 'detetom',
+        r'\bdjeca\b': 'deca',
+        r'\bdjece\b': 'dece',
+        r'\bdjeci\b': 'deci',
+        r'\bdjecom\b': 'decom',
+        r'\bdječak\b': 'dečak',
+        r'\bdječaka\b': 'dečaka',
+        r'\bdječaku\b': 'dečaku',
+        r'\bdječakom\b': 'dečakom',
+        r'\bdječaci\b': 'dečaci',
+        r'\bdječacima\b': 'dečacima',
+        r'\bdjevojčica\b': 'devojčica',
+        r'\bdjevojčice\b': 'devojčice',
+        r'\bdjevojčici\b': 'devojčici',
+        r'\bdjevojčicu\b': 'devojčicu',
+        r'\bdjevojčicom\b': 'devojčicom',
+        r'\bdjevojčicama\b': 'devojčicama',
+        
+        # tijelo
+        r'\btijelo\b': 'telo',
+        r'\btijela\b': 'tela',
+        r'\btijelu\b': 'telu',
+        r'\btijelom\b': 'telom',
+        r'\btijelima\b': 'telima',
+        
+        # vrijeme
+        r'\bvrijeme\b': 'vreme',
+        r'\bumjesto\b': 'umesto',
+        r'\bmjesto\b': 'mesto',
+        r'\bmjesta\b': 'mesta',
+        
+        # vjerojatno
+        r'\bvjerovatno\b': 'verovatno',
+        r'\bvjerojatno\b': 'verovatno',
+        r'\bvjerovati\b': 'verovati',
+        r'\bnevjerojatno\b': 'neverovatno',
+        r'\bnevjerovatno\b': 'neverovatno',
+        r'\bnevjerojatan\b': 'neverovatan',
+        r'\bnevjerovatan\b': 'neverovatan',
+        r'\bnevjerojatna\b': 'neverovatna',
+        r'\bnevjerovatna\b': 'neverovatna',
+        r'\bnevjerojatne\b': 'neverovatne',
+        r'\bnevjerovatne\b': 'neverovatne',
+        r'\bnevjerojatnih\b': 'neverovatnih',
+        r'\bnevjerovatnih\b': 'neverovatnih',
+        r'\bvjerojatnost\b': 'verovatnoća',
+        r'\bvjerovatnost\b': 'verovatnoća',
+        r'\bvjerojatnosti\b': 'verovatnoće',
+        r'\bvjerovatnosti\b': 'verovatnoće',
+        
+        # primjerno
+        r'\bprimjerno\b': 'primereno',
+        r'\bneprimjerno\b': 'neprimereno',
+        r'\bprimerno\b': 'primereno',
+        r'\bneprimerno\b': 'neprimereno',
+        
+        # vidjeti
+        r'\bvidjeti\b': 'videti',
+        r'\bvidjeće\b': 'videće',
+        r'\bvidjećeš\b': 'videćeš',
+        r'\bvidjećemo\b': 'videćemo',
+        r'\bvidjećete\b': 'videćete',
+        
+        # donijeti
+        r'\bdonijeti\b': 'doneti',
+        r'\bdonijeće\b': 'doneće',
+        r'\bdonijećeš\b': 'donećeš',
+        r'\bdonijećemo\b': 'donećemo',
+        r'\bdonijećete\b': 'donećete',
+        
+        # dijeliti
+        r'\bdijeliti\b': 'deliti',
+        r'\bdijeliće\b': 'deliće',
+        r'\bdijelićeš\b': 'delićeš',
+        r'\bdijelićemo\b': 'delićemo',
+        r'\bdijelićete\b': 'delićete',
+        
+        # htjeti
+        r'\bhtjeti\b': 'hteti',
+        r'\bhtjeće\b': 'hteće',
+        r'\bhtjećeš\b': 'htećeš',
+        r'\bhtjećemo\b': 'htećemo',
+        r'\bhtjećete\b': 'htećete',
+        
+        # riješiti
+        r'\briješiti\b': 'rešiti',
+        r'\briješiće\b': 'rešiće',
+        r'\briješeno\b': 'rešeno',
+        
+        # rješavati
+        r'\brješavati\b': 'rešavati',
+        r'\brješava\b': 'rešava',
+        r'\brješavaju\b': 'rešavaju',
+        r'\brješavaš\b': 'rešavaš',
+        r'\brješavamo\b': 'rešavamo',
+        r'\brješavate\b': 'rešavate',
+        r'\brješavao\b': 'rešavao',
+        r'\brješavala\b': 'rešavala',
+        r'\brješavali\b': 'rešavali',
+        r'\brješavanje\b': 'rešavanje',
+        r'\brješavanja\b': 'rešavanja',
+        r'\brješavanju\b': 'rešavanju',
+        r'\brješavanjem\b': 'rešavanjem',
+        r'\brješavaću\b': 'rešavaću',
+        r'\brješavaćeš\b': 'rešavaćeš',
+        r'\brješavaće\b': 'rešavaće',
+        r'\brješavaćemo\b': 'rešavaćemo',
+        r'\brješavaćete\b': 'rešavaćete',
+        
+        # promijeniti
+        r'\bpromijeniti\b': 'promeniti',
+        r'\bpromijeni\b': 'promeni',
+        r'\bpromijene\b': 'promene',
+        r'\bpromijenio\b': 'promenio',
+        r'\bpromijenila\b': 'promenila',
+        r'\bpromijenili\b': 'promenili',
+        r'\bpromijeniće\b': 'promeniće',
+        r'\bpromijenjeno\b': 'promenjeno',
+        r'\bpromijenivši\b': 'promenivši',
+        r'\bpromijenite\b': 'promenite',
+        
+        # primijeniti
+        r'\bprimijeniti\b': 'primeniti',
+        r'\bprimijeni\b': 'primeni',
+        r'\bprimijene\b': 'primene',
+        r'\bprimijenio\b': 'primenio',
+        r'\bprimijenila\b': 'primenila',
+        r'\bprimijenili\b': 'primenili',
+        r'\bprimijeniće\b': 'primeniće',
+        r'\bprimijenjeno\b': 'primenjeno',
+        r'\bprimijenivši\b': 'primenivši',
+        r'\bprimijenite\b': 'primenite',
+        
+        # izravno
+        r'\bizravno\b': 'direktno',
+        r'\bizravan\b': 'direktan',
+        r'\bizravna\b': 'direktna',
+        r'\bizravne\b': 'direktne',
+        r'\bizravnih\b': 'direktnih',
+        r'\bizravnom\b': 'direktnom',
+        r'\bizravnog\b': 'direktnog',
+        r'\bizravnoga\b': 'direktnog',
+        r'\bizravnu\b': 'direktnu',
+        r'\bizravni\b': 'direktni',
+        r'\bizravnim\b': 'direktnim',
+        
+        # razumjeti
+        r'\brazumjeti\b': 'razumeti',
+        r'\brazumjeće\b': 'razumeće',
+        
+        # Specifični medicinski/tehnički izrazi
         r'\bspokoen\b': 'spokojan',
         r'\bspokoena\b': 'spokojna',
         r'\bspokoeno\b': 'spokojno',
@@ -233,32 +591,14 @@ def to_latin(text: str) -> str:
         r'\bženicama\b': 'ženkama',
         r'\bšaljubiti\b': 'poludeti',
         r'\btrpešćine\b': 'strpljenja',
-        r'\bsmejte\b': 'smeje',
-        r'\bsmejne\b': 'smeje',
         r'\bvreže\b': 'seče',
         r'\bse smešta\b': 'maže',
         r'\bdrevne osnovice\b': 'drvene osnove',
         r'\bdrevne\b': 'drvene',
         r'\bzavari seam\b': 'zavari šav',
         r'\bseam\b': 'šav',
-        r'\buvijek\b': 'uvek',
-        r'\bpolovicu\b': 'polovinu',
-        r'\bpolovica\b': 'polovina',
-        r'\bpolovice\b': 'polovine',
-        r'\bpolovici\b': 'polovini',
-        r'\bsvijet\b': 'svet',
-        r'\bdijete\b': 'dete',
-        r'\bvrijeme\b': 'vreme',
-        r'\bumjesto\b': 'umesto',
-        r'\bvjerovatno\b': 'verovatno',
-        r'\bvjerojatno\b': 'verovatno',
-        r'\bvjerovati\b': 'verovati',
-        r'\bmjesto\b': 'mesto',
-        r'\bmjesta\b': 'mesta',
-        r'\bprimjerno\b': 'primereno',
-        r'\bneprimjerno\b': 'neprimereno',
-        r'\bprimerno\b': 'primereno',
-        r'\bneprimerno\b': 'neprimereno',
+        r'\bukuju\b': 'bodu',
+        r'\bukuje\b': 'bode',
         r'\bopakuj\b': 'obmotaj',
         r'\bopakujte\b': 'obmotajte',
         r'\bopakuje\b': 'obmotava',
@@ -276,41 +616,19 @@ def to_latin(text: str) -> str:
         r'\bserežeš\b': 'isečeš',
         r'\bsereže\b': 'iseče',
         r'\bserezati\b': 'iseći',
-        r'\bsrezati\b': 'iseći',
-        r'\bvidjeti\b': 'videti',
-        r'\bvidjeće\b': 'videće',
-        r'\bvidjećeš\b': 'videćeš',
-        r'\bvidjećemo\b': 'videćemo',
-        r'\bvidjećete\b': 'videćete',
-        r'\bdonijeti\b': 'doneti',
-        r'\bdonijeće\b': 'doneće',
-        r'\bdonijećeš\b': 'donećeš',
-        r'\bdonijećemo\b': 'donećemo',
-        r'\bdonijećete\b': 'donećete',
-        r'\bdijeliti\b': 'deliti',
-        r'\bdijeliće\b': 'deliće',
-        r'\bdijelićeš\b': 'delićeš',
-        r'\bdijelićemo\b': 'delićemo',
-        r'\bdijelićete\b': 'delićete',
-        r'\bhtjeti\b': 'hteti',
-        r'\bhtjeće\b': 'hteće',
-        r'\bhtjećeš\b': 'htećeš',
-        r'\bhtjećemo\b': 'htećemo',
-        r'\bhtjećete\b': 'htećete',
-        r'\briješiti\b': 'rešiti',
-        r'\briješiće\b': 'rešiće',
-        r'\briješeno\b': 'rešeno',
-        r'\bpromijeniti\b': 'promeniti',
-        r'\bpromijeniće\b': 'promeniće',
-        r'\bpromijenjeno\b': 'promenjeno',
-        r'\brazumjeti\b': 'razumeti',
-        r'\brazumjeće\b': 'razumeće',
-        r'\bukuju\b': 'bodu',
-        r'\bukuje\b': 'bode'
+        r'\bsrezati\b': 'iseći'
     }
     
+    def preserve_case(match, repl):
+        matched_text = match.group(0)
+        if matched_text.isupper():
+            return repl.upper()
+        if matched_text and matched_text[0].isupper():
+            return repl[0].upper() + repl[1:] if len(repl) > 1 else repl.upper()
+        return repl.lower()
+
     for pattern, repl in replacements.items():
-        text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+        text = re.sub(pattern, lambda m, r=repl: preserve_case(m, r), text, flags=re.IGNORECASE)
         
     return text
 
@@ -632,17 +950,34 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "     * 'you know' prevedi kao 'znate' ili izostavi ako je suvišno.\n"
             "     * 'i mean' prevedi kao 'hoću reći' ili 'mislim'.\n"
             "     * Kolokvijalno 'like' (npr. 'he was like...') izostavi ili prevedi prilagođeno kontekstu.\n"
-            "4. POŠTOVANJE LIMITA KARAKTERA:\n"
+            "4. STROGO ZABRANJENI REGIONALIZMI (HRVATSKI / IJEKAVSKI IZRAZI):\n"
+            "   - Zabranjeno je koristiti reči: 'tijekom', 'tjedan', 'tisuća', 'sustav', 'uvjet', 'utjecaj', 'učinkovitost', 'tvrtka', 'sučelje', 'zaslon', 'tipkovnica', 'poveznica'.\n"
+            "   - Koristi isključivo srpske ekavske zamene: 'tokom', 'nedelja', 'hiljada', 'sistem', 'uslov', 'uticaj', 'efikasnost', 'firma' (ili 'kompanija'), 'interfejs', 'ekran', 'tastatura', 'link' (ili 'veza').\n"
+            "   - Zabranjeni su svi ijekavski oblici: 'dio' (mora biti 'deo'), 'spriječiti' ('sprečiti'), 'dvjesto' ('dvesta'), 'promijeniti' ('promeniti'), 'riješiti' ('rešiti'), 'vrijeme' ('vreme'), 'uvijek' ('uvek').\n"
+            "   - NIKADA nemoj koristiti hrvatske nazive meseci (siječanj, veljača...). Koristi isključivo: januar, februar, mart, april, maj, jun, jul, avgust, septembar, oktobar, novembar, decembar.\n"
+            "5. PRIMERI DOBROG I LOŠEG PREVODA:\n"
+            "   - Engleski: 'During this week, the system prevented the spread of dengue.'\n"
+            "     * LOŠE (Hrvatski/Ijekavski): 'Tijekom ovog tjedna, sustav je spriječio širenje denga groznice.'\n"
+            "     * DOBRO (Srpski ekavica): 'Tokom ove nedelje, sistem je sprečio širenje denga groznice.'\n"
+            "   - Engleski: 'Align the smaller tube to fit the interface.'\n"
+            "     * LOŠE (Hrvatski/Pasivan): 'Poravnajte manju cijev da odgovara sučelju.'\n"
+            "     * DOBRO (Srpski ekavica): 'Poravnaj manju cev da odgovara interfejsu.'\n"
+            "6. POŠTOVANJE LIMITA KARAKTERA:\n"
             "   - Tvoj prevod (translated_text) za svaki segment mora biti kraći ili jednak prosleđenom LIMITU kako bi se izgovorio u predviđenom vremenu. Koristi kraće sinonime ili sažmi rečenicu ako je potrebno.\n"
-            "5. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove.\n\n"
+            "7. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove. Polje 'id' u svakom objektu MORA biti ceo broj koji tačno odgovara indeksu segmenta iz ulaza (npr. za segment '[seg-5]' id mora biti 5).\n\n"
             "FORMAT ODGOVORA:\n"
-            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica):\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez ikakvog uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica). Polje 'id' mora biti tačan indeks segmenta:\n"
             "{\n"
             "  \"segments\": [\n"
             "    {\n"
-            "      \"id\": 9999,\n"
+            "      \"id\": 0,\n"
             "      \"analysis\": \"Kratka analiza padeža, roda i skraćenica.\",\n"
             "      \"translated_text\": \"Prevedeni tekst na srpskom jeziku koji poštuje limit karaktera.\"\n"
+            "    },\n"
+            "    {\n"
+            "      \"id\": 1,\n"
+            "      \"analysis\": \"Analiza drugog segmenta.\",\n"
+            "      \"translated_text\": \"Prevedeni tekst drugog segmenta.\"\n"
             "    }\n"
             "  ],\n"
             "  \"used_terms\": {\n"
@@ -928,8 +1263,18 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bvisokoj toploti\b', 'visokom toplotom', text, flags=re.IGNORECASE)
     text = re.sub(r'\bkoristi visokoj toploti\b', 'koristi visoku toplotu', text, flags=re.IGNORECASE)
     text = re.sub(r'\bkoristi visoku temperaturu za peč\b', 'koristi visoku toplotu da utisne ivicu', text, flags=re.IGNORECASE)
-
-
+    # 18.5 Dodatna stilska čišćenja za Ej Aj i neprirodne fraze
+    text = re.sub(r'\bEj-Aj\b', 'Ej Aj', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bEj-Aja\b', 'Ej Aja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bEj-Aju\b', 'Ej Aju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bEj-Ajem\b', 'Ej Ajem', text, flags=re.IGNORECASE)
+    
+    # Neprirodne kolokvijalne fraze
+    text = re.sub(r'\bpostaje ludo\b', 'postaje zanimljivo', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bpostaju lude\b', 'postaju zanimljive', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bludo je kako\b', 'neverovatno je kako', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bstvari postaju lude\b', 'stvari postaju zanimljive', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bovde postaje ludilo\b', 'ovde situacija postaje zanimljiva', text, flags=re.IGNORECASE)
 
     # 19. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
@@ -1219,17 +1564,32 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "   - MORFOLOGIJA I SLAGANJE: Strogo pazi na morfološko slaganje prideva i imenica po rodu, broju i padežu (npr. 'drveni komad' ili 'komad drveta', a nikako 'komad drvenog'; 'jednake cilindriće' u akuzativu množine, a ne 'jednake cilindri'; 'zavar je gladak' u muškom rodu, a ne 'glatko').\n"
             "   - PRIRODNOST FRAZA: Izbegavaj bukvalne prevode engleskih kolokvijalnih konstrukcija (npr. 'this is where it gets crazy' prevodi kao 'sada stvari postaju zanimljive' ili 'ovde nastaje preokret', a nikako 'ovde postaje ludilo').\n"
             "   - DISKURSNE MARKERE I KOHEZIJU lekturiši prirodno, a ne doslovno (npr. 'so' kao 'Dakle,'/'Zato,' na početku ili 'pa'/'tako da' u sredini; 'now' kao 'E sad,'/'Evo,'; 'well' kao 'Pa,'/'Dobro,' ili 'Međutim,'; 'basically' kao 'u suštini'/'praktično'; 'actually' kao 'zapravo'/'u stvari'; 'honestly' kao 'iskreno'; 'right?' kao 'zar ne?'/'jel tako?'; 'you know' i 'like' izostavi ili prilagodi kontekstu).\n"
-            "4. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
-            "5. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
-            "6. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
+            "4. STROGO ZABRANJENI REGIONALIZMI (HRVATSKI / IJEKAVSKI IZRAZI):\n"
+            "   - Izbaci iz lekture i ispravi reči: 'tijekom', 'tjedan', 'tisuća', 'sustav', 'uvjet', 'utjecaj', 'učinkovitost', 'tvrtka', 'sučelje', 'zaslon', 'tipkovnica', 'poveznica'.\n"
+            "   - Koristi isključivo srpske ekavske zamene: 'tokom', 'nedelja', 'hiljada', 'sistem', 'uslov', 'uticaj', 'efikasnost', 'firma', 'interfejs', 'ekran', 'tastatura', 'link'.\n"
+            "   - Ispravi sve ijekavske oblike: 'dio' -> 'deo', 'spriječiti' -> 'sprečiti', 'dvjesto' -> 'dvesta', 'promijeniti' -> 'promeniti', 'riješiti' -> 'rešiti', 'uvijek' -> 'uvek'.\n"
+            "   - Ispravi hrvatske nazive meseci (siječanj, veljača...) u srpske ekavske nazive (januar, februar...).\n"
+            "5. PRIMERI DOBROG I LOŠEG PREVODA U LEKTURI:\n"
+            "   - Grubi prevod (SRB): 'Tijekom ovog tjedna sustav je spriječio širenje bolesti.'\n"
+            "     * LEKTURA (dobro): 'Tokom ove nedelje sistem je sprečio širenje bolesti.'\n"
+            "   - Grubi prevod (SRB): 'Poravnajte manju cijev da odgovara sučelju.'\n"
+            "     * LEKTURA (dobro): 'Poravnaj manju cev da odgovara interfejsu.'\n"
+            "6. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
+            "7. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
+            "8. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
             "FORMAT ODGOVORA:\n"
-            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica):\n"
+            "Odgovori isključivo u validnom JSON formatu prema sledećoj šemi, bez uvodnog ili pratećeg teksta. Neka polje 'analysis' bude izuzetno kratko (maksimalno jedna rečenica). Polje 'id' u svakom objektu MORA biti ceo broj koji tačno odgovara indeksu jedinstvenog segmenta (npr. za segment '[seg-5]' id mora biti 5):\n"
             "{\n"
             "  \"segments\": [\n"
             "    {\n"
-            "      \"id\": 9999,\n"
+            "      \"id\": 0,\n"
             "      \"analysis\": \"Kratka analiza lekture.\",\n"
             "      \"refined_text\": \"Lekturisani i skraćeni srpski prevod.\"\n"
+            "    },\n"
+            "    {\n"
+            "      \"id\": 1,\n"
+            "      \"analysis\": \"Kratka analiza lekture drugog segmenta.\",\n"
+            "      \"refined_text\": \"Lekturisani i skraćeni srpski prevod drugog segmenta.\"\n"
             "    }\n"
             "  ]\n"
             "}\n\n"

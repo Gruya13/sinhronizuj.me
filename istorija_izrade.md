@@ -2773,3 +2773,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Runda 3 Evaluacija:** Uspešno pokrenuta evaluacija nad svih 5 test video snimaka. Svi testovi su prošli stabilno, a prosek ocena LLM sudije se popeo na **7.9/10**, sa značajnim skokom na videu 2 (**8/10** u odnosu na ranijih 6.0/10) i videu 3 (**8/10** u odnosu na ranijih 7.5/10).
     * **Dokumentacija:** Ažuriran fajl `sicret doc/evaluacija_i_poredjenje_testova.md` sa novim podacima i kompletnom uporednom analizom sve tri runde testova.
 - **Status:** Završeno. Sve tri faze su uspešno implementirane, testirane (19/19 pytest prolaza i namenska test skripta), i verifikovane kroz treću rundu masovne evaluacije.
+
+### 14.06.2026. 11:45 — Otklanjanje regionalizama (hrvatskih/ijekavskih izraza), ispravka rodnih neusaglašenosti i baga sa ID 9999
+- **Zahtevi:** Otkloniti preostale ijekavizme i hrvatske izraze koje je korisnik primetio, popraviti neprirodne rečenice i osigurati da se lektura primenjuje na sve segmente.
+- **Urađeno:**
+    * **Otklanjanje baga sa ID 9999:** Uočio sam da su primeri formata odgovora u `translator_prompt` i `lektor_prompt` koristili fiksni `"id": 9999`. LLM je to dosledno prepisivao, pa je JSON parser uspevao da učita samo 1 segment po batch-u, dok je ostalih 95% propadalo i išlo na neobrađen regex fallback. Zamenio sam to dinamičkim primerima (ID 0, 1) i uputstvom da ID mora odgovarati indeksu segmenta.
+    * **Proširenje padeža i oblika u to_latin:** Proširio deterministički rečnik zamena za sve gramatičke padeže i glagolske oblike (npr. *tjedan*, *sustav*, *uvjet*, *utjecaj*, *sučelje*, *tvrtka*, *poveznica*, *tisuća*, *spriječiti*, *promijeniti*, *primijeniti*, *rješavati*, *tijelo*, *dijete*, *vjerojatno*, *učinkovit*, *izravno*). Rešen problem sa dupliranim ključem za *sučelja*.
+    * **Ispravka rodnih neusaglašenosti:** Uvedene namenske zamene za fraze (npr. `ovom tjednu` -> `ovoj nedelji`) kako bi se izbegli gramatički neispravni oblici kao što je "u ovom nedelji".
+    * **Stilska čišćenja u clean_translation_text:** Dodao dodatne regex zamene za prepoznavanje i korekciju neprirodnih konstrukcija modela ("postaje ludo" -> "postaje zanimljivo", "Ej-Aj" -> "Ej Aj").
+    * **Verifikacija:** Proširena test skripta `scratch/test_untranslatable_and_negations.py` novim test primerima za sve padeže. Svi testovi, kao i kompletan `pytest` paket (19/19), uspešno prolaze.
+- **Status:** Završeno. Popravke su uspešno implementirane i lokalno verifikovane.
