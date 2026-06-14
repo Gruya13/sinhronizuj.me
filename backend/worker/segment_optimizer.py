@@ -40,9 +40,44 @@ def optimize_segments_for_translation(segments: list, min_duration: float = 1.0,
         else:
             merged.append(merge_segment_list(buffer))
 
+    # Korak 1.5: Semantičko spajanje zavisnih segmenata (rečenica prekinuta na pola)
+    semantic_merged = []
+    i = 0
+    while i < len(merged):
+        curr_seg = merged[i]
+        
+        if i == len(merged) - 1:
+            semantic_merged.append(curr_seg)
+            break
+            
+        next_seg = merged[i+1]
+        curr_text = curr_seg.get("text", "").strip()
+        
+        # Proveravamo da li se završava interpunkcijom (. ! ? ...)
+        ends_with_punctuation = any(curr_text.endswith(p) for p in ['.', '!', '?', '...'])
+        
+        # Proveravamo pauzu između segmenata
+        pause_duration = next_seg["start"] - curr_seg["end"]
+        
+        # Zbirno trajanje ako se spoje
+        combined_duration = next_seg["end"] - curr_seg["start"]
+        
+        # Spajamo ako se trenutni ne završava interpunkcijom, pauza je mala (< 0.45s) i zbirno trajanje ne prelazi max_duration
+        if not ends_with_punctuation and pause_duration < 0.45 and combined_duration <= max_duration:
+            curr_seg = {
+                "start": curr_seg["start"],
+                "end": next_seg["end"],
+                "text": curr_text + " " + next_seg.get("text", "").strip()
+            }
+            merged[i+1] = curr_seg
+            i += 1
+        else:
+            semantic_merged.append(curr_seg)
+            i += 1
+
     # Korak 2: Podela predugih segmenata
     final_segments = []
-    for seg in merged:
+    for seg in semantic_merged:
         final_segments.extend(split_on_punctuation(seg, max_duration))
 
     # Re-indeksiranje segmenata od 0

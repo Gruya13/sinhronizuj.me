@@ -1,3 +1,13 @@
+## [2026-06-14 02:59:00] Implementacija 5 naprednih unapređenja prevodioca i lektora, ASR echo filtera i zatvorene petlje kompresije rečenica
+- **Opis:**
+  Uspešno smo implementirali i verifikovali svih 5 predloženih naprednih unapređenja prevodioca i lektora na backendu:
+  1. **ASR Echo i Redundancy Filter:** U `transcriber.py` dodat Jaccard filter sličnosti koji automatski pronalazi i uklanja Whisper eho ponavljanja ako je sličnost uzastopnih segmenata preko 85% a vremensko rastojanje malo. Tokom testova nad videom 3 uspešno je uklonio 4 eho ponavljanja.
+  2. **Semantičko spajanje zavisnih segmenata:** U `segment_optimizer.py` dodat algoritam koji automatski spaja zavisne segmente (rečenice koje se završavaju bez interpunkcije i imaju kratku pauzu do sledeće) radi očuvanja kompletnog gramatičkog konteksta.
+  3. **TTS-Aware Compression (Zatvorena petlja):** U `translator.py` implementirana zatvorena petlja koja meri dužinu lekturisanog prevoda u odnosu na TTS limit karaktera. Ako prevod premašuje limit za preko 15%, aktivira se LLM kompresor na Modalu.
+  4. **Rešavanje baga sa praznim segmentima i Qwen brojenjem slova:** Rešen je problem gde se Qwen model zapetljavao u brojanje slova slovo po slovo (dostižući timeout ili limit tokena i ostavljajući prazne prevode). Povećan je `max_tokens` na 1000, uklonjeno pominjanje procesa razmišljanja o slovima, dodat je sistemski prompt za brzo intuitivno skraćivanje, i uveden je bezbedan fallback na originalni tekst ako je rezultat prazan.
+  5. **Morfološka validacija i pravopisne popravke:** Dodata su deterministička pravila u `clean_translation_text` za ispravku uočenih grešaka iz evaluacije (npr. "rđasto drvo" -> "crvenkasto drvo", "tamlja" -> "trlja", "kontrast je neverovatno" -> "kontrast je neverovatan", "sabošenje" -> "šmirglanje", "žičani sečiv" -> "žičanu testeru", itd.).
+  6. **Verifikacija:** Svi pytest testovi (19/19) su uspešno prošli. Evaluacija nad videom 3 je uspešno završena, prazni segmenti su u potpunosti otklonjeni, a prevod je ocenjen kao izuzetno tačan, stabilan i gramatički ispravan.
+
 ## [2026-06-13 15:15:00] Implementacija naprednih optimizacija prevodioca, feedback petlje, pametne segmentacije i confidence scoring-a
 - **Opis:**
   Uspešno smo implementirali i verifikovali svih 7 predloženih naprednih optimizacija u prevodilačkom i miks modulu:

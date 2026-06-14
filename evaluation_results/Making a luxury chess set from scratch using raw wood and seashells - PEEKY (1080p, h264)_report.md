@@ -1,69 +1,48 @@
 # Izveštaj o Evaluaciji Prevoda Videa
 
 **Video:** `Making a luxury chess set from scratch using raw wood and seashells - PEEKY (1080p, h264).mp4`
-**Datum evaluacije:** 2026-06-13 22:02:51
-**Trajanje obrade:** ASR: 55.5s | Prevođenje: 267.0s | Ukupno: 376.4s
+**Datum evaluacije:** 2026-06-14 02:58:33
+**Trajanje obrade:** ASR: 70.9s | Prevođenje: 287.9s | Ukupno: 381.9s
 
 ---
 
 <think>
-Okay, let's tackle this translation evaluation. First, I need to check each segment for accuracy. For example, in Seg 0, "drvenog" should be "drvena" to match the gender of "komad." Then, Seg 1 uses "jednake cilindri" which is missing the plural form "cilindri." 
+Okay, let's see. I need to evaluate this English-to-Serbian translation based on four criteria: accuracy, tone/naturalness, glossary alignment, and segment length/speech tempo. 
 
-Next, tone and naturalness. The Serbian translations should sound natural. Seg 3 is empty, which is an issue. Seg 4 "ona iznosi" might be better as "ona izvlači" for "brings out." 
+Starting with accuracy. I'll check if the meaning is preserved. For example, in Seg 0, "basic dark piece of wood" is translated as "tamnim komadom drveta." That seems okay. But in Seg 14, "This is where it gets crazy" is translated as "Stvari postaju zanimljive." "Crazy" here might mean more intense or challenging, so "zanimljive" (interesting) might not capture the intended meaning. Maybe "postaju teške" or "zahtevne" would be better.
 
-Glossary alignment: Terms like "žičanu pilu" in Seg 15 are correct. But "drvene podloge" in Seg 17 should be "drvene osnove" for consistency.
+Tone and naturalness: The translation should sound natural in Serbian. Seg 3 is just "Onda," which is correct. Seg 15 uses "ručno isese složene oblike," which is natural. However, in Seg 17, "visokoj toploti da stampa granicu" might be better as "visokom toplotom da stampa granicu." Also, "stampati" is correct, but maybe "iskovati" could be more natural in this context.
 
-Speech tempo: Some segments are too long. Seg 27 combines two sentences, which might be too long for the given duration. Also, Seg 21-24 are repeated, which might be a formatting issue.
+Glossary alignment: Check technical terms. "Wire saw" is "žičana testerka," which is correct. "Wet sanding" is "vlažno šmirgljenje," which is accurate. "Chess set" is "šah," which is correct. No obvious issues here.
 
-Overall, the translation has some grammatical errors and inconsistencies. The quality score would be around 6-7, needing corrections in grammar, consistency, and segment length.
+Segment length and tempo: Serbian is 20-30% longer. Let's check the durations. Seg 0 is 3.4s, which is short. Seg 1 is 5.4s, which is okay. Seg 23 is 5.8s, but the Serbian translation is longer. The original English is 5.8s, but the Serbian might be a bit long for that duration. Also, Seg 24 is 3.3s, and the translation "Kada je briše, kontrast je neverovatno." The last part is missing an article or preposition. It should be "neverovatan" instead of "neverovatno." Also, the segment might be too short for the content.
+
+Other issues: Seg 20, 21, 22 are duplicates. The translation is the same, which is correct, but maybe the repetition is intentional. Seg 25 combines two sentences into one, which might affect clarity. Also, in Seg 24, "neverovatno" is an adjective but used as an adverb here. It should be "neverovatan."
+
+So, overall, the translation is mostly accurate but has some issues with naturalness and segment length. The tone is generally correct for the genre, which seems to be a descriptive video. Some segments are too long or too short, and there are minor grammatical errors.
 </think>
 
 # Izveštaj o kvalitetu prevoda
 
 ## Rezime kvaliteta prevoda
-Prevod je u većem delu tačan i prirodan, ali postoji nekoliko gramatičkih grešaka, nekonzistentnosti u terminologiji i problema sa dužinom rečenica. Tekst zvuči prirodno za opisivanje umetničkog procesa, ali neki segmenti zahtevaju revidiranje radi bolje čitljivosti i gramatičke ispravnosti.
+Prevod je u većem delu tačan i prirodan, ali postoji nekoliko grešaka u gramatici, izboru reči i dužini segmenta. Tekst zadržava deskriptivni ton, prikladan za video sa sadržajem o majstorstvu. Tekuća terminologija je korektna, ali postoji prostor za unapređenje u prirodnosti i ritmu rečenica.
 
-## Detaljna analiza po kriterijumima
+## Detaljna analiza
 
 ### 1. Tačnost (Accuracy)
-- **Dobri primeri**: Seg 15 ("situ žičanu pilu") i Seg 26 ("kontrast je nevjerovatan") tačno prenose tehničke detalje.
-- **Loši primeri**: 
-  - Seg 0: "drvenog" (neodgovara rod komada drvenog) → "drvena".
-  - Seg 18: "ispunjava centrale" (netačna akcija) → "ispunjavanje centara".
+- **Dobro:** Segment 15 ("ručno isese složene oblike") tačno prenosi tehniku. Segment 27 ("prilagođeni kineski šah") je korektan.
+- **Loše:** Segment 14 ("Stvari postaju zanimljive") ne odražava intenzitet "crazy" iz originala. Segment 24 ("neverovatno" umesto "neverovatan") ima gramatičku grešku.
 
-### 2. Tonalnost i prirodnost (Tone/Naturalness)
-- **Dobri primeri**: Seg 14 ("ovde postaje ludilo") prirodno prenosi emocionalnu notu.
-- **Loši primeri**:
-  - Seg 3: Prazan segment (treba "Onda").
-  - Seg 4: "ona iznosi" (nepravilan izraz) → "ona izvlači".
+### 2. Ton i prirodnost (Tone/Naturalness)
+- **Dobro:** Segment 17 ("visokoj toploti da stampa granicu") je prirodan. Segment 15 koristi "žičanu testeru," što je tehnološki tačno.
+- **Loše:** Segment 17 bi mogao koristiti "iskovati" umesto "stampati." Segment 24 ("neverovatno") nije gramatički ispravan u kontekstu.
 
-### 3. Terminologija (Glossary)
-- **Dobri primeri**: "žičana pila" (Seg 15) i "mokro šljofanje" (Seg 28) su tehnički tačni.
-- **Loši primeri**:
-  - Seg 17: "drvene podloge" → "drvene osnove" (konzistentniji izraz).
-  - Seg 12: "secu tradicionalne figure" → "iseču" (precizniji glagol).
+### 3. Uklapanje rečnika (Glossary Alignment)
+- Sve tehničke reči (žičana testerka, vlažno šmirgljenje, šah) su ispravno prevedene. Nema inkonzistentnosti u terminologiji.
 
-### 4. Tempo i dužina rečenica (Speech Tempo)
-- **Problematični segmenti**:
-  - Seg 27: Kombinacija dve rečenice u jednu (prema 5.8s) → razdvojiti.
-  - Seg 21-24: Ponavljanje istog sadržaja bez razloga → uklanjanje duplikata.
-  - Seg 18: "ispunjava centrale" → preduže rečenicu za 1-2s.
+### 4. Dužina segmenta i tempo (Speech Tempo)
+- **Problematični segmenti:** Segment 23 (5.8s) je predužan za originalni sadržaj. Segment 24 (3.3s) je prekratak za kompletnu poruku. Segment 25 kombinuje dve rečenice, što može izazvati konfuziju.
 
-## Spisak grešaka po segmentima
+## Spisak grešaka
 
-| ID | Trenutni prevod | Problem | Predlog |
-|----|------------------|--------|---------|
-| 0 | drvenog | Neodgovara rod | drvena |
-| 1 | jednake cilindri | Nedostaje plural | jednake cilindriće |
-| 3 | [prazno] | Nedostaje reč | Onda |
-| 4 | ona iznosi | Nepravilan izraz | ona izvlači |
-| 17 | drvene podloge | Nekonzistentnost | drvene osnove |
-| 18 | ispunjava centrale | Netačna akcija | ispunjava centra |
-| 27 | spojene rečenice | Preduže | razdvojiti u dve rečenice |
-
-## Ukupna ocena kvaliteta
-**Ocena: 6.5/10**
-
-## Preporuke za unapređenje
-1. **Gramatička ispravnost**: Fokusirati se na pravilnost roda i broja imenica i glagola.
-2. **Terminološka konzistentnost**: Korišćenje istih izraza za "osnove"
+| ID

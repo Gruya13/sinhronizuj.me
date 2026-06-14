@@ -12,6 +12,41 @@ def clean_thought_tags(text: str) -> str:
             text = text.split(f"<{tag}>")[0]
     return text.strip()
 
+def jaccard_similarity(str1: str, str2: str) -> float:
+    if not str1 or not str2:
+        return 0.0
+    words1 = set(re.findall(r'\w+', str1.lower()))
+    words2 = set(re.findall(r'\w+', str2.lower()))
+    if not words1 or not words2:
+        return 0.0
+    return len(words1.intersection(words2)) / len(words1.union(words2))
+
+def filter_asr_redundancies(segments: list) -> list:
+    if not segments:
+        return []
+    filtered = []
+    i = 0
+    while i < len(segments):
+        curr_seg = segments[i]
+        if i == len(segments) - 1:
+            filtered.append(curr_seg)
+            break
+        next_seg = segments[i+1]
+        sim = jaccard_similarity(curr_seg.get("text", ""), next_seg.get("text", ""))
+        time_gap = next_seg["start"] - curr_seg["end"]
+        if sim > 0.8 and (time_gap < 2.0 or time_gap < 0):
+            print(f"[ASR FILTER] Detektovan eho/duplikat između segmenata {i} i {i+1}. Zadržavam duži.", flush=True)
+            curr_len = len(curr_seg.get("text", ""))
+            next_len = len(next_seg.get("text", ""))
+            if next_len > curr_len:
+                curr_seg = next_seg
+            segments[i+1] = curr_seg
+            i += 1
+        else:
+            filtered.append(curr_seg)
+            i += 1
+    return filtered
+
 def segment_by_sentences(segments):
     if not segments:
         return []
@@ -248,6 +283,7 @@ def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callb
             sensevoice_output = future_sensevoice.result()
             
         raw_segments = whisper_output.get("segments", [])
+        raw_segments = filter_asr_redundancies(raw_segments)
         sentence_segments = segment_by_sentences(raw_segments)
         
         sensevoice_text = ""

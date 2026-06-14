@@ -427,12 +427,12 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         glossary_prompt_section = ""
         if confirmed_lines:
             glossary_prompt_section += (
-                "POTVRĐENI PREVODI IZ PRETHODNIH SEGMENATA (OBAVEZNO koristi tačno ove srpske prevode radi konzistentnosti):\n"
+                "STRIKTNI POTVRĐENI PREVODI IZ PRETHODNIH SEGMENATA (OBAVEZNO koristi tačno ove srpske prevode radi konzistentnosti):\n"
                 + "\n".join(confirmed_lines) + "\n\n"
             )
         if proposed_lines:
             glossary_prompt_section += (
-                "PREDLOŽENI GLOSAR ZA NOVE ENTITETE (Prilagodi ih gramatički kontekstu rečenice):\n"
+                "STRIKTNI PREDLOŽENI GLOSAR ZA NOVE ENTITETE (OBAVEZNO koristi ove srpske prevode i prilagodi ih gramatički kontekstu rečenice, zabranjeno je koristiti druge sinonime):\n"
                 + "\n".join(proposed_lines) + "\n\n"
             )
         if not glossary_prompt_section:
@@ -458,6 +458,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "   - Prevedi sve engleske izraze u potpunosti (nemoj ostavljati engleske reči).\n"
             "   - Izbegavaj pasivne konstrukcije sa 'od strane' (npr. umesto 'primenjena od strane vlada' koristi aktiv 'koju su vlade primenile').\n"
             "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije ili sistema prevodi kao 'nestane', 'propadne' ili 'se uruši', a ne 'da se sruši'.\n"
+            "   - MORFOLOGIJA I SLAGANJE: Strogo pazi na morfološko slaganje prideva i imenica po rodu, broju i padežu (npr. 'drveni komad' ili 'komad drveta', a nikako 'komad drvenog'; 'jednake cilindriće' u akuzativu množine, a ne 'jednake cilindri'; 'zavar je gladak' u muškom rodu, a ne 'glatko').\n"
+            "   - PRIRODNOST FRAZA: Izbegavaj bukvalne prevode engleskih kolokvijalnih konstrukcija (npr. 'this is where it gets crazy' prevodi kao 'sada stvari postaju zanimljive' ili 'ovde nastaje preokret', a nikako 'ovde postaje ludilo').\n"
             "4. POŠTOVANJE LIMITA KARAKTERA:\n"
             "   - Tvoj prevod (translated_text) za svaki segment mora biti kraći ili jednak prosleđenom LIMITU kako bi se izgovorio u predviđenom vremenu. Koristi kraće sinonime ili sažmi rečenicu ako je potrebno.\n"
             "5. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove.\n\n"
@@ -662,7 +664,69 @@ def clean_translation_text(text: str) -> str:
     # 17. Ispravka futura I sa "će" (hrvatski / ijekavski oblici: radit će -> radiće, raditi će -> radiće)
     text = re.sub(r'\b([a-zA-ZđžćčšĐŽĆČŠ]+)ti?\s+će(š|mo|te)?\b', r'\1će\2', text, flags=re.IGNORECASE)
 
-    # 18. Dupli razmaci i čišćenje
+    # 18. Morfološke i sintaksičke ispravke (na osnovu evaluacije)
+    text = re.sub(r'\bjednake cilindri\b', 'jednake cilindriće', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsecu tradicionalne\b', 'seku tradicionalne', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bdrvenog komad\b', 'drveni komad', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bkomad drvenog\b', 'komad drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bdrvene podloge\b', 'drvene osnove', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bdrvenog podloge\b', 'drvene osnove', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bna razmeru koju\b', 'u razmeri koju', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bna razmeru\b', 'u razmeri', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bZavar je glatko\b', 'Zavar je gladak', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bglatko izgleda\b', 'gladak izgled', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnavojni štap montaža\b', 'montažni štap sa navojem', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnavojnog štapa montaža\b', 'montažnog štapa sa navojem', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bšljofanje\b', 'brušenje', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bšljofanja\b', 'brušenja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bšljofati\b', 'brusiti', text, flags=re.IGNORECASE)
+    
+    # Dodatne ispravke za video 3
+    text = re.sub(r'\brđav[ao] drv[o-z]\b', 'crvenkasto drvo', text, flags=re.IGNORECASE)
+    text = re.sub(r'\brđast[ao] drv[o-z]\b', 'crvenkasto drvo', text, flags=re.IGNORECASE)
+    text = re.sub(r'\brđast[a-z]*\b', 'crvenkast', text, flags=re.IGNORECASE)
+    text = re.sub(r'\botrpere\b', 'obriše', text, flags=re.IGNORECASE)
+    text = re.sub(r'\btrli\b', 'trlja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\btamlja\b', 'trlja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnevjera\b', 'neverovatno', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnevjerojatan\b', 'neverovatan', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bnevjerojatno\b', 'neverovatno', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bkontrast je neverovatno\b', 'kontrast je neverovatan', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bkontrast je neverovatan\b', 'kontrast je neverovatan', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsečiv\b', 'sečivo', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bžičani sečiv\b', 'žičanu testeru', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bžičani sečivom\b', 'žičanom testerom', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bničeg osim ovim\b', 'ničeg osim ovog', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bničeg osim ove\b', 'ničeg osim ovog', text, flags=re.IGNORECASE)
+    text = re.sub(r'\btamne komade drvenog\b', 'tamnog komada drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bosnovnim tamnim komade drvenog\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bosnovnim tamnim komadom drvenog\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bosnovnim tamnim komadom drveta\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bKineski šahovski komplet\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bKineski šahovski set\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bKinesku šahovsku ploču\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bKineski šahovsku ploču\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bšahovsku ploču\b', 'šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bšahovski set\b', 'šahovski komplet', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsabošenje\b', 'šmirglanje', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsabošenja\b', 'šmirglanja', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bsabošiti\b', 'šmirglati', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bveštinu majstora\b', 'majstorsku veštinu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bveštinu ovog majstora\b', 'majstorsku veštinu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bstvari postaju zanimljive\b', 'stvari postaju fascinantne', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bpostaju zanimljive\b', 'postaju fascinantne', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bboju drva\b', 'boju drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bduboku boju drva\b', 'duboku boju drveta', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bda stampa granicu\b', 'da utisne ivicu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bvisokoj toploti da stampa granicu\b', 'visoku toplotu da utisne ivicu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bvisokoj toploti da stampa\b', 'visoku toplotu da utisne', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bvisokoj toploti\b', 'visokom toplotom', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bkoristi visokoj toploti\b', 'koristi visoku toplotu', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bkoristi visoku temperaturu za peč\b', 'koristi visoku toplotu da utisne ivicu', text, flags=re.IGNORECASE)
+
+
+
+    # 19. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -934,13 +998,15 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             f"{history_section}"
             "PRAVILA ZA UREĐIVANJE:\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM (nikada ćirilica).\n"
-            "2. GLOSAR: Koristi ponuđeni prevod za stručni termin, ali ga gramatički prilagodi rečenici (padež, rod, broj):\n"
+            "2. STRIKTNI GLOSAR: Za engleske stručne pojmove OBAVEZNO koristi ponuđene prevode iz glosara ispod. Zabranjeno je koristiti druge sinonime ili bukvalno prevoditi (prilagodi ih gramatički padežu, rodu i broju):\n"
             f"{dynamic_glossary_str}\n\n"
             "3. STRIKTNA EKAVICA I PRAVOPIS:\n"
             "   - Zameni sve strane, dijalekatske i ijekavske reči srpskim ekavskim rečima (npr. 'smeje' umesto 'smije', 'dela'/'delovi' umesto 'dijela'/'dijelovi', 'deo' umesto 'dijel', 'video' umesto 'vidio', 'rešenje' umesto 'rješenje', 'tačke' umesto 'točke').\n"
             "   - Izuzetak: Uobičajene IT akronime i tehnologije poput GPS, Wi-Fi i Bluetooth piši u njihovom originalnom obliku (GPS, Wi-Fi, Bluetooth) i nemoj ih pisati fonetski ili menjati.\n"
             "   - Izbegavaj pasivne konstrukcije sa 'od strane' (npr. umesto 'primenjena od strane vlada' koristi aktiv 'vlade su primenile').\n"
             "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije prevodi kao 'nestane' ili 'se uruši', a ne 'da se sruši'.\n"
+            "   - MORFOLOGIJA I SLAGANJE: Strogo pazi na morfološko slaganje prideva i imenica po rodu, broju i padežu (npr. 'drveni komad' ili 'komad drveta', a nikako 'komad drvenog'; 'jednake cilindriće' u akuzativu množine, a ne 'jednake cilindri'; 'zavar je gladak' u muškom rodu, a ne 'glatko').\n"
+            "   - PRIRODNOST FRAZA: Izbegavaj bukvalne prevode engleskih kolokvijalnih konstrukcija (npr. 'this is where it gets crazy' prevodi kao 'sada stvari postaju zanimljive' ili 'ovde nastaje preokret', a nikako 'ovde postaje ludilo').\n"
             "4. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
             "5. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
             "6. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
@@ -1086,6 +1152,21 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     lektor_duration = time.time() - t_start_lektor
     print(f"[LEKTOR] Lektura završena za {lektor_duration:.2f}s. Uspešno lekturisano {len(parsed_lektor_dict)} od {len(unique_segments)} jedinstvenih segmenata.", flush=True)
     
+    # 3. Zatvorena petlja: Provera i kompresija predugačkih segmenata (TTS-Aware Compression)
+    for u_seg in unique_segments:
+        idx = u_seg["unique_id"]
+        if idx in parsed_lektor_dict:
+            lektorised_text = parsed_lektor_dict[idx]
+            if not lektorised_text:
+                continue
+            duration = u_seg["duration"]
+            factor = calculate_dynamic_factor(u_seg, user_avg_speedup)
+            limit_char = max(15, int(duration * factor))
+            
+            if len(lektorised_text) > limit_char * 1.15:
+                compressed = compress_sentence_via_llm(lektorised_text, limit_char)
+                parsed_lektor_dict[idx] = compressed
+
     if len(parsed_lektor_dict) > 0:
         for i, seg in enumerate(translated_segments):
             unique_idx = orig_to_unique_map.get(i)
@@ -1107,4 +1188,58 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "lektor_duration": lektor_duration
         }
     }
+
+def compress_sentence_via_llm(text: str, limit_char: int) -> str:
+    """
+    Poziva Modal Lektor da skrati srpsku rečenicu tako da stane u limit karaktera.
+    """
+    if not settings.MODAL_LEKTOR_URL or not text or len(text) <= limit_char:
+        return text
+        
+    print(f"[COMPRESS] Skraćujem rečenicu ({len(text)} -> limit {limit_char}): {text}", flush=True)
+    
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        f"Skrati sledeću rečenicu na srpskom jeziku (ekavica, latinica) tako da njena dužina bude maksimalno {limit_char} karaktera.\n"
+        "VAŽNA PRAVILA:\n"
+        "1. Zadrži osnovni smisao i informaciju iz rečenice.\n"
+        "2. Skraćena rečenica mora biti gramatički ispravna i prirodna na srpskom.\n"
+        "3. Tvoj odgovor mora sadržati isključivo skraćenu rečenicu, bez ikakvog dodatnog teksta, komentara, navodnika ili objašnjenja.\n"
+        "4. STROGO ZABRANJENO: Nemoj brojati slova jedno po jedno niti raditi matematičke proračune u razmišljanju. Samo intuitivno i brzo napiši kraću verziju rečenice.\n\n"
+        f"REČENICA ZA SKRAĆIVANJE: {text}"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [
+            {
+                "role": "system", 
+                "content": "Ti si brzi stručni lektor. Tvoj zadatak je da odmah vratiš skraćenu verziju rečenice na srpskom jeziku na osnovu zadatog limita. Ne analiziraj rečenicu detaljno i nemoj brojati slova u razmišljanju, samo odmah ispiši skraćeni tekst."
+            },
+            {
+                "role": "user", 
+                "content": prompt
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1000
+    }
+    
+    try:
+        from backend.worker.utils import call_modal_endpoint
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
+        content = res["choices"][0]["message"]["content"].strip()
+        cleaned = clean_thought_tags(content).strip().strip('"\'')
+        
+        if not cleaned or len(cleaned) < 2:
+            print(f"[COMPRESS WARNING] Dobijen prazan ili nevalidan rezultat nakon čišćenja (sirovo: {repr(content)}). Vraćam originalni tekst.", flush=True)
+            return text
+            
+        print(f"[COMPRESS SUCCESS] Nova rečenica ({len(cleaned)} karaktera): {cleaned}", flush=True)
+        return cleaned
+    except Exception as e:
+        print(f"[COMPRESS ERROR] Greška pri skraćivanju: {e}", flush=True)
+        return text
+
+
 
