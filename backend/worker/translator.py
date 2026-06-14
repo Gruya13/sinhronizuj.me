@@ -8,6 +8,163 @@ from typing import List
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
+def mask_untranslatable(text: str) -> tuple[str, dict]:
+    if not text:
+        return text, {}
+    masks = {}
+    counter = 0
+    
+    patterns = [
+        # Kod u backtick-ovima
+        (r'`[^`]+`', 'CODE'),
+        # URL-ovi
+        (r'https?://\S+', 'URL'),
+        # Email adrese  
+        (r'\b[\w.-]+@[\w.-]+\.\w+\b', 'EMAIL'),
+        # Komande u zagradama ili reči velikim slovima koje liče na komande
+        (r'\([A-Z][A-Z0-9_]+\)', 'CMD'),
+        # Hashtag-ovi
+        (r'#\w+', 'HASHTAG'),
+        # Matematičke formule
+        (r'\d+\s*[+\-*/=]\s*\d+', 'FORMULA'),
+        # Verzije softvera
+        (r'\bv\d+\.\d+(?:\.\d+)?\b', 'VERSION'),
+    ]
+    
+    masked_text = text
+    for pattern, mask_type in patterns:
+        matches = list(re.finditer(pattern, masked_text))
+        for match in reversed(matches):
+            val = match.group(0)
+            placeholder = f'[{mask_type}_{counter}]'
+            masks[placeholder] = val
+            start, end = match.span()
+            masked_text = masked_text[:start] + placeholder + masked_text[end:]
+            counter += 1
+            
+    return masked_text, masks
+
+def unmask_text(translated_text: str, masks: dict) -> str:
+    if not translated_text or not masks:
+        return translated_text
+    for placeholder, original in masks.items():
+        translated_text = translated_text.replace(placeholder, original)
+    return translated_text
+
+def mask_segment_pair(orig_text: str, trans_text: str) -> tuple[str, str, dict]:
+    masked_orig, masks = mask_untranslatable(orig_text)
+    
+    masked_trans = trans_text
+    for placeholder, original_val in masks.items():
+        if original_val in masked_trans:
+            masked_trans = masked_trans.replace(original_val, placeholder)
+            
+    return masked_orig, masked_trans, masks
+
+
+# Boolean provera negacija radi izbegavanja dvostruke negacije na srpskom
+NEGATION_PATTERNS_ENG = [
+    r'\bnot\b', r'\bnever\b', r'\bno\b', r'\bnobody\b', r'\bnothing\b', r'\bnowhere\b',
+    r"\bdon't\b", r"\bcan't\b", r"\bwon't\b", r"\bisn't\b",
+    r"\bwouldn't\b", r"\bcouldn't\b", r"\bshouldn't\b",
+    r"\bdidn't\b", r"\bhasn't\b", r"\bhaven't\b"
+]
+
+def check_negation_preservation(original: str, translated: str) -> bool:
+    if not original:
+        return True
+    
+    has_original_negation = any(
+        re.search(p, original, re.IGNORECASE) for p in NEGATION_PATTERNS_ENG
+    )
+    
+    has_serbian_negation = bool(re.search(
+        r'\bne\b|\bne(ću|ćeš|će|ćemo|ćete|ću)\b|\bni(sam|si|je|smo|ste|su)\b|\bne(mam|maš|ma|mamo|mate|maju)\b|\bni(ko|šta|kad|kada|gde|kako|jedan|kakav|ti|ti)\b|\bni\b',
+        translated, re.IGNORECASE
+    ))
+    
+    if has_original_negation and not has_serbian_negation:
+        return False
+    return True
+
+_embedding_model = None
+
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        print("[EMBEDDING] Inicijalizujem paraphrase-multilingual-MiniLM-L12-v2 model...", flush=True)
+        from sentence_transformers import SentenceTransformer
+        _embedding_model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+    return _embedding_model
+
+def semantic_similarity(english_text: str, serbian_text: str) -> float:
+    if not english_text or not serbian_text:
+        return 1.0
+    try:
+        model = get_embedding_model()
+        embeddings = model.encode([english_text, serbian_text], convert_to_numpy=True)
+        
+        import numpy as np
+        norm_a = np.linalg.norm(embeddings[0])
+        norm_b = np.linalg.norm(embeddings[1])
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        similarity = np.dot(embeddings[0], embeddings[1]) / (norm_a * norm_b)
+        return float(similarity)
+    except Exception as e:
+        print(f"[EMBEDDING ERROR] Greška pri računanju semantičke sličnosti: {e}", flush=True)
+        return 0.8  # Fallback
+
+def retranslate_with_self_critique(english_text: str, bad_translation: str, feedback_hint: str) -> str:
+    if not settings.MODAL_LEKTOR_URL:
+        return bad_translation
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    
+    prompt = (
+        "Ti si stručni prevodilac za srpski jezik (ekavica). Prethodni prevod ima greške.\n"
+        f"Originalni engleski tekst: {english_text}\n"
+        f"Prethodni loš prevod: {bad_translation}\n"
+        f"Uočene greške / Uputstvo za ispravku: {feedback_hint}\n\n"
+        "Tvoj zadatak je da pružiš novi, ispravljeni prevod na srpskom jeziku (ekavica, latinica) koji:\n"
+        "1. U potpunosti rešava sve uočene greške i prati uputstvo.\n"
+        "2. Zvuči prirodno, koristi srpske idiome i ispravne gramatičke oblike.\n"
+        "3. Piše sve brojeve i procente slovima (npr. 'dvesta', 'pet posto').\n"
+        "4. Piše strana imena i brendove fonetski (npr. 'Klod', 'Doker') osim GPS, Wi-Fi, Bluetooth.\n"
+        "5. Tvoj odgovor mora sadržati isključivo ispravljeni srpski tekst prevoda, bez ikakvih uvodnih rečenica, objašnjenja, navodnika ili think tagova.\n"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Ti si stručni prevodilac i lektor. Vrati isključivo ispravljeni prevod na srpski jezik bez ikakvog dodatnog teksta ili komentara."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.2,
+        "max_tokens": 500
+    }
+    
+    try:
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
+        content = res["choices"][0]["message"]["content"].strip()
+        cleaned = clean_thought_tags(content).strip().strip('"\'')
+        if cleaned:
+            print(f"[SELF-CRITIQUE SUCCESS] Prethodni: {bad_translation} -> Novi: {cleaned}", flush=True)
+            return cleaned
+    except Exception as e:
+        print(f"[SELF-CRITIQUE ERROR] Greška prilikom re-prevoda sa samokritikom: {e}", flush=True)
+        
+    return bad_translation
+
+
+
+
 CYRILLIC_TO_LATIN = {
     'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'ђ': 'đ', 'е': 'e', 'ж': 'ž',
     'з': 'z', 'и': 'i', 'ј': 'j', 'к': 'k', 'л': 'l', 'љ': 'lj', 'м': 'm', 'н': 'n',
@@ -375,22 +532,26 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     parsed_dict = {}
     
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
-    
     for batch_idx, batch_start in enumerate(range(0, len(segments), batch_size)):
         batch_segments = segments[batch_start:batch_start + batch_size]
-        print(f"[TRANSLATOR] Batch {batch_idx + 1}/{((len(segments)-1)//batch_size)+1} (segmenti {batch_start} do {batch_start + len(batch_segments) - 1})", flush=True)
         
         if progress_callback:
             progress_callback(detail=f"Prevođenje batcha {batch_idx + 1}...")
             
-        # Generisanje transkripta sa limitom karaktera (dužinska svesnost)
+        # Generisanje transkripta sa limitom karaktera (dužinska svesnost) i maskiranjem
         transcript_text = ""
+        batch_masks_map = {}
         for j, s in enumerate(batch_segments):
             global_idx = batch_start + j
             duration = s["end"] - s["start"]
             factor = calculate_dynamic_factor(s, user_avg_speedup)
-            limit_char = max(15, int(duration * factor))
-            transcript_text += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) {s['text']}\n"
+            limit_char = max(15, int(duration * factor), int(len(s['text']) * 0.75))
+            
+            # Maskiramo pre slanja LLM-u
+            masked_txt, masks = mask_untranslatable(s['text'])
+            batch_masks_map[global_idx] = masks
+            
+            transcript_text += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) {masked_txt}\n"
             
         # Klizni prozor konteksta (poslednjih 2 segmenta iz prethodnog batch-a)
         history_text = ""
@@ -460,6 +621,17 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije ili sistema prevodi kao 'nestane', 'propadne' ili 'se uruši', a ne 'da se sruši'.\n"
             "   - MORFOLOGIJA I SLAGANJE: Strogo pazi na morfološko slaganje prideva i imenica po rodu, broju i padežu (npr. 'drveni komad' ili 'komad drveta', a nikako 'komad drvenog'; 'jednake cilindriće' u akuzativu množine, a ne 'jednake cilindri'; 'zavar je gladak' u muškom rodu, a ne 'glatko').\n"
             "   - PRIRODNOST FRAZA: Izbegavaj bukvalne prevode engleskih kolokvijalnih konstrukcija (npr. 'this is where it gets crazy' prevodi kao 'sada stvari postaju zanimljive' ili 'ovde nastaje preokret', a nikako 'ovde postaje ludilo').\n"
+            "   - DISKURSNE MARKERE I KOHEZIJU prevedi prirodno, a ne doslovno:\n"
+            "     * 'so' na početku rečenice prevedi kao 'Dakle,' ili 'Zato,', a u sredini kao 'pa' ili 'tako da'.\n"
+            "     * 'now' kao diskursni marker prevedi kao 'E sad,' ili 'Evo,', a ne uvek kao 'sada'.\n"
+            "     * 'well' kao poštapalicu prevedi kao 'Pa,' ili 'Dobro,', a kao kontrast 'Međutim,'.\n"
+            "     * 'basically' prevedi kao 'u suštini' ili 'praktično'.\n"
+            "     * 'actually' prevedi kao 'zapravo' ili 'u stvari'.\n"
+            "     * 'honestly' prevedi kao 'iskreno'.\n"
+            "     * 'right?' na kraju rečenice prevedi kao 'zar ne?' ili 'jel tako?'.\n"
+            "     * 'you know' prevedi kao 'znate' ili izostavi ako je suvišno.\n"
+            "     * 'i mean' prevedi kao 'hoću reći' ili 'mislim'.\n"
+            "     * Kolokvijalno 'like' (npr. 'he was like...') izostavi ili prevedi prilagođeno kontekstu.\n"
             "4. POŠTOVANJE LIMITA KARAKTERA:\n"
             "   - Tvoj prevod (translated_text) za svaki segment mora biti kraći ili jednak prosleđenom LIMITU kako bi se izgovorio u predviđenom vremenu. Koristi kraće sinonime ili sažmi rečenicu ako je potrebno.\n"
             "5. GRANICE SEGMENATA: Prevedi svaki red nezavisno pod tačnim [seg-ID] tagom. Nikada nemoj spajati ili preskakati redove.\n\n"
@@ -533,10 +705,43 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                         except ValueError:
                             continue
                             
-            # Spajanje u glavni rečnik i ažuriranje running glossary-ja
+            # Spajanje u glavni rečnik, unmasking i validacija
             for idx, text in batch_parsed.items():
                 if batch_start <= idx < batch_start + len(batch_segments):
-                    parsed_dict[idx] = text
+                    # Unmasking tokena
+                    unmasked_text = unmask_text(text, batch_masks_map.get(idx, {}))
+                    
+                    # Provera i verifikacija (negacije i semantika)
+                    orig_segment = segments[idx]
+                    orig_text = orig_segment["text"]
+                    
+                    negation_ok = check_negation_preservation(orig_text, unmasked_text)
+                    sim_score = semantic_similarity(orig_text, unmasked_text)
+                    print(f"[VALIDATION] Segment {idx}: Negation OK = {negation_ok}, Similarity = {sim_score:.3f}", flush=True)
+                    
+                    # Automatska re-prevod i samokritika petlja ako validacija ne prođe
+                    if not negation_ok or sim_score < 0.72:
+                        hints = []
+                        if not negation_ok:
+                            hints.append("Prevod je izgubio negaciju iz originala. Originalna rečenica ima negaciju (not/never/no/don't itd.), dok tvoj prevod nema. Obavezno ispravi prevod da sadrži negaciju (ne/nikad/nije/nema/nemam).")
+                        if sim_score < 0.72:
+                            hints.append("Prevod je semantički previše udaljen od originala. Zadrži tačan smisao rečenice i nemoj dodavati suvišne reči ili interpretacije.")
+                        
+                        hint_str = " ".join(hints)
+                        print(f"[RETRANSLATION NEEDED] Segment {idx} ne zadovoljava kriterijume. Pokrećem self-critique...", flush=True)
+                        
+                        # Pokrećemo self-critique u maskiranom modu
+                        masked_orig, masked_bad, self_critique_masks = mask_segment_pair(orig_text, unmasked_text)
+                        refined = retranslate_with_self_critique(masked_orig, masked_bad, hint_str)
+                        unmasked_refined = unmask_text(refined, self_critique_masks)
+                        
+                        negation_ok_2 = check_negation_preservation(orig_text, unmasked_refined)
+                        sim_score_2 = semantic_similarity(orig_text, unmasked_refined)
+                        print(f"[VALIDATION AFTER SELF-CRITIQUE] Segment {idx}: Negation OK = {negation_ok_2}, Similarity = {sim_score_2:.3f}", flush=True)
+                        
+                        unmasked_text = unmasked_refined
+                        
+                    parsed_dict[idx] = unmasked_text
                     
             # Ažuriranje confirmed_translations na osnovu used_terms koji je model vratio
             used_terms_found = False
@@ -933,7 +1138,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                     u_seg["orig_indices"].append(i)
                     orig_to_unique_map[i] = u_idx
                     break
-
+    
     print(f"[LEKTOR] Deduplikacija završena. Sa originalnih {len(translated_segments)} smanjeno na {len(unique_segments)} jedinstvenih segmenata.", flush=True)
 
     # 2. Generisanje ili preuzimanje globalnog konteksta i glosara
@@ -954,6 +1159,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
     batch_size = 5
     parsed_lektor_dict = {}
+    lektor_masks_map = {}
     lektor_duration = 0.0
     
     url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
@@ -969,8 +1175,13 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             global_idx = batch_start + j
             duration = seg["duration"]
             factor = calculate_dynamic_factor(seg, user_avg_speedup)
-            limit_char = max(15, int(duration * factor))
-            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) ENG: {seg['orig_text']} | SRB: {to_latin(seg['translated_text'])}\n"
+            limit_char = max(15, int(duration * factor), int(len(seg['orig_text']) * 0.75))
+            
+            # Maskiramo pre slanja lektoru
+            masked_orig, masked_trans, masks = mask_segment_pair(seg['orig_text'], to_latin(seg['translated_text']))
+            lektor_masks_map[global_idx] = masks
+            
+            lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) ENG: {masked_orig} | SRB: {masked_trans}\n"
             
         # Klizni prozor konteksta za lektora
         history_text = ""
@@ -1007,6 +1218,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "   - Izbegavaj bukvalne prevode engleskih fraza poput 'the hope is' u 'nadam se' ako se govori o opštem cilju projekta (bolje je 'cilj je' ili 'očekuje se'). Reč 'collapses' u kontekstu populacije prevodi kao 'nestane' ili 'se uruši', a ne 'da se sruši'.\n"
             "   - MORFOLOGIJA I SLAGANJE: Strogo pazi na morfološko slaganje prideva i imenica po rodu, broju i padežu (npr. 'drveni komad' ili 'komad drveta', a nikako 'komad drvenog'; 'jednake cilindriće' u akuzativu množine, a ne 'jednake cilindri'; 'zavar je gladak' u muškom rodu, a ne 'glatko').\n"
             "   - PRIRODNOST FRAZA: Izbegavaj bukvalne prevode engleskih kolokvijalnih konstrukcija (npr. 'this is where it gets crazy' prevodi kao 'sada stvari postaju zanimljive' ili 'ovde nastaje preokret', a nikako 'ovde postaje ludilo').\n"
+            "   - DISKURSNE MARKERE I KOHEZIJU lekturiši prirodno, a ne doslovno (npr. 'so' kao 'Dakle,'/'Zato,' na početku ili 'pa'/'tako da' u sredini; 'now' kao 'E sad,'/'Evo,'; 'well' kao 'Pa,'/'Dobro,' ili 'Međutim,'; 'basically' kao 'u suštini'/'praktično'; 'actually' kao 'zapravo'/'u stvari'; 'honestly' kao 'iskreno'; 'right?' kao 'zar ne?'/'jel tako?'; 'you know' i 'like' izostavi ili prilagodi kontekstu).\n"
             "4. LIMIT KARAKTERA: Prevod (refined_text) mora biti kraći ili jednak prosleđenom LIMITU. Za mikro-segmente (trajanje < 0.5s) refined_text MORA biti potpuno prazan string `\"\"`. Za sve ostale segmente, ako je prevod već tačan, OBAVEZNO kopiraj grubi prevod (SRB) u 'refined_text' (nikada ne ostavljaj prazno za regularne segmente).\n"
             "5. DOSLEDNO OBRAĆANJE: Koristi neformalno obraćanje 'ti' (npr. 'ako želiš', 'poravnaj').\n"
             "6. LINGVISTIČKA PROVERA: U polju 'analysis' (CoT) obrazloži teške fraze. Izbegavaj bukvalne prevode poput 'postaje ludo' (prevedi npr. 'gde situacija postaje zanimljiva' ili 'gde se sve menja').\n\n"
@@ -1021,7 +1233,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             "    }\n"
             "  ]\n"
             "}\n\n"
-            f"TEKST ZA LEKTURU:\n{lektor_input}"
+            "TEKST ZA LEKTURU:\n{lektor_input}"
         )
 
         try:
@@ -1094,8 +1306,10 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             # Spajanje u parsed_lektor_dict i proračun metrika
             for idx, text in batch_parsed_lektor.items():
                 if batch_start <= idx < batch_start + len(batch_translated):
-                    parsed_lektor_dict[idx] = text
-                    print(f"[LEKTOR] Segment {idx} lekturisan: {text[:60]}...", flush=True)
+                    # Unmasking tokena
+                    unmasked_text = unmask_text(text, lektor_masks_map.get(idx, {}))
+                    parsed_lektor_dict[idx] = unmasked_text
+                    print(f"[LEKTOR] Segment {idx} lekturisan: {unmasked_text[:60]}...", flush=True)
                     
                     # Pronalaženje originalnog segmenta za proračun limita i logovanje
                     idx_int = int(idx)
@@ -1126,7 +1340,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                             if trigger in str(analysis).lower():
                                 confidence -= 1
                         
-                        overshoot = len(str(text)) / limit_char
+                        overshoot = len(str(unmasked_text)) / limit_char
                         if overshoot > 1.2:
                             confidence -= 1
                         confidence = max(1, confidence)
@@ -1140,9 +1354,9 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                             "segment_id": idx_int,
                             "duration": duration,
                             "limit_char": limit_char,
-                            "actual_char": len(str(text)),
-                            "compliance": len(str(text)) <= limit_char,
-                            "overshoot_pct": max(0.0, (len(str(text)) - limit_char) / limit_char * 100)
+                            "actual_char": len(str(unmasked_text)),
+                            "compliance": len(str(unmasked_text)) <= limit_char,
+                            "overshoot_pct": max(0.0, (len(str(unmasked_text)) - limit_char) / limit_char * 100)
                         }
                         compliance_logger.info(f"[COMPLIANCE] {json.dumps(compliance_stats)}")
                     
@@ -1161,7 +1375,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 continue
             duration = u_seg["duration"]
             factor = calculate_dynamic_factor(u_seg, user_avg_speedup)
-            limit_char = max(15, int(duration * factor))
+            limit_char = max(15, int(duration * factor), int(len(u_seg['orig_text']) * 0.75))
             
             if len(lektorised_text) > limit_char * 1.15:
                 compressed = compress_sentence_via_llm(lektorised_text, limit_char)

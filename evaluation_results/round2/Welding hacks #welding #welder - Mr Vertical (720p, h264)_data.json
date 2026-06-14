@@ -1,0 +1,381 @@
+{
+  "video_name": "Welding hacks #welding #welder - Mr Vertical (720p, h264).mp4",
+  "evaluation_time": "2026-06-14T04:20:17.696083",
+  "pipeline_durations": {
+    "asr_sec": 59.07992124557495,
+    "translation_sec": 526.5124404430389,
+    "total_sec": 638.2454500198364
+  },
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.16,
+      "end": 2.12,
+      "text": "Skriveni trikovi zavarivanja.",
+      "original_text": "These are the hidden welding hack.",
+      "confidence_score": 4
+    },
+    {
+      "id": 1,
+      "start": 2.12,
+      "end": 4.08,
+      "text": "Zavarivači znaju kako da urade.",
+      "original_text": "Suddenly real welders seem to know.",
+      "confidence_score": 4
+    },
+    {
+      "id": 2,
+      "start": 4.08,
+      "end": 8.4,
+      "text": "Kako da zavariš tanke kvadratne cevi različitih veličina?",
+      "original_text": "One. How do you weld thin square tubes of different sizes together?",
+      "confidence_score": 5
+    },
+    {
+      "id": 3,
+      "start": 8.4,
+      "end": 10.67,
+      "text": "Stručni zavarivači to rade ovako.",
+      "original_text": "Professional welders do it like this.",
+      "confidence_score": 5
+    },
+    {
+      "id": 4,
+      "start": 10.67,
+      "end": 13.3,
+      "text": "Poravnaj manju cev pod uglom od 45 stepeni.",
+      "original_text": "Align the smaller tube at a 45 degree",
+      "confidence_score": 5
+    },
+    {
+      "id": 5,
+      "start": 13.3,
+      "end": 16.72,
+      "text": "Poravnaj donju ivicu veće cevi.",
+      "original_text": "angle against the lower edge of the larger tube."
+    },
+    {
+      "id": 6,
+      "start": 16.72,
+      "end": 18.69,
+      "text": "Prvo heftaj kritične tačke.",
+      "original_text": "Tack weld the critical points first."
+    },
+    {
+      "id": 7,
+      "start": 18.69,
+      "end": 24.0,
+      "text": "Da spriječi deformaciju, primeti da dio gornje ivice viri.",
+      "original_text": "To prevent the structure from deforming, you'll notice part of the upper edge sticks out."
+    },
+    {
+      "id": 8,
+      "start": 24.0,
+      "end": 27.65,
+      "text": "Iseci oba bočna dela duž označenih linija.",
+      "original_text": "Cut off both side sections along the marked lines."
+    },
+    {
+      "id": 9,
+      "start": 27.65,
+      "end": 29.87,
+      "text": "Zadrži samo prednji deo.",
+      "original_text": "Only keep the front-facing section."
+    },
+    {
+      "id": 10,
+      "start": 29.87,
+      "end": 32.52,
+      "text": "Zatim zavarivač koristi svoje dvadeset godina",
+      "original_text": "Then the welder uses his 200 years",
+      "confidence_score": 4
+    },
+    {
+      "id": 11,
+      "start": 32.52,
+      "end": 36.18,
+      "text": "precizno isekuje duž označenih linija.",
+      "original_text": "of experience to cut precisely along the marks.",
+      "confidence_score": 5
+    },
+    {
+      "id": 12,
+      "start": 36.18,
+      "end": 39.93,
+      "text": "Savij preostali prednji deo navan 90 stepeni da",
+      "original_text": "Bend the remaining front section downward 90 degrees so",
+      "confidence_score": 5
+    },
+    {
+      "id": 13,
+      "start": 39.93,
+      "end": 43.61,
+      "text": "savrseno odgovara gornjem rubu manje cevi,",
+      "original_text": "it perfectly matches the top edge of the smaller tube,",
+      "confidence_score": 5
+    },
+    {
+      "id": 14,
+      "start": 43.61,
+      "end": 45.84,
+      "text": "i postignut je savršeni var.",
+      "original_text": "and seamless welding is achieved.",
+      "confidence_score": 5
+    },
+    {
+      "id": 15,
+      "start": 45.84,
+      "end": 50.24,
+      "text": "Dva. Ako direktno zavariš dva ugaona profila, oni će se blokirati jedan prema drugom.",
+      "original_text": "Two. If you directly weld two angle irons together, they'll block against each other."
+    },
+    {
+      "id": 16,
+      "start": 50.24,
+      "end": 52.38,
+      "text": "Stručni zavarivač mi je pokazao ovu tačku.",
+      "original_text": "A professional welder taught me this trick."
+    },
+    {
+      "id": 17,
+      "start": 52.38,
+      "end": 56.93,
+      "text": "Koristi elektrode za zavarivanje da povežeš gornji i donji krajevi oba ugaona profila.",
+      "original_text": "Use welding rods to connect the upper and lower points of both angle irons."
+    },
+    {
+      "id": 18,
+      "start": 56.93,
+      "end": 60.2,
+      "text": "Označena linija postaje savrseni 45-stepeni presek.",
+      "original_text": "The marked line becomes a perfect 45 degree bisector."
+    },
+    {
+      "id": 19,
+      "start": 60.2,
+      "end": 64.8,
+      "text": "Posle odsečenja označenog dela, dva komada se savrseno uklopit za zavarivanje.",
+      "original_text": "After cutting off the marked section, the two pieces fit together perfectly for welding."
+    },
+    {
+      "id": 20,
+      "start": 64.8,
+      "end": 67.68,
+      "text": "Tri. Veliki puknuti metali teško zavariti?",
+      "original_text": "Three. Large cracked metal pieces difficult to weld?",
+      "confidence_score": 5
+    },
+    {
+      "id": 21,
+      "start": 67.68,
+      "end": 70.56,
+      "text": "Prvo zavari maticu na donju ploču.",
+      "original_text": "First weld a nut onto the lower plate.",
+      "confidence_score": 5
+    },
+    {
+      "id": 22,
+      "start": 70.56,
+      "end": 75.6,
+      "text": "Zatim zavari navojnu šipku na gornju ploču, direktno uz ivicu matice.",
+      "original_text": "Then weld the threaded rod assembly onto the upper plate, right against the edge of the nut.",
+      "confidence_score": 5
+    },
+    {
+      "id": 23,
+      "start": 75.6,
+      "end": 80.0,
+      "text": "Zavrti navojnu šipku da povučeš puknute delove u poravnanje.",
+      "original_text": "Turn the threaded rod to pull the cracked sections back into alignment.",
+      "confidence_score": 5
+    },
+    {
+      "id": 24,
+      "start": 80.0,
+      "end": 83.28,
+      "text": "Kada rupa zatvori, započni zavarivanje šava.",
+      "original_text": "Once the gap closes tightly, start welding the seam.",
+      "confidence_score": 5
+    },
+    {
+      "id": 25,
+      "start": 83.28,
+      "end": 85.04,
+      "text": "Zavar je gladak.",
+      "original_text": "The weld comes out smooth.",
+      "confidence_score": 5
+    },
+    {
+      "id": 26,
+      "start": 85.44,
+      "end": 87.2,
+      "text": "Konstrukcija je stabilna.",
+      "original_text": "And the structure stays solid.",
+      "confidence_score": 4
+    },
+    {
+      "id": 27,
+      "start": 87.2,
+      "end": 87.51,
+      "text": "",
+      "original_text": "Four.",
+      "confidence_score": 5
+    },
+    {
+      "id": 28,
+      "start": 87.51,
+      "end": 91.05,
+      "text": "Ako direktno heftaneš četiri krugih čeličnih cevi,",
+      "original_text": "If you directly tack weld four round steel pipes together,",
+      "confidence_score": 5
+    },
+    {
+      "id": 29,
+      "start": 91.05,
+      "end": 94.72,
+      "text": "lako se otključe jer heftanje nije dovoljno sigurno.",
+      "original_text": "they can easily loosen because the weld isn't secure enough.",
+      "confidence_score": 5
+    },
+    {
+      "id": 30,
+      "start": 94.72,
+      "end": 97.03,
+      "text": "Stručni zavarivači uvek to rade ovako.",
+      "original_text": "Professional welders always do it like this.",
+      "confidence_score": 5
+    },
+    {
+      "id": 31,
+      "start": 97.03,
+      "end": 100.32,
+      "text": "Zaveži list papira čvrsto oko čelične cevi.",
+      "original_text": "Wrap a sheet of paper tightly around the steel pipe.",
+      "confidence_score": 5
+    },
+    {
+      "id": 32,
+      "start": 100.32,
+      "end": 103.9,
+      "text": "Iseci papir tako da širina odgovara opsegu cevi.",
+      "original_text": "Once cut the paper so the width matches the pipe circumference.",
+      "confidence_score": 5
+    },
+    {
+      "id": 33,
+      "start": 103.9,
+      "end": 105.52,
+      "text": "Zatim ga prepolovi.",
+      "original_text": "Then fold it in half.",
+      "confidence_score": 5
+    },
+    {
+      "id": 34,
+      "start": 105.52,
+      "end": 110.24,
+      "text": "Nakon prepolavljanja, stavi ga čvrsto uz cev i označi dve tačke.",
+      "original_text": "After folding, place it tightly against the pipe again and mark two points.",
+      "confidence_score": 5
+    },
+    {
+      "id": 35,
+      "start": 110.24,
+      "end": 114.48,
+      "text": "Rastojanje između tačaka odgovara prečniku cevi.",
+      "original_text": "The distance between those points perfectly matches the pipe diameter.",
+      "confidence_score": 5
+    },
+    {
+      "id": 36,
+      "start": 114.48,
+      "end": 119.68,
+      "text": "Na obe duge ivice papira nacrtaj dve podesne polukružnice uz oznake.",
+      "original_text": "On both long edges of the folded paper, draw two matching semicircles aligned with the marks.",
+      "confidence_score": 5
+    },
+    {
+      "id": 37,
+      "start": 119.68,
+      "end": 122.54,
+      "text": "Nacrtaj dve tangente među polukrugovima.",
+      "original_text": "Then draw two tangent lines between the semicircles.",
+      "confidence_score": 4
+    },
+    {
+      "id": 38,
+      "start": 122.54,
+      "end": 126.07,
+      "text": "Odseči višak uz krive i tangentne linije.",
+      "original_text": "Cut away the excess along the curves and tangent lines.",
+      "confidence_score": 5
+    },
+    {
+      "id": 39,
+      "start": 126.07,
+      "end": 129.85,
+      "text": "Nakon razvijanja papira, zavij ga nazad oko čelične cevi.",
+      "original_text": "After unfolding the paper, wrap it back around the steel pipe.",
+      "confidence_score": 5
+    },
+    {
+      "id": 40,
+      "start": 129.85,
+      "end": 133.26,
+      "text": "Označi ivicu otvora markerom.",
+      "original_text": "Use a marker to trace along the edge of the opening.",
+      "confidence_score": 5
+    },
+    {
+      "id": 41,
+      "start": 133.26,
+      "end": 135.94,
+      "text": "Iseci označeni deo ugaonom brusilicom.",
+      "original_text": "Then cut the marked area with an angle grinder.",
+      "confidence_score": 5
+    },
+    {
+      "id": 42,
+      "start": 135.94,
+      "end": 137.03,
+      "text": "Posle rezanja,",
+      "original_text": "After cutting,",
+      "confidence_score": 5
+    },
+    {
+      "id": 43,
+      "start": 137.03,
+      "end": 140.48,
+      "text": "Površine između čeličnih cevi se poklapaju.",
+      "original_text": "the contact surfaces between the pipes match",
+      "confidence_score": 5
+    },
+    {
+      "id": 44,
+      "start": 140.48,
+      "end": 144.16,
+      "text": "Savršeni var se može postići.",
+      "original_text": "perfectly and seamless welding can be achieved.",
+      "confidence_score": 5
+    },
+    {
+      "id": 45,
+      "start": 144.48,
+      "end": 146.48,
+      "text": "Ako imaš pitanja ili probleme, ostavi ih u komentarima.",
+      "original_text": "If you have any questions or other problems, please post them in the comments below.",
+      "confidence_score": 4
+    },
+    {
+      "id": 46,
+      "start": 146.48,
+      "end": 148.48,
+      "text": "Hvala što gledaš.",
+      "original_text": "Thank you for watching.",
+      "confidence_score": 5
+    }
+  ],
+  "metrics": {
+    "translator_duration": 197.698721408844,
+    "lektor_duration": 202.1090807914734
+  }
+}

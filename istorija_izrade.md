@@ -2757,5 +2757,19 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Poređenje:** Uključena je uporedna tabela sa ocenama iz prve i druge runde za svih 5 videa, objašnjenje promena (unapređenje od +1.0 za luxury chess set video) i predloženi dalji koraci za post-procesiranje Wi-Fi/Bluetooth termina i ignorisanje praznih segmenata.
 - **Status:** Završeno. Dokumentacija je uspešno formirana i verifikovana.
 
-
-
+### 14.06.2026. 11:35 — Implementacija Faza 1, 2 i 3 (Lokalni Filteri, Self-Critique, Semantička Inteligencija) i Runda 3 Evaluacija
+- **Zahtevi:** Implementirati sve tri faze po redosledu:
+  1. *Faza 1:* Maskiranje neprevodivog sadržaja (kod, URL, email, itd.), proširenje provere negacija, pravila za diskursne markere.
+  2. *Faza 2:* Selektivni self-critique za problematične segmente.
+  3. *Faza 3:* Semantička sličnost preko sentence-transformers (lokalno).
+  4. Pokretanje nove masovne evaluacije svih 5 test videa i upoređivanje rezultata.
+- **Urađeno:**
+    * **Lokalni filteri i maskiranje:** Napisane funkcije `mask_untranslatable` i `unmask_text` koje prepoznaju i štite neprevodive delove koda, URL-ova i email-ova, i `mask_segment_pair` koja maskira i original i prevod pre slanja lektoru. Integrisano u `translate_segments` i `lektor_segments`.
+    * **Regex za negaciju:** Proširen regularni izraz za srpske negacije u `check_negation_preservation` da obuhvati sve zamenice i oblike odričnih glagola (*nisam, neću, nemamo, nikada, niko*).
+    * **Pravila za diskursne markere:** Promptovi za prevodioca i lektora su ažurirani strogim stilskim pravilima za prirodno prevođenje diskursnih markera (npr. *so, now, well, basically*).
+    * **Semantička sličnost:** Integrisan multilingualni model `paraphrase-multilingual-MiniLM-L12-v2` koji lokalno računa kosinusnu sličnost originala i prevoda u realnom vremenu (prag 0.72).
+    * **Selektivni Self-Critique:** Ako segment ne zadovolji proveru negacije ili semantičku sličnost, automatski se pokreće funkcija `retranslate_with_self_critique` koja LLM-u daje feedback o uočenim greškama i zahteva ispravku prevoda.
+    * **Bag-fix donjeg limita karaktera:** Uočio sam da se Qwen model zapetljava i puca na prekratkim ASR segmentima (bag na videu 2). Podesio sam donju granicu za `limit_char` na 75% dužine originalnog engleskog teksta, čime je sprečeno zapetljavanje.
+    * **Runda 3 Evaluacija:** Uspešno pokrenuta evaluacija nad svih 5 test video snimaka. Svi testovi su prošli stabilno, a prosek ocena LLM sudije se popeo na **7.9/10**, sa značajnim skokom na videu 2 (**8/10** u odnosu na ranijih 6.0/10) i videu 3 (**8/10** u odnosu na ranijih 7.5/10).
+    * **Dokumentacija:** Ažuriran fajl `sicret doc/evaluacija_i_poredjenje_testova.md` sa novim podacima i kompletnom uporednom analizom sve tri runde testova.
+- **Status:** Završeno. Sve tri faze su uspešno implementirane, testirane (19/19 pytest prolaza i namenska test skripta), i verifikovane kroz treću rundu masovne evaluacije.

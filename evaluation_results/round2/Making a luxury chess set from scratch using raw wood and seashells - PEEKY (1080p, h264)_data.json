@@ -1,0 +1,247 @@
+{
+  "video_name": "Making a luxury chess set from scratch using raw wood and seashells - PEEKY (1080p, h264).mp4",
+  "evaluation_time": "2026-06-14T04:05:47.125418",
+  "pipeline_durations": {
+    "asr_sec": 216.15706300735474,
+    "translation_sec": 299.77140617370605,
+    "total_sec": 543.8250005245209
+  },
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 3.44,
+      "text": "Počela je sa drvenim komadom.",
+      "original_text": "She started out with nothing but this basic dark piece of wood.",
+      "confidence_score": 5
+    },
+    {
+      "id": 1,
+      "start": 4.0,
+      "end": 9.36,
+      "text": "Teško je reći šta želi dok ih oblikuje u jednake cilindriće.",
+      "original_text": "At first, it's hard to tell what she's even aiming for as she shapes it into these uniform cylinders.",
+      "confidence_score": 5
+    },
+    {
+      "id": 2,
+      "start": 10.0,
+      "end": 15.92,
+      "text": "Treba mnogo polaganih, pažljivih poteza da ih razdvoji.",
+      "original_text": "It takes a lot of slow, careful cuts just to separate them into individual coins.",
+      "confidence_score": 5
+    },
+    {
+      "id": 3,
+      "start": 15.92,
+      "end": 17.04,
+      "text": "",
+      "original_text": "Then,",
+      "confidence_score": 5
+    },
+    {
+      "id": 4,
+      "start": 17.04,
+      "end": 20.25,
+      "text": "iznese",
+      "original_text": "she brings out",
+      "confidence_score": 5
+    },
+    {
+      "id": 5,
+      "start": 20.25,
+      "end": 25.52,
+      "text": "potpuno drugačiji,",
+      "original_text": "a completely different,",
+      "confidence_score": 5
+    },
+    {
+      "id": 6,
+      "start": 25.52,
+      "end": 30.32,
+      "text": "rđava drvena i radi",
+      "original_text": "reddish wood and does",
+      "confidence_score": 5
+    },
+    {
+      "id": 7,
+      "start": 30.32,
+      "end": 35.12,
+      "text": "sasvim isto.",
+      "original_text": "the exact same thing.",
+      "confidence_score": 5
+    },
+    {
+      "id": 8,
+      "start": 35.76,
+      "end": 39.25,
+      "text": "Svaki komad mora biti zarezivan ručno.",
+      "original_text": "Every single piece has to be filed down by hand.",
+      "confidence_score": 5
+    },
+    {
+      "id": 9,
+      "start": 39.25,
+      "end": 44.88,
+      "text": "Ovaj deo traje beskrajno, samo brušenje i zamakanje površina dok se konačno ne izglade.",
+      "original_text": "This part takes forever, just grinding and wetting the surfaces until they finally start to smooth out.",
+      "confidence_score": 5
+    },
+    {
+      "id": 10,
+      "start": 45.44,
+      "end": 49.68,
+      "text": "Zatim ide sveže školjke do reke da ih očisti.",
+      "original_text": "Next, she takes these raw seashells down to the river to clean them.",
+      "confidence_score": 5
+    },
+    {
+      "id": 11,
+      "start": 49.68,
+      "end": 52.4,
+      "text": "Reže ih na sitne, ravne kvadratiće.",
+      "original_text": "She begins cutting them into tiny, flat squares.",
+      "confidence_score": 5
+    },
+    {
+      "id": 12,
+      "start": 61.52,
+      "end": 65.76,
+      "text": "Da bude tačna, reže tradicionalne karaktere iz papira.",
+      "original_text": "To get the designs right, she cuts out traditional characters from paper.",
+      "confidence_score": 5
+    },
+    {
+      "id": 13,
+      "start": 65.76,
+      "end": 68.24,
+      "text": "Prilepi ih ravno na komade školjki.",
+      "original_text": "She glues them straight onto the pieces of shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 14,
+      "start": 73.6,
+      "end": 75.44,
+      "text": "Ovde stvari postaju fascinantne.",
+      "original_text": "This is where it gets crazy.",
+      "confidence_score": 4
+    },
+    {
+      "id": 15,
+      "start": 75.44,
+      "end": 80.4,
+      "text": "Koristi malu žičanu testeru da ručno isecuje složene oblike iz školjke.",
+      "original_text": "She uses a tiny wire saw to manually cut those intricate shapes out of the shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 16,
+      "start": 81.12,
+      "end": 83.04,
+      "text": "Pogrešan potez i razbije se.",
+      "original_text": "One wrong move, and it shatters.",
+      "confidence_score": 5
+    },
+    {
+      "id": 17,
+      "start": 83.68,
+      "end": 88.8,
+      "text": "Sada za drvene osnove koristi pečat visoke temperature da odštampa granicu na svaku.",
+      "original_text": "Now for the wooden bases, she uses high heat to stamp a border into each one.",
+      "confidence_score": 5
+    },
+    {
+      "id": 18,
+      "start": 88.8,
+      "end": 94.32,
+      "text": "Zatim ručno ispoljavanje centara da likovi iz školjke savršeno stane unutra.",
+      "original_text": "Then, she hollows out the centers by hand so the shell characters can fit perfectly inside.",
+      "confidence_score": 5
+    },
+    {
+      "id": 19,
+      "start": 102.96,
+      "end": 104.96,
+      "text": "Videš koliko ovo zahteva strpljenja.",
+      "original_text": "You can see how much patience this takes.",
+      "confidence_score": 4
+    },
+    {
+      "id": 20,
+      "start": 105.44,
+      "end": 110.32,
+      "text": "Zahteva mnogo rada da se iz školjke dobije pravi oblik.",
+      "original_text": "It takes a lot of work, but it takes a lot of work to get the right shape out of a piece of shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 21,
+      "start": 112.32,
+      "end": 114.32,
+      "text": "Zahteva mnogo rada da se iz školjke dobije pravi oblik.",
+      "original_text": "It takes a lot of work, but it takes a lot of work to get the right shape out of a piece of shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 22,
+      "start": 116.32,
+      "end": 118.32,
+      "text": "Zahteva mnogo rada da se iz školjke dobije pravi oblik.",
+      "original_text": "It takes a lot of work, but it takes a lot of work to get the right shape out of a piece of shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 23,
+      "start": 121.2,
+      "end": 126.96,
+      "text": "Zatim nanese tamnu pastu na vrh da popuni sve sitne pukotine.",
+      "original_text": "After placing the shell, she rubs a dark paste over the top to fill in all the tiny gaps.",
+      "confidence_score": 5
+    },
+    {
+      "id": 24,
+      "start": 126.96,
+      "end": 130.24,
+      "text": "Kada je otrese, kontrast je nevjerovatan.",
+      "original_text": "When she wipes it away, the contrast is incredible.",
+      "confidence_score": 5
+    },
+    {
+      "id": 25,
+      "start": 130.24,
+      "end": 134.56,
+      "text": "Zatim nanese tamnu pastu na vrh da popuni sve sitne pukotine. Kada je otrese, kontrast je nevjerovatan.",
+      "original_text": "After placing the shell, she rubs a dark paste over the top to fill in all the tiny gaps. When she wipes it away, the contrast is incredible.",
+      "confidence_score": 4
+    },
+    {
+      "id": 26,
+      "start": 134.56,
+      "end": 139.52,
+      "text": "Konačno vlažno brušenje ističe duboku boju drveta i sjaj školjke.",
+      "original_text": "A final wet sanding brings out the deep color of the wood and the shine of the shell.",
+      "confidence_score": 5
+    },
+    {
+      "id": 27,
+      "start": 139.6,
+      "end": 144.32,
+      "text": "Ispostavilo se da pravi kineski šahovski komplet od nule.",
+      "original_text": "It turns out she was making a custom Chinese chess set from scratch.",
+      "confidence_score": 5
+    },
+    {
+      "id": 28,
+      "start": 144.32,
+      "end": 148.56,
+      "text": "Oceni razinu veštine majstora od 1 do 10 u komentarima.",
+      "original_text": "Rate this craftsman's incredible level of skill from 1 to 10 in the comments below.",
+      "confidence_score": 4
+    }
+  ],
+  "metrics": {
+    "translator_duration": 124.4575707912445,
+    "lektor_duration": 92.9582371711731
+  }
+}

@@ -1,79 +1,71 @@
 {
   "video_name": "5 Dark Psychology Truths 🧠 #lifelessons #motivation #successmindset #growthmind - The Daily Lesson (720p, h264).mp4",
-  "evaluation_time": "2026-06-14T03:50:18.108402",
+  "evaluation_time": "2026-06-14T10:57:23.522421",
   "pipeline_durations": {
-    "asr_sec": 19.79543900489807,
-    "translation_sec": 121.266428232193,
-    "total_sec": 173.69092631340027
+    "asr_sec": 20.787654876708984,
+    "translation_sec": 87.76947855949402,
+    "total_sec": 126.19684553146362
   },
   "segments": [
     {
       "id": 0,
       "start": 0.0,
       "end": 1.35,
-      "text": "Tamna psihologija. Prvi.",
-      "original_text": "Dark psychology. Number one.",
-      "confidence_score": 4
+      "text": "Tamna psihologija. Broj jedan.",
+      "original_text": "Dark psychology. Number one."
     },
     {
       "id": 1,
       "start": 1.35,
       "end": 6.4,
-      "text": "Osoba koja je teško za čitanje često je ona koja najdublje oseća.",
-      "original_text": "The person who is hard to read is often the one who feels the deepest.",
-      "confidence_score": 5
+      "text": "Osoba kojoj je teško pročitati često osjeća najdublje.",
+      "original_text": "The person who is hard to read is often the one who feels the deepest."
     },
     {
       "id": 2,
       "start": 6.4,
       "end": 11.04,
-      "text": "Drugi. Osoba mirna u kaosu borila se u olujama koje ne videš.",
-      "original_text": "Number two. The person who stays calm in chaos has fought storms you'll never see.",
-      "confidence_score": 4
+      "text": "Broj dva. Osoba koja ostaje mirna u kaosu borila se oluje. Nikada nećeš videti.",
+      "original_text": "Number two. The person who stays calm in chaos has fought storms. You'll never see."
     },
     {
       "id": 3,
       "start": 11.6,
       "end": 12.35,
-      "text": "",
-      "original_text": "Number three.",
-      "confidence_score": 5
+      "text": "Broj tri.",
+      "original_text": "Number three."
     },
     {
       "id": 4,
       "start": 12.35,
       "end": 17.67,
-      "text": "Ona koja nestaje bez objašnjenja naučila je moć zaštititi njihovu energiju.",
-      "original_text": "The one who disappears without explanation has learned the power of protecting their energy.",
-      "confidence_score": 5
+      "text": "Osoba koja ističe se bez objašnjenja naučila je moć zaštite svoje energije.",
+      "original_text": "The one who disappears without explanation has learned the power of protecting their energy."
     },
     {
       "id": 5,
       "start": 17.67,
       "end": 23.12,
-      "text": "Broj četiri. Onaj koji smehuje se svemu često zaštititi ranjeno srce.",
-      "original_text": "Number four. The one who laughs at everything is often protecting a heart that's breaking.",
-      "confidence_score": 5
+      "text": "Broj četiri. Osoba koja smehuje se svemu često zaštiti srce koje se slomi.",
+      "original_text": "Number four. The one who laughs at everything is often protecting a heart that's breaking."
     },
     {
       "id": 6,
       "start": 23.12,
       "end": 24.13,
       "text": "Broj pet.",
-      "original_text": "Number five.",
-      "confidence_score": 5
+      "original_text": "Number five."
     },
     {
       "id": 7,
       "start": 24.13,
       "end": 29.84,
-      "text": "Onaj koji daje najbolji savet obično se bori u bitkama sam.",
-      "original_text": "The one who gives the best advice is usually fighting battles alone.",
-      "confidence_score": 5
+      "text": "Osoba koja daje najbolji savet obično bori se u bitkama sam.",
+      "original_text": "The one who gives the best advice is usually fighting battles alone."
     }
   ],
   "metrics": {
-    "translator_duration": 70.34501147270203,
-    "lektor_duration": 27.317662000656128
+    "translator_duration": 71.10951375961304,
+    "lektor_duration": 16.650490283966064
   }
 }

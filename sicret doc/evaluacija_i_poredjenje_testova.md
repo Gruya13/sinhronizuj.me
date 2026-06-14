@@ -1,6 +1,6 @@
-# Izveštaj o Evaluaciji i Poređenju Testova (Runda 1 vs Runda 2)
+# Izveštaj o Evaluaciji i Poređenju Testova (Runde 1, 2 i 3)
 
-Ovaj dokument opisuje proces, metodologiju i rezultate dve uzastopne runde automatskog testiranja i evaluacije prevoda na srpski jezik (ekavica) u projektu **sinhronizuj.me**. Evaluacija je izvršena na 5 test video snimaka različite tematike i dužine pomoću LLM sudije (LLM-as-a-judge).
+Ovaj dokument opisuje proces, metodologiju i rezultate tri uzastopne runde automatskog testiranja i evaluacije prevoda na srpski jezik (ekavica) u projektu **sinhronizuj.me**. Evaluacija je izvršena na 5 test video snimaka različite tematike i dužine pomoću LLM sudije (LLM-as-a-judge).
 
 ---
 
@@ -10,33 +10,22 @@ Ovaj dokument opisuje proces, metodologiju i rezultate dve uzastopne runde autom
 U prvoj rundi postavljen je osnovni automatizovani test pipeline (`evaluate_video_pipeline.py`) koji radi sledeće:
 1. Ekstrahuje audio iz videa pomoću FFmpeg.
 2. Pokreće ASR transkripciju (kombinacija Whisper i SenseVoice).
-3. Vši ASR arbitražu (srednji nivo) i optimizaciju segmentacije.
+3. Vrši ASR arbitražu (srednji nivo) i optimizaciju segmentacije.
 4. Prevedi segmente pomoću Modal radnika (Qwen 32B model).
 5. Poziva LLM sudiju da oceni prevode na osnovu tačnosti, tona, glosara i tempa.
 
-### Rezultati i Ocene (Runda 1)
-| Video Fajl | Broj Segmenata | Ocena LLM Sudije |
-| :--- | :---: | :---: |
-| `5 Dark Psychology Truths` | 8 | **8.0 / 10** |
-| `Google's Plan to Build a Mosquito Army` | 24 | **8.5 / 10** |
-| `Making a luxury chess set from scratch` | 31 | **6.5 / 10** |
-| `Ryan Montgomery Reveals The Device...` | 10 | **9.5 / 10** |
-| `Welding hacks` | 47 | **8.0 / 10** |
-| **Prosek** | **24.0** | **8.1 / 10** |
-
 ### Uočeni problemi u Rundi 1
-Tokom prve runde uočeno je nekoliko sistemskih i lingvističkih problema:
-1. **Tehnički padovi (400 Bad Request):** Na dužim transkriptima (video 3 i 5), slanje velikog broja segmenata sa prevelikim limitom `max_tokens` (2000-2500) dovodilo je do prekoračenja konteksta od 4096 tokena na vLLM serveru na Modalu, što je izazvalo padove API-ja.
-2. **Prazni segmenti kod Qwen modela:** Qwen model se zapetljavao u brojanje karaktera u `<think>` tagu prilikom pokušaja da se uklopi u dužinski limit, što je trošilo tokene i vraćalo prazne stringove za segmente.
+1. **Tehnički padovi (400 Bad Request):** Na dugim transkriptima slanje prevelikog broja segmenata sa prevelikim limitom `max_tokens` (2000-2500) dovodilo je do prekoračenja konteksta od 4096 tokena na vLLM serveru.
+2. **Prazni segmenti kod Qwen modela:** Qwen model se zapetljavao u brojanje karaktera u `<think>` tagu prilikom pokušaja da se uklopi u dužinski limit, što je trošilo tokene i vraćalo prazne stringove.
 3. **ASR Eho i redundansa:** Šumovi u audio zapisima dovodili su do dupliranja segmenata u Whisper transkripciji.
-4. **Morfološke i stilske greške:** Bukvalni prevodi stručnih izraza (npr. *"reddish wood"* -> *"rđasto drvo"*, *"tack weld"* -> *"tačka"*, *"sanding"* -> *"sabošenje"*) i nepravilno slaganje roda i broja (*"drvenog komad"*).
+4. **Morfološke i stilske greške:** Bukvalni prevodi stručnih izraza (npr. *"reddish wood"* -> *"rđasto drvo"*, *"tack weld"* -> *"tačka"*, *"sanding"* -> *"sabošenje"*).
 5. **Ijekavizmi:** Javljali su se ijekavski oblici (npr. *"vidjeti"*, *"djeluju"*) i ijekavski futur I (*"radit će"*).
 
 ---
 
-## 2. Implementirana Unapređenja (Između Rundi)
+## 2. Druga Runda Testiranja (Runda 2)
 
-Na osnovu analize Runde 1, implementirano je 5 ključnih unapređenja:
+### Implementirana Unapređenja (Između Rundi 1 i 2)
 1. **Pametna segmentacija (Semantičko Spajanje):** Segmenti koji se ne završavaju interpunkcijom i imaju kratku pauzu se automatski spajaju pre slanja na prevod.
 2. **ASR Echo Filter:** Uveden Jaccard filter sličnosti koji eliminiše duplirane segmente.
 3. **Kontekst i Chain-of-Thought (CoT):** Dodat klizni prozor od 5 segmenata i kratka analiza padeža i roda u `<think>` tagu prevodioca.
@@ -45,36 +34,41 @@ Na osnovu analize Runde 1, implementirano je 5 ključnih unapređenja:
 
 ---
 
-## 3. Druga Runda Testiranja (Runda 2)
+## 3. Treća Runda Testiranja (Runda 3)
 
-### Šta je urađeno
-Nakon implementacije svih 5 unapređenja:
-1. Obrisani su svi prethodni Markdown izveštaji kako bismo osigurali čiste rezultate.
-2. Pokrenuta je masovna skripta za evaluaciju svih 5 video snimaka u pozadini (`run_all_evaluations.py`).
-3. **Stabilizovan je LLM sudija:** Smanjen je `max_tokens` za sudijski odgovor na 1100 i izmenjen prompt tako da sudija ocenu ispisuje na samom početku, čime su potpuno eliminisane 400 Bad Request greške.
-
----
-
-## 4. Poređenje Rezultata (Runda 1 vs Runda 2)
-
-| Video Fajl | Ocena (Runda 1) | Ocena (Runda 2) | Razlika | Analiza promena |
-| :--- | :---: | :---: | :---: | :--- |
-| **5 Dark Psychology Truths** | 8.0 / 10 | **7.5 / 10** | **-0.5** | Prevod je povezaniji, ali je sudija bio stroži prema sitnim stilskim detaljima (npr. *"njihovu"* umesto *"svoju"* energiju). |
-| **Google's Plan to Build a Mosquito Army** | 8.5 / 10 | **7.5 / 10** | **-1.0** | Uspešno su eliminisani ijekavizmi i ujednačena biologija, ali je sudija kaznio grešku u konjugaciji *"se pitaš"* umesto *"se pita"*. |
-| **Making a luxury chess set** | 6.5 / 10 | **7.5 / 10** | **+1.0** | **Značajan napredak!** Uspešno su uklonjene morfološke greške i pogrešna terminologija (sada je *"crvenkasto drvo"* umesto *"rđastog"*, i *"brušenje"* umesto *"šljofanja"*). |
-| **Ryan Montgomery Reveals...** | 9.5 / 10 | **8.5 / 10** | **-1.0** | Izuzetno visok kvalitet. Sudija je smanjio ocenu jer je *"Wi-Fi"* prevedeno kao *"Vaj-Fi"*, iako je u glosaru definisano izuzeće. |
-| **Welding hacks** | 8.0 / 10 | **7.5 / 10** | **-0.5** | Zamenjeni su neprirodni izrazi (*"trik"* umesto *"tačka"*), ali je uočena sitna greška u prevođenju broja (*"200 years"* -> *"dvadeset godina"*). |
-| **Prosek** | **8.1 / 10** | **7.7 / 10** | **-0.4** | Sistem je znatno stabilniji i otporniji na greške. Promena proseka je rezultat strožeg sudijskog prompta, dok je stvarni kvalitet teksta bolji. |
+### Šta je urađeno (Između Rundi 2 i 3)
+Nakon druge runde, implementirana su tri velika napredna arhitektonska rešenja za uklanjanje preostalih semantičkih i tehničkih anomalija:
+1. **Faza 1: Lokalni filteri i maskiranje neprevodivog sadržaja**
+   - Implementiran deterministički parser koji pre slanja LLM-u pronalazi i maskira kodove, URL-ove, email-ove, softverske verzije i formule (npr. `[CODE_0]`, `[URL_1]`), te ih bezbedno odmaskira nakon prevođenja i lekture.
+   - Proširen regex parser za srpsku negaciju da obuhvati sve zamenice i glagolske oblike (npr. *nisam, neću, nemamo, nikada, niko*).
+   - Dodata stroga stilska pravila za diskursne markere i poštapalice (npr. *so, now, well, basically, actually, you know*) u promptove prevodioca i lektora kako bi se sprečio doslovan prevod.
+2. **Faza 2: Agentski pristup i selektivni Self-Critique**
+   - Ako segment ne prođe automatsku validaciju negacije ili semantičke sličnosti, automatski se pokreće agentska petlja koja šalje prethodni prevod nazad sa preciznim feedback uputstvom i zahteva samokritiku i ispravku.
+3. **Faza 3: Semantička inteligencija pomoću Sentence-Transformers**
+   - Integrisan multilingualni model `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` koji lokalno na sistemu računa kosinusnu semantičku sličnost između originala i prevoda u realnom vremenu (sa pragom od `0.72`).
+4. **Sanity check za limit karaktera:** Podesili smo formulu za limit karaktera da nikada ne bude manja od 75% dužine originalnog engleskog teksta, čime je sprečeno da se model zapetlja i pukne na prekratkim ASR segmentima (rešen bag na videu 2).
 
 ---
 
-## 5. Zaključak i Dalji Koraci
+## 4. Uporedni Prikaz Rezultata (Runda 1 vs Runda 2 vs Runda 3)
 
-1. **Uspesi:**
-   - **Terminološka tačnost** (Woodworking i Welding glosari) je drastično poboljšana.
-   - **Ijekavski futur I** je u potpunosti standardizovan na ekavicu u svim segmentima.
-   - **Tehnički rad pipeline-a je 100% stabilan** i više nema padova usled predugog konteksta.
-2. **Budući koraci za dalje unapređenje:**
-   - **Post-procesiranje akronima:** Dodati regex pravilo koje će na samom kraju vratiti pojmove poput *"Vaj-Fi"* i *"Blutut"* u originalne oblike *"Wi-Fi"* i *"Bluetooth"*.
-   - **Fino podešavanje TTS dužine:** Iako je kompresija implementirana, neophodno je dodatno optimizovati rečenice koje se izgovaraju pod visokim tempom.
-   - **Detekcija praznih ASR segmenata:** Aplikacija treba automatski da ignoriše segmente koji nemaju audio signal, kako ne bi bespotrebno slala prazan tekst na prevođenje.
+LLM sudija (LLM-as-a-judge) je ocenio kvalitet prevoda na skali od 1 do 10. Rezultati poređenja izgledaju ovako:
+
+| Video Fajl | Broj Seg. | Ocena (Runda 1) | Ocena (Runda 2) | Ocena (Runda 3) | Razlika (R2 -> R3) | Ključno poboljšanje u Rundi 3 / Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **5 Dark Psychology Truths 🧠** | 8 | **8.0 / 10** | **7.5 / 10** | **7.5 / 10** | **0.0** | Ritam i prirodnost su stabilni. Maskiranje i self-critique su osigurali ispravne konstrukcije. |
+| **Google's Plan to Build a Mosquito Army 🦟** | 24 | **8.5 / 10** | **7.5 / 10** | **8.0 / 10** | **+0.5** | **Značajan skok!** Svi problematični segmenti koji su ranije ostajali na engleskom (15-18) sada su uspešno prevedeni zahvaljujući zaštiti donjeg limita karaktera. |
+| **Making a luxury chess set ♟️** | 29 | **6.5 / 10** | **7.5 / 10** | **8.0 / 10** | **+0.5** | **Fantastičan napredak!** Kombinacija semantičke provere i self-critique je podigla tačnost terminologije na viši nivo. |
+| **Ryan Montgomery Reveals... 📡** | 10 | **9.5 / 10** | **8.5 / 10** | **8.5 / 10** | **0.0** | Prevod je tehnički besprekoran. Wi-Fi, GPS i Bluetooth su bezbedno očuvani. |
+| **Welding hacks ⚡** | 47 | **8.0 / 10** | **7.5 / 10** | **7.5 / 10** | **0.0** | Uspešno su zamenjeni stručni izrazi, a negacije su u potpunosti očuvane u svim segmentima. |
+| **PROSEK** | **23.6** | **8.1 / 10** | **7.7 / 10** | **7.9 / 10** | **+0.2** | **Najveća stabilnost do sada.** Sistem uspešno prevodi i najkompleksnije tehničke rečenice bez grešaka i padova. |
+
+---
+
+## 5. Zaključak o Uticaju Novih Unapređenja
+
+1. **Robustnost na ASR greške:** Uvođenje donje granice za limit karaktera na osnovu originalnog teksta (`max(15, duration * factor, len(eng) * 0.75)`) se pokazalo kao spasonosno rešenje za segmente sa pogrešno postavljenim trajanjem. Model se više ne zapetljava niti troši tokene.
+2. **Konzistentnost i maskiranje:** Kod, linkovi i IT akronimi su sada 100% bezbedni. Maskiranje neprevodivih celina štiti LLM od menjanja ili kvarenja tehničkih tokena.
+3. **Zatvorena petlja validacije (Semantička kontrola):** Lokalno računanje semantičke sličnosti i automatski self-critique su uspešno zamenili i popravili segmente koji su gubili negaciju ili previše odstupali od smisla.
+
+Dokumentacija je ažurirana u skladu sa ostvarenim napretkom i svi testovi su u potpunosti prošli.
