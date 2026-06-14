@@ -2750,5 +2750,12 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Zajednički sumarni izveštaj:** Ažuriran je fajl `evaluation_results/summary_report.md` sa novim i kompletnim ocenama za svih 5 test video snimaka.
 - **Status:** Završeno. Druga runda evaluacije je u potpunosti sprovedena, a uporedni izveštaj je uspešno generisan.
 
+### 14.06.2026. 10:30 — Kreiranje Izveštaja Evaluacije i Poređenja u sicret doc
+- **Zahtevi:** Kreirati novi markdown izveštaj u direktorijumu `sicret doc` koji opisuje prvu rundu testiranja, šta je odrađeno, drugu rundu testiranja, i na kraju upoređuje rezultate.
+- **Urađeno:**
+    * **Kreiranje fajla:** Napravio sam `sicret doc/evaluacija_i_poredjenje_testova.md` u kome su detaljno opisane obe runde testiranja, metodologija, uočeni problemi (vLLM 400 Bad Request padovi, morfološke greške, prazni segmenti) i rešenja.
+    * **Poređenje:** Uključena je uporedna tabela sa ocenama iz prve i druge runde za svih 5 videa, objašnjenje promena (unapređenje od +1.0 za luxury chess set video) i predloženi dalji koraci za post-procesiranje Wi-Fi/Bluetooth termina i ignorisanje praznih segmenata.
+- **Status:** Završeno. Dokumentacija je uspešno formirana i verifikovana.
+
 
 
