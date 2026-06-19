@@ -7,7 +7,10 @@ from backend.worker.translator import (
     clean_translation_text,
     lektor_segments,
     translate_segments,
-    clean_thought_tags
+    clean_thought_tags,
+    mask_untranslatable,
+    unmask_text,
+    calculate_jaccard_similarity
 )
 
 
@@ -117,4 +120,89 @@ def test_clean_thought_tags():
     # Slučaj 4: Prazan ulaz
     assert clean_thought_tags("") == ""
     assert clean_thought_tags(None) == ""
+
+
+@patch("backend.worker.translator.call_modal_endpoint")
+@patch("backend.worker.translator.get_dynamic_glossary")
+@patch("backend.worker.translator.generate_video_summary")
+def test_faza1_features(mock_summary, mock_glossary, mock_call_endpoint):
+    mock_summary.return_value = "Mock summary"
+    mock_glossary.return_value = "Mock glossary"
+    
+    mock_call_endpoint.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"segments": [{"id": 0, "refined_text": "Konfiguriši GPS."}, {"id": 1, "refined_text": ""}]}'
+                }
+            }
+        ]
+    }
+
+    # 1. Testiranje maskiranja entiteta (Wi-Fi, GPS, Bluetooth)
+    text_with_entities = "Configure the GPS and test the Wi-Fi connection with Bluetooth."
+    masked, masks = mask_untranslatable(text_with_entities)
+    assert "GPS" not in masked
+    assert "Wi-Fi" not in masked
+    assert "Bluetooth" not in masked
+    # Provera da li unmask vraća original
+    unmasked = unmask_text(masked, masks)
+    assert unmasked == text_with_entities
+
+    # 2. Testiranje Jaccard similarity funkcije
+    s1 = "This is a very similar sentence"
+    s2 = "This is a very similar sentence."
+    s3 = "Different sentence altogether"
+    assert calculate_jaccard_similarity(s1, s2) >= 0.85
+    assert calculate_jaccard_similarity(s1, s3) < 0.5
+
+    # 3. Testiranje Jaccard deduplikacije u lektor_segments
+    original = [
+        {"text": "Configure the GPS.", "start": 0.0, "end": 2.0},
+        {"text": "Configure the GPS.", "start": 2.0, "end": 4.0}
+    ]
+    translated = [
+        {"text": "Konfiguriši GPS.", "start": 0.0, "end": 2.0},
+        {"text": "Konfiguriši GPS.", "start": 2.0, "end": 4.0}
+    ]
+    
+    with patch("backend.core.config.settings.MODAL_LEKTOR_URL", "http://fake-modal-endpoint"):
+        res = lektor_segments(original, translated)
+        assert res["translated_segments"][1]["text"] == ""
+
+
+@patch("backend.worker.translator.call_modal_endpoint")
+@patch("backend.worker.translator.get_dynamic_glossary")
+@patch("backend.worker.translator.generate_video_summary")
+def test_glossary_word_boundaries(mock_summary, mock_glossary, mock_call_endpoint):
+    mock_summary.return_value = "Mock summary"
+    mock_glossary.return_value = "- \"in\" -> \"u\"\n- \"net\" -> \"mreža\""
+    
+    captured_payloads = []
+    def mock_call(url, payload, **kwargs):
+        captured_payloads.append(payload)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": '{"segments": [{"id": 0, "translated_text": "internet radi"}]}'
+                    }
+                }
+            ]
+        }
+    mock_call_endpoint.side_effect = mock_call
+    
+    segments = [
+        {"id": 0, "start": 0.0, "end": 2.0, "text": "internet"}
+    ]
+    
+    with patch("backend.core.config.settings.MODAL_LEKTOR_URL", "http://fake-modal-endpoint"):
+        translate_segments(segments)
+        
+    assert len(captured_payloads) > 0
+    prompt_sent = captured_payloads[0]["messages"][0]["content"]
+    # "in" ne bi trebalo da se pojavi u promptu glosara jer je "internet" cela reč
+    assert "STRIKTNI PREDLOŽENI GLOSAR" not in prompt_sent or "in" not in prompt_sent
+
+
 

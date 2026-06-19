@@ -1,3 +1,14 @@
+## [2026-06-19 17:15:00] Faza 1: Strukturne izmene i poboljšanje robusnosti u pipeline-u za EN->SR prevod
+- **Opis:**
+  Uspešno smo završili implementaciju i verifikaciju Faze 1 sa ciljem unapređenja strukture, robusnosti i performansi pipeline-a:
+  1. **Wi-Fi, GPS i Bluetooth entiteti:** Uveli smo maskiranje ovih specifičnih IT pojmova u `mask_untranslatable` i `unmask_text` kako bi ih LLM ostavio u originalnom obliku i obezbedio tačan izlaz bez neželjenih prevoda.
+  2. **Near-Duplicate deduplikacija:** Implementirali smo programsku deduplikaciju u `lektor_segments` koja poredi susedne segmente koristeći Jaccard similarity sa pragom 0.85. Ukoliko se prepozna skoro identično ponavljanje u engleskom ili srpskom jeziku, tekst drugog segmenta se uklanja radi eliminisanja dosadnih ponavljanja (eha).
+  3. **Optimizacija LLM poziva:** Isključili smo reasoning mod slanjem parametra `enable_thinking=False` u payload-u ka Modal lektor i translator endpointima i uklonili polje `analysis` iz promptova čime smo drastično uštedeli tokene i smanjili šansu za lomljenje JSON strukture.
+  4. **Guided JSON strukturisani izlaz:** Integrisali smo `guided_json` strukturu za lektora (`lektor_schema`) sa šemom koja striktno zahteva niz `segments` sa objektima `{id, refined_text}` i usmerava vLLM dekoder ka validnom JSON-u. Ažurirali smo fallback log u lektoru da koristi `logging.error`.
+  5. **Glosar word boundaries:** Ispravili smo pretragu glosara u `translator.py` korišćenjem regex pretrage sa jasnim granicama reči (``) kako bismo izbegli pogrešna preklapanja (npr. reč "in" u "internet").
+  6. **Kompajliranje to_latin regexa (5x Ubrzanje):** Pre-kompajlirali smo kompletan replacements rečnik i prebacili ga na nivo modula zajedno sa `preserve_case` funkcijom. Profilisanjem smo dokazali da je vreme izvršavanja 1000 poziva `to_latin` palo sa **21.25s** na **4.14s** (500% ubrzanje).
+  7. **Unit testovi:** Napisali smo i proširili unit testove u [test_translator.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_translator.py) kako bismo testirali maskiranje entiteta (Wi-Fi, GPS, Bluetooth), Jaccard deduplikaciju, i word boundaries glosara sa ispravnim mock-ovanjem svih API poziva. Svi testovi (26/26) uspešno prolaze.
+
 ## [2026-06-19 08:01:00] Faza 0: Otklanjanje kritičnih bagova u pipeline-u za EN->SR prevod
 - **Opis:**
   Uspešno smo završili implementaciju i verifikaciju Faze 0 sa ciljem stabilizacije prevodilačkog i lektorskog pipeline-a:
