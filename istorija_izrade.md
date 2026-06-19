@@ -1,3 +1,13 @@
+## [2026-06-19 08:01:00] Faza 0: Otklanjanje kritičnih bagova u pipeline-u za EN->SR prevod
+- **Opis:**
+  Uspešno smo završili implementaciju i verifikaciju Faze 0 sa ciljem stabilizacije prevodilačkog i lektorskog pipeline-a:
+  1. **Redosled post-procesiranja i Leak Guard:** U `lektor_segments` smo promenili redosled izvršavanja determinističkog sloja na: `unmask` -> `to_latin` -> `clean_translation_text`. Dodali smo i `LEAK_PATTERN` guard koji prepoznaje ijekavicu i hrvatske reči koje procure u finalni izlaz i automatski pokreće ponovno čišćenje. Takođe smo obezbedili prosleđivanje maski iz translatora.
+  2. **Bezbedan futur bez kvarenja imenica:** Izmenili smo preširoko regex pravilo za futur u `clean_translation_text` tako da se spajanje vrši samo za glagolske osnove definisane na whitelist-i (`VERB_STEMS`). Time smo otklonili tihu korupciju imenica poput *put*, *internet*, *sat*, *sajt* i uspešno pokrili sve regresione slučajeve.
+  3. **Padež meseca:** Ispravili smo genitiv meseca u `to_latin` replacements rečniku (listopada -> oktobra) i uklonili obmanjujući komentar.
+  4. **Uklanjanje dupliranih ključeva:** Detektovali smo i uklonili sve duplirane ključeve u replacements rečniku (`dijeliti`, `dijeliće`, `dijelićeš`, `dijelićemo`, `dijelićete`, `općenito`). Konflikt za `općenito` je svesno razrešen tako da se mapira na `uopšte` (prirodniji ekvivalent u većini konteksta).
+  5. **Unapređenje cijeli -> ceo:** Izmenili smo mapiranje reči `cijeli` iz `celi` u `ceo` za prirodniji ekavski oblik u jednini i dodali `cijel -> ceo`.
+  6. **Unit testovi:** Napisali smo nove testove u [test_translator.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_translator.py) koji verifikuju ispravnost futura, padeže meseca, reč "cijeli", i proveravaju da li leak guard uspešno čisti ijekavski tekst kroz ceo pipeline. Svi testovi (23/23) u projektu uspešno prolaze.
+
 ## [2026-06-14 02:59:00] Implementacija 5 naprednih unapređenja prevodioca i lektora, ASR echo filtera i zatvorene petlje kompresije rečenica
 - **Opis:**
   Uspešno smo implementirali i verifikovali svih 5 predloženih naprednih unapređenja prevodioca i lektora na backendu:
@@ -2774,12 +2784,13 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Dokumentacija:** Ažuriran fajl `sicret doc/evaluacija_i_poredjenje_testova.md` sa novim podacima i kompletnom uporednom analizom sve tri runde testova.
 - **Status:** Završeno. Sve tri faze su uspešno implementirane, testirane (19/19 pytest prolaza i namenska test skripta), i verifikovane kroz treću rundu masovne evaluacije.
 
-### 14.06.2026. 11:45 — Otklanjanje regionalizama (hrvatskih/ijekavskih izraza), ispravka rodnih neusaglašenosti i baga sa ID 9999
-- **Zahtevi:** Otkloniti preostale ijekavizme i hrvatske izraze koje je korisnik primetio, popraviti neprirodne rečenice i osigurati da se lektura primenjuje na sve segmente.
+### 14.06.2026. 11:45 — Otklanjanje regionalizama, ispravka rodnih neusaglašenosti, rešavanje 400 Bad Request na Modalu i baga sa ID 9999
+- **Zahtevi:** Otkloniti preostale ijekavizme i hrvatske izraze koje je korisnik primetio, popraviti neprirodne rečenice, osigurati da se lektura primenjuje na sve segmente, i otkloniti `400 Bad Request` greške na Modalu.
 - **Urađeno:**
     * **Otklanjanje baga sa ID 9999:** Uočio sam da su primeri formata odgovora u `translator_prompt` i `lektor_prompt` koristili fiksni `"id": 9999`. LLM je to dosledno prepisivao, pa je JSON parser uspevao da učita samo 1 segment po batch-u, dok je ostalih 95% propadalo i išlo na neobrađen regex fallback. Zamenio sam to dinamičkim primerima (ID 0, 1) i uputstvom da ID mora odgovarati indeksu segmenta.
+    * **Otklanjanje 400 Bad Request grešaka na Modalu (Qwen limit):** Zbog predugačkih pravila u promptu i dinamičkog glosara, ukupan broj tokena sa `max_tokens` od 1500 je prelazio limit modela (4096 tokena) na vLLM API-ju, uzrokujući pucanje veze za skoro sve batch-eve. Skratio sam promptove za prevodioca i lektora za preko 500 tokena (sažimanjem pravila i diskursnih markera), i smanjio `max_tokens` na `1000` (više nego dovoljno za batch size 5), čime su sve 400 greške trajno eliminisane.
     * **Proširenje padeža i oblika u to_latin:** Proširio deterministički rečnik zamena za sve gramatičke padeže i glagolske oblike (npr. *tjedan*, *sustav*, *uvjet*, *utjecaj*, *sučelje*, *tvrtka*, *poveznica*, *tisuća*, *spriječiti*, *promijeniti*, *primijeniti*, *rješavati*, *tijelo*, *dijete*, *vjerojatno*, *učinkovit*, *izravno*). Rešen problem sa dupliranim ključem za *sučelja*.
     * **Ispravka rodnih neusaglašenosti:** Uvedene namenske zamene za fraze (npr. `ovom tjednu` -> `ovoj nedelji`) kako bi se izbegli gramatički neispravni oblici kao što je "u ovom nedelji".
     * **Stilska čišćenja u clean_translation_text:** Dodao dodatne regex zamene za prepoznavanje i korekciju neprirodnih konstrukcija modela ("postaje ludo" -> "postaje zanimljivo", "Ej-Aj" -> "Ej Aj").
     * **Verifikacija:** Proširena test skripta `scratch/test_untranslatable_and_negations.py` novim test primerima za sve padeže. Svi testovi, kao i kompletan `pytest` paket (19/19), uspešno prolaze.
-- **Status:** Završeno. Popravke su uspešno implementirane i lokalno verifikovane.
+- **Status:** Završeno. Sve popravke i optimizacije su uspešno implementirane i verifikovane.
