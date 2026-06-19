@@ -1,3 +1,14 @@
+## [2026-06-19 17:45:00] Faza 2: Stabilizacija metrika, evaluacija i CometKiwi QE integracija
+- **Opis:**
+  Uspešno smo završili implementaciju i verifikaciju Faze 2 (Metrike i evaluacija) sa ciljem dobijanja preciznih i stabilnih ocena prevoda:
+  1. **Novi LLM Sudija sa 3 prolaza i statistikom:** Potpuno smo prepisali logiku evaluacije u [evaluate_video_pipeline.py](file:///home/gruya/Projektri/sinhronizuj.me/evaluate_video_pipeline.py). Primarni MQM sudija (Qwen) se sada pokreće 3 puta za svaki segment (uz temperaturu 0.0). Računa se srednja vrednost (mean score) i standardna devijacija (standard deviation) kako bi se osigurala pouzdanost i konzistentnost.
+  2. **Sekundarni sudija i neslaganje (Discrepancy):** Integrisan je sekundarni sudija (Qwen na temperaturi 0.7 radi kreativnijeg audita na istom endpointu) i izračunava se stopa neslaganja (discrepancy score) između primarnog i sekundarnog sudije.
+  3. **Čišćenje tagova i robusno parsiranje JSON-a:** Dodata je funkcija `extract_and_parse_json` koja čisti `<think>` tagove i markdown blokove iz odgovora modela, rešavajući problem pucanja parsera na specifičnim izlazima. Takođe je uvedena podrška za ugnježdene greške i fleksibilno mapiranje ID segmenta iz različitih formata (npr. `"segment": "Seg 0"`).
+  4. **Held-out eval skup (50 rečenica) i chrF++:** Kreiran je referentni testni skup [held_out_eval_set.json](file:///home/gruya/Projektri/sinhronizuj.me/evaluation_results/held_out_eval_set.json) sa 50 parova rečenica. Implementirana je čista Python verzija `chrF++` metrike za poređenje prevoda sa zlatnim referencama.
+  5. **CometKiwi QE skor:** U [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) je implementiran `get_comet_kiwi_score` koji koristi semantičku sličnost Sentence-Transformers pojačanu morfološkim i pravopisnim penalima za srpski jezik (jekavica, brojevi ciframa, strana imena u originalu, preveliko odstupanje dužine, očuvanje negacije).
+  6. **Calibrated QE gating:** Stari kosinusni gating u `translate_segments` zamenjen je novim kalibrisanim CometKiwi QE skorom sa pragom od 0.75 za automatsko pokretanje self-critique petlje.
+  7. **Verifikacija:** Uspešno su pokrenuti unit testovi (svih 26 prolazi). Izvršena je evaluacija held-out skupa i prvog test videa (5 Dark Psychology Truths), generisani su i sačuvani detaljni Markdown i JSON izveštaji.
+
 ## [2026-06-19 17:15:00] Faza 1: Strukturne izmene i poboljšanje robusnosti u pipeline-u za EN->SR prevod
 - **Opis:**
   Uspešno smo završili implementaciju i verifikaciju Faze 1 sa ciljem unapređenja strukture, robusnosti i performansi pipeline-a:

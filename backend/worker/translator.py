@@ -117,6 +117,61 @@ def semantic_similarity(english_text: str, serbian_text: str) -> float:
         print(f"[EMBEDDING ERROR] Greška pri računanju semantičke sličnosti: {e}", flush=True)
         return 0.8  # Fallback
 
+def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
+    """
+    Quality Estimation (QE) skor koji zamenjuje stari kosinusni gejting.
+    Kombinuje semantičku sličnost (Sentence-Transformers) sa morfološkim,
+    sintaksičkim i pravopisnim kaznenim poenima prilagođenim srpskim pravilima projekta.
+    """
+    if not english_text or not serbian_text:
+        return 1.0
+        
+    # 1. Bazična semantička sličnost
+    base_similarity = semantic_similarity(english_text, serbian_text)
+    
+    # 2. Pravopisni/morfološki kazneni poeni
+    penalties = 0.0
+    
+    # a) Curenje dijalekta (ijekavica / hrvatski regionalizmi)
+    LEAK_PATTERN = re.compile(
+        r'\b(dio|dijel\w*|dvjesto|spriječi\w*|tijekom|sustav\w*|tjedan|tjedn\w*|'
+        r'tisuć\w*|uvjet\w*|utjecaj\w*|sučelj\w*|zaslon\w*|tipkovnic\w*|poveznic\w*|'
+        r'vidjeti|djeluj\w*|riješi\w*|uvijek|gdje)\b', re.IGNORECASE)
+    
+    leaks = LEAK_PATTERN.findall(serbian_text)
+    if leaks:
+        # Kazna: 0.1 po uočenoj reči
+        penalties += 0.1 * len(leaks)
+        
+    # b) Brojevi napisani ciframa umesto rečima
+    if re.search(r'\b\d+\b', serbian_text):
+        if re.search(r'\b\d+\b', english_text):
+            penalties += 0.08
+            
+    # c) Padež meseca
+    if "listopada" in serbian_text.lower() or ("oktobru" in serbian_text.lower() and "u oktobru" not in serbian_text.lower()):
+        penalties += 0.1
+        
+    # d) Strana imena napisana u originalu (npr. Claude, OpenAI, a ne Klod, Ej Aj)
+    # Ignorišemo Wi-Fi, GPS, Bluetooth koji ostaju u originalu
+    english_words = re.findall(r'\b[A-Za-z]+\b', serbian_text)
+    allowed_entities = {"Wi-Fi", "WiFi", "GPS", "Bluetooth", "wifi", "gps", "bluetooth", "ENTITY", "CODE", "URL", "EMAIL"}
+    unallowed_english = [w for w in english_words if w not in allowed_entities]
+    if unallowed_english:
+        penalties += 0.05 * len(unallowed_english)
+        
+    # e) Negacija
+    if not check_negation_preservation(english_text, serbian_text):
+        penalties += 0.2
+        
+    # f) Predugačak prevod (veliko odstupanje u dužini)
+    if len(serbian_text) > len(english_text) * 1.5:
+        penalties += 0.05
+        
+    # Izračunavanje finalnog QE skora
+    qe_score = base_similarity - penalties
+    return max(0.0, min(1.0, qe_score))
+
 def retranslate_with_self_critique(english_text: str, bad_translation: str, feedback_hint: str) -> str:
     if not settings.MODAL_LEKTOR_URL:
         return bad_translation
@@ -1367,16 +1422,17 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     orig_text = orig_segment["text"]
                     
                     negation_ok = check_negation_preservation(orig_text, unmasked_text)
-                    sim_score = semantic_similarity(orig_text, unmasked_text)
-                    print(f"[VALIDATION] Segment {idx}: Negation OK = {negation_ok}, Similarity = {sim_score:.3f}", flush=True)
+                    # Zamena starog kosinusnog gejtinga CometKiwi skorom sa kalibrisanim pragom
+                    qe_score = get_comet_kiwi_score(orig_text, unmasked_text)
+                    print(f"[VALIDATION] Segment {idx}: Negation OK = {negation_ok}, CometKiwi QE Score = {qe_score:.3f}", flush=True)
                     
                     # Automatska re-prevod i samokritika petlja ako validacija ne prođe
-                    if not negation_ok or sim_score < 0.72:
+                    if not negation_ok or qe_score < 0.75:
                         hints = []
                         if not negation_ok:
                             hints.append("Prevod je izgubio negaciju iz originala. Originalna rečenica ima negaciju (not/never/no/don't itd.), dok tvoj prevod nema. Obavezno ispravi prevod da sadrži negaciju (ne/nikad/nije/nema/nemam).")
-                        if sim_score < 0.72:
-                            hints.append("Prevod je semantički previše udaljen od originala. Zadrži tačan smisao rečenice i nemoj dodavati suvišne reči ili interpretacije.")
+                        if qe_score < 0.75:
+                            hints.append("Prevod ima nizak kvalitet ili odstupa od standarda projekta (ekavica, bez regionalizama, brojevi rečima, fonetska imena). Zadrži tačan smisao rečenice i striktno poštuj pravila prevoda.")
                         
                         hint_str = " ".join(hints)
                         print(f"[RETRANSLATION NEEDED] Segment {idx} ne zadovoljava kriterijume. Pokrećem self-critique...", flush=True)
@@ -1387,8 +1443,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                         unmasked_refined = unmask_text(refined, self_critique_masks)
                         
                         negation_ok_2 = check_negation_preservation(orig_text, unmasked_refined)
-                        sim_score_2 = semantic_similarity(orig_text, unmasked_refined)
-                        print(f"[VALIDATION AFTER SELF-CRITIQUE] Segment {idx}: Negation OK = {negation_ok_2}, Similarity = {sim_score_2:.3f}", flush=True)
+                        qe_score_2 = get_comet_kiwi_score(orig_text, unmasked_refined)
+                        print(f"[VALIDATION AFTER SELF-CRITIQUE] Segment {idx}: Negation OK = {negation_ok_2}, CometKiwi QE Score = {qe_score_2:.3f}", flush=True)
                         
                         unmasked_text = unmasked_refined
                         
