@@ -1,4 +1,12 @@
-import pytest
+from backend.cli import create_admin
+from tests.conftest import TestingSessionLocal
+
+def create_test_admin(email, password):
+    db = TestingSessionLocal()
+    try:
+        create_admin(email, password, db=db)
+    finally:
+        db.close()
 
 def test_admin_routes_forbidden_for_regular_user(client):
     """
@@ -26,22 +34,16 @@ def test_create_first_admin_and_access_routes(client):
     """
     Testira kreiranje prvog administratora i uspešan pristup admin rutama.
     """
-    # 1. Kreiranje prvog admina preko endpointa
+    # 1. Provera da je stara ruta create-first-admin zaista uklonjena (404)
     admin_payload = {
         "email": "superadmin@sinhronizuj.me",
         "password": "SuperSecretPassword123"
     }
     response = client.post("/api/v1/admin/create-first-admin", json=admin_payload)
-    assert response.status_code == 200
-    assert "promovisan" in response.json()["message"]
+    assert response.status_code == 404
     
-    # 2. Pokušaj kreiranja još jednog prvog admina (treba da pukne sa 400)
-    response2 = client.post("/api/v1/admin/create-first-admin", json={
-        "email": "anotheradmin@sinhronizuj.me",
-        "password": "Password123!"
-    })
-    assert response2.status_code == 400
-    assert "Administrator već postoji" in response2.json()["detail"]
+    # 2. Kreiranje admina preko CLI funkcije
+    create_test_admin(admin_payload["email"], admin_payload["password"])
     
     # 3. Login sa admin nalogom
     login_resp = client.post("/api/v1/auth/login", json=admin_payload)
@@ -62,9 +64,9 @@ def test_waitlist_approval_flow(client):
     """
     Testira ceo tok odobravanja i odbijanja waitlist prijava.
     """
-    # 1. Kreiramo admina
+    # 1. Kreiramo admina preko CLI funkcije
     admin_payload = {"email": "admin_wl@sinhronizuj.me", "password": "Password123!"}
-    client.post("/api/v1/admin/create-first-admin", json=admin_payload)
+    create_test_admin(admin_payload["email"], admin_payload["password"])
     login_resp = client.post("/api/v1/auth/login", json=admin_payload)
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -94,9 +96,9 @@ def test_toggle_user_admin(client):
     """
     Testira da administrator može drugom korisniku dati admin prava.
     """
-    # 1. Kreiramo prvog admina
+    # 1. Kreiramo prvog admina preko CLI funkcije
     admin_payload = {"email": "boss@sinhronizuj.me", "password": "Password123!"}
-    client.post("/api/v1/admin/create-first-admin", json=admin_payload)
+    create_test_admin(admin_payload["email"], admin_payload["password"])
     login_resp = client.post("/api/v1/auth/login", json=admin_payload)
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}

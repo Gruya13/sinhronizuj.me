@@ -112,7 +112,7 @@ export default function StudioTimeline() {
 
   // Izvedene vrednosti za putanje zvuka
   const dubbedFilename = project?.dubbed_audio_path ? project.dubbed_audio_path.split('/').pop() : null;
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://12.34.56.78:8000";
   const dubbedAudioUrl = project?.dubbed_audio_url || (dubbedFilename ? `${API_BASE_URL}/videos/${dubbedFilename}?cb=${dubbedBuster}` : null);
 
   const noVocalsFilename = project?.no_vocals_path ? project.no_vocals_path.split('/').pop() : null;

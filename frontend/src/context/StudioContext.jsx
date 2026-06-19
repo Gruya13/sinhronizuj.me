@@ -4,7 +4,7 @@ import { api } from '../services/api';
 
 const StudioContext = createContext();
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://12.34.56.78:8000";
 
 export function StudioProvider({ children }) {
   // Stanja za autentifikaciju

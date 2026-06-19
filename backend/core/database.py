@@ -23,6 +23,7 @@ Base = declarative_base()
 
 # FastAPI Dependency za dobijanje DB sesije po zahtevu
 def get_db():
+    print("\n[ORIGINAL_GET_DB] Pozvan originalni get_db!", flush=True)
     db = SessionLocal()
     try:
         yield db

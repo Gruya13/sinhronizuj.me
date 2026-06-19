@@ -9,12 +9,12 @@ Ovaj dokument pruža detaljan pregled produkcione i razvojne infrastrukture, Doc
 Aplikacija je hostovana na Hetzner Cloud VPS serverima (Falkenstein lokacija), podeljenim na dva izolovana okruženja:
 
 ### 1.1. Razvojno okruženje (Development VPS)
-*   **IP Adresa**: `116.202.103.35`
+*   **IP Adresa**: `98.76.54.32`
 *   **Namena**: Testiranje novih funkcionalnosti pre puštanja u produkciju.
 *   **Grana**: Povezano sa `development` granom na GitHub-u. Automatski deploy se vrši nakon uspešnog CI testa i build-a slika na GHCR.
 
 ### 1.2. Produkciono okruženje (Production VPS)
-*   **IP Adresa**: `178.104.214.78`
+*   **IP Adresa**: `12.34.56.78`
 *   **Namena**: Aktivna verzija aplikacije za krajnje korisnike.
 *   **Grana**: Povezano sa `main` granom na GitHub-u. Zahteva prolazak celokupnog CI/CD ciklusa i manuelno odobrenje/tagovanje pre puštanja.
 

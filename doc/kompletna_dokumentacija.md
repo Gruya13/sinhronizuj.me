@@ -103,8 +103,8 @@ AI modeli se izvršavaju na serverless Modal platformi, što omogućava nulte tr
 Aplikacija se razvija i isporučuje kroz strukturisani DevOps pipeline:
 
 ### 6.1. VPS Serveri
-*   **Development VPS**: `116.202.103.35` (povezan sa `development` granom na GitHub-u).
-*   **Production VPS**: `178.104.214.78` (povezan sa `main` granom).
+*   **Development VPS**: `98.76.54.32` (povezan sa `development` granom na GitHub-u).
+*   **Production VPS**: `12.34.56.78` (povezan sa `main` granom).
 *   **Sigurnost**: Nginx SSL reverse proxy, Cloudflare proxy zaštita i mrežni UFW firewall.
 
 ### 6.2. Docker Compose lokalni servisi i produkcioni kontejneri

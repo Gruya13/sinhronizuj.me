@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://12.34.56.78:8000";
 
 export default function LandingPage({ onEnterLogin }) {
   // Stanja za listu čekanja
