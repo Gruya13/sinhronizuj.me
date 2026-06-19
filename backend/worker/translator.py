@@ -7,6 +7,7 @@ import re
 from typing import List
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
+from backend.worker.numbers_to_words import convert_numbers_to_words
 
 def mask_untranslatable(text: str) -> tuple[str, dict]:
     if not text:
@@ -1163,7 +1164,7 @@ def calculate_dynamic_factor(seg: dict, user_avg_speedup: float = 1.0) -> float:
         
     return factor
 
-def translate_segments(segments: list, video_path: str = None, progress_callback=None, user_avg_speedup: float = 1.0) -> dict:
+def translate_segments(segments: list, video_path: str = None, progress_callback=None, user_avg_speedup: float = 1.0, skip_lektor: bool = False, skip_gating: bool = False, skip_deduplication: bool = False) -> dict:
     """
     Poziva Modal Serverless Lektor (Qwen3-32B) za tekstualni prevod visoke tačnosti.
     Optimizovano: bez slika, bez hladnog starta na A10G, batch size = 30.
@@ -1427,7 +1428,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     print(f"[VALIDATION] Segment {idx}: Negation OK = {negation_ok}, CometKiwi QE Score = {qe_score:.3f}", flush=True)
                     
                     # Automatska re-prevod i samokritika petlja ako validacija ne prođe
-                    if not negation_ok or qe_score < 0.75:
+                    if not skip_gating and (not negation_ok or qe_score < 0.75):
                         hints = []
                         if not negation_ok:
                             hints.append("Prevod je izgubio negaciju iz originala. Originalna rečenica ima negaciju (not/never/no/don't itd.), dok tvoj prevod nema. Obavezno ispravi prevod da sadrži negaciju (ne/nikad/nije/nema/nemam).")
@@ -1493,6 +1494,23 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         
     # Pokretanje Lektor faze sa prosleđenim parametrima
     try:
+        if skip_lektor:
+            # Ako preskačemo lektora, moramo odraditi unmasking i prevođenje u latinicu i clean_translation_text za finalne segmente
+            for fs in final_segments:
+                unmasked = unmask_text(fs["text"], fs["masks"])
+                from backend.worker.translator import to_latin
+                lat = to_latin(unmasked)
+                cleaned = clean_translation_text(lat)
+                fs["text"] = cleaned
+            return {
+                "status": "success",
+                "translated_segments": final_segments,
+                "metrics": {
+                    "translator_duration": translator_duration,
+                    "lektor_duration": 0.0
+                }
+            }
+        
         return lektor_segments(
             segments, 
             final_segments, 
@@ -1500,7 +1518,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             translator_duration=translator_duration,
             dynamic_glossary_str=dynamic_glossary_str,
             video_summary=video_summary,
-            user_avg_speedup=user_avg_speedup
+            user_avg_speedup=user_avg_speedup,
+            skip_deduplication=skip_deduplication
         )
     except Exception as e:
         import traceback
@@ -1558,13 +1577,7 @@ def clean_translation_text(text: str) -> str:
     # 11. Ispravka nepravilnog 'zabrinu o riziku' -> 'zabrinuti zbog rizika'
     text = re.sub(r'\bkoji se (zabrinu|zabrinjavaju|zabrinjuju) o riziku\b', 'koji su zabrinuti zbog rizika', text, flags=re.IGNORECASE)
 
-    # 12. Ispravka "Nemam lice" -> "Nema lice" (za seg-5, opis robota Lune)
-    text = re.sub(r'\bNemam lice\b', 'Nema lice', text, flags=re.IGNORECASE)
-    
-    # 13. Ispravka "veliki log na zidu" / "veliki log" -> "veliki logo"
-    text = re.sub(r'\bveliki log na zidu\b', 'veliki logo na zidu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnaslika veliki log\b', 'naslika veliki logo', text, flags=re.IGNORECASE)
+
     # 14. Ispravka "žele ovo budućnost" -> "žele takvu budućnost"
     text = re.sub(r'\bžele ovo budućnost\b', 'žele takvu budućnost', text, flags=re.IGNORECASE)
     
@@ -1611,48 +1624,7 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bšljofanja\b', 'brušenja', text, flags=re.IGNORECASE)
     text = re.sub(r'\bšljofati\b', 'brusiti', text, flags=re.IGNORECASE)
     
-    # Dodatne ispravke za video 3
-    text = re.sub(r'\brđav[ao] drv[o-z]\b', 'crvenkasto drvo', text, flags=re.IGNORECASE)
-    text = re.sub(r'\brđast[ao] drv[o-z]\b', 'crvenkasto drvo', text, flags=re.IGNORECASE)
-    text = re.sub(r'\brđast[a-z]*\b', 'crvenkast', text, flags=re.IGNORECASE)
-    text = re.sub(r'\botrpere\b', 'obriše', text, flags=re.IGNORECASE)
-    text = re.sub(r'\btrli\b', 'trlja', text, flags=re.IGNORECASE)
-    text = re.sub(r'\btamlja\b', 'trlja', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnevjera\b', 'neverovatno', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnevjerojatan\b', 'neverovatan', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnevjerojatno\b', 'neverovatno', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bkontrast je neverovatno\b', 'kontrast je neverovatan', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bkontrast je neverovatan\b', 'kontrast je neverovatan', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bsečiv\b', 'sečivo', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bžičani sečiv\b', 'žičanu testeru', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bžičani sečivom\b', 'žičanom testerom', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bničeg osim ovim\b', 'ničeg osim ovog', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bničeg osim ove\b', 'ničeg osim ovog', text, flags=re.IGNORECASE)
-    text = re.sub(r'\btamne komade drvenog\b', 'tamnog komada drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bosnovnim tamnim komade drvenog\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bosnovnim tamnim komadom drvenog\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bosnovnim tamnim komadom drveta\b', 'osnovnog tamnog komada drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bKineski šahovski komplet\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bKineski šahovski set\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bKinesku šahovsku ploču\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bKineski šahovsku ploču\b', 'kineski šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bšahovsku ploču\b', 'šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bšahovski set\b', 'šahovski komplet', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bsabošenje\b', 'šmirglanje', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bsabošenja\b', 'šmirglanja', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bsabošiti\b', 'šmirglati', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bveštinu majstora\b', 'majstorsku veštinu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bveštinu ovog majstora\b', 'majstorsku veštinu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bstvari postaju zanimljive\b', 'stvari postaju fascinantne', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bpostaju zanimljive\b', 'postaju fascinantne', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bboju drva\b', 'boju drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bduboku boju drva\b', 'duboku boju drveta', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bda stampa granicu\b', 'da utisne ivicu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bvisokoj toploti da stampa granicu\b', 'visoku toplotu da utisne ivicu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bvisokoj toploti da stampa\b', 'visoku toplotu da utisne', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bvisokoj toploti\b', 'visokom toplotom', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bkoristi visokoj toploti\b', 'koristi visoku toplotu', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bkoristi visoku temperaturu za peč\b', 'koristi visoku toplotu da utisne ivicu', text, flags=re.IGNORECASE)
+
     # 18.5 Dodatna stilska čišćenja za Ej Aj i neprirodne fraze
     text = re.sub(r'\bEj-Aj\b', 'Ej Aj', text, flags=re.IGNORECASE)
     text = re.sub(r'\bEj-Aja\b', 'Ej Aja', text, flags=re.IGNORECASE)
@@ -1707,7 +1679,10 @@ def clean_translation_text(text: str) -> str:
     text = re.sub(r'\bučinkovit(a|o|i|e|u|om)\b', r'efikasn\1', text, flags=re.IGNORECASE)
     text = re.sub(r'\btvrtk(a|e|i|u|om|ama)\b', r'firm\1', text, flags=re.IGNORECASE)
 
-    # 19. Dupli razmaci i čišćenje
+    # 19. Deterministička konverzija brojeva u reči
+    text = convert_numbers_to_words(text)
+
+    # 20. Dupli razmaci i čišćenje
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -1880,7 +1855,7 @@ def calculate_jaccard_similarity(text1: str, text2: str) -> float:
     union = set1.union(set2)
     return len(intersection) / len(union)
 
-def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0, dynamic_glossary_str=None, video_summary=None, user_avg_speedup: float = 1.0):
+def lektor_segments(original_segments, translated_segments, progress_callback=None, translator_duration=0.0, dynamic_glossary_str=None, video_summary=None, user_avg_speedup: float = 1.0, skip_deduplication: bool = False):
     """
     Druga faza: Qwen 2.5/3.0 Lektor lekturiše grubi prevod sa programskom deduplikacijom i dinamičkim glosarom.
     Optimizovano: batch_size = 30, max_tokens = 1000, robusno JSON + Regex parsiranje.
@@ -1898,18 +1873,19 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         }
         
     # 0. Near-duplicate deduplikacija za susedne segmente
-    for i in range(1, len(translated_segments)):
-        orig_prev = original_segments[i-1].get("text", "")
-        orig_curr = original_segments[i].get("text", "")
-        trans_prev = translated_segments[i-1].get("text", "")
-        trans_curr = translated_segments[i].get("text", "")
-        
-        eng_sim = calculate_jaccard_similarity(orig_prev, orig_curr)
-        trans_sim = calculate_jaccard_similarity(trans_prev, trans_curr)
-        
-        if eng_sim >= 0.85 or trans_sim >= 0.85:
-            print(f"[DEDUP] Pronađen near-duplicate na segmentu {i}. Uklanjam ponavljanje.", flush=True)
-            translated_segments[i]["text"] = ""
+    if not skip_deduplication:
+        for i in range(1, len(translated_segments)):
+            orig_prev = original_segments[i-1].get("text", "")
+            orig_curr = original_segments[i].get("text", "")
+            trans_prev = translated_segments[i-1].get("text", "")
+            trans_curr = translated_segments[i].get("text", "")
+            
+            eng_sim = calculate_jaccard_similarity(orig_prev, orig_curr)
+            trans_sim = calculate_jaccard_similarity(trans_prev, trans_curr)
+            
+            if eng_sim >= 0.85 or trans_sim >= 0.85:
+                print(f"[DEDUP] Pronađen near-duplicate na segmentu {i}. Uklanjam ponavljanje.", flush=True)
+                translated_segments[i]["text"] = ""
 
     # 1. Programska deduplikacija ponovljenih identičnih segmenata
     unique_segments = []

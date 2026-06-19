@@ -205,4 +205,34 @@ def test_glossary_word_boundaries(mock_summary, mock_glossary, mock_call_endpoin
     assert "STRIKTNI PREDLOŽENI GLOSAR" not in prompt_sent or "in" not in prompt_sent
 
 
+# Testovi za Fazu 3.2: Deterministička konverzija brojeva u reči
+def test_numbers_to_words_conversion():
+    from backend.worker.numbers_to_words import num_to_words_sr, convert_numbers_to_words
+    
+    # 1. Testiranje num_to_words_sr direktno
+    assert num_to_words_sr(0) == "nula"
+    assert num_to_words_sr(5) == "pet"
+    assert num_to_words_sr(11) == "jedanaest"
+    assert num_to_words_sr(25) == "dvadeset pet"
+    assert num_to_words_sr(100) == "sto"
+    assert num_to_words_sr(123) == "sto dvadeset tri"
+    assert num_to_words_sr(1000) == "hiljadu"
+    assert num_to_words_sr(2026) == "dve hiljade dvadeset šest"
+    
+    # Redni brojevi
+    assert num_to_words_sr(1, ordinal=True) == "prvi"
+    assert num_to_words_sr(25, ordinal=True) == "dvadeset peti"
+    assert num_to_words_sr(2026, ordinal=True) == "dve hiljade dvadeset šesti"
+    
+    # 2. Testiranje convert_numbers_to_words kroz tekst
+    assert convert_numbers_to_words("Imamo 5 jabuka.") == "Imamo pet jabuka."
+    assert convert_numbers_to_words("U 2026. godini.") == "U dve hiljade dvadeset šesti godini."
+    assert convert_numbers_to_words("Smanjenje od 5% za sve.") == "Smanjenje od pet posto za sve."
+    
+    # 3. Testiranje kroz clean_translation_text
+    assert clean_translation_text("rezultat je 5") == "rezultat je pet"
+    assert clean_translation_text("cena je pala za 10%") == "cena je pala za deset posto"
+
+
+
 

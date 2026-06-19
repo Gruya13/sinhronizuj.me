@@ -1,3 +1,12 @@
+## [2026-06-19 23:15:00] Faza 3: Arhitektura (Uklanjanje hardkodova, konverzija brojeva, ablaciona studija i LoRA dataset)
+- **Opis:**
+  Uspešno smo završili implementaciju i verifikaciju Faze 3 (Arhitektura):
+  1. **Uklanjanje hardkodovanih pravila:** Očistili smo specifična pravila za video 3 (poput "Nemam lice", "šahovski komplet", "sabošenje", "rđasto drvo") iz `clean_translation_text` u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py). Time smo postigli opštost sistema.
+  2. **Deterministička konverzija brojeva:** Kreirali smo novi modul [numbers_to_words.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/numbers_to_words.py) koji prepoznaje cele brojeve, procente i redne brojeve u tekstu i automatski ih pretvara u reči na srpskom jeziku (ekavica). Integrisali smo ovaj modul na sam kraj determinističkog post-procesiranja u `clean_translation_text`.
+  3. **Ablaciona studija:** Kreirali smo skriptu [run_ablation_study.py](file:///home/gruya/Projektri/sinhronizuj.me/run_ablation_study.py) koja automatski meri uticaj svake komponente pipeline-a (Lektor faza, CometKiwi gating/self-critique, Jaccard deduplikacija) nad held-out test skupom od 50 rečenica. Rezultati pokazuju da **Full Pipeline** daje najviši chrF++ skor od **0.6854** (u poređenju sa 0.6328 bez lektora, 0.6429 bez gatinga i 0.6376 bez deduplikacije).
+  4. **LoRA dataset:** Kreirali smo skriptu [prepare_lora_dataset.py](file:///home/gruya/Projektri/sinhronizuj.me/prepare_lora_dataset.py) koja izvozi parove iz held-out skupa u chat formatu (system prompt, user izvor, assistant referentni prevod) u JSONL datoteku spremnu za fine-tuning Qwen modela.
+  5. **Unit testovi:** Napisali smo nove unit testove za konverziju brojeva u [test_translator.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_translator.py) i pokrenuli pytest. Svi testovi (27/27) uspešno prolaze.
+
 ## [2026-06-19 17:45:00] Faza 2: Stabilizacija metrika, evaluacija i CometKiwi QE integracija
 - **Opis:**
   Uspešno smo završili implementaciju i verifikaciju Faze 2 (Metrike i evaluacija) sa ciljem dobijanja preciznih i stabilnih ocena prevoda:
