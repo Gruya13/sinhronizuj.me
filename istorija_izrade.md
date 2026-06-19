@@ -1,3 +1,10 @@
+## [2026-06-20 00:35:00] Analiza pravne usklađenosti i izrada izveštaja (Wav2Lip licence, Voice Cloning i GDPR/EU AI Act)
+- **Opis:**
+  Sproveli smo sveobuhvatnu pravnu i etičku analizu celokupnog staka modela i arhitekture projekta sinhronizuj.me pred javno lansiranje (P4). Detaljan izveštaj je sačuvan u [pravna_usklađenost_izvestaj.md](file:///home/gruya/.gemini/antigravity/brain/bf11e4db-91f7-4c6e-a67c-cd38dff657a5/.system_generated/worktrees/subagent-Legal-and-Ethical-Compliance-Officer-LegalComplianceAgent-37fcb52a/doc/pravna_usklađenost_izvestaj.md):
+  1. **Licence modela i komercijalizacija:** Identifikovali smo da Wav2Lip ima nekomercijalnu licencu (CC BY-NC-SA 4.0) što ga čini nepogodnim za komercijalnu upotrebu. Predložili smo prelazak na dozvoljene alternative poput SadTalker-a (MIT), GeneFace++, obuke custom Wav2Lip modela na čistim podacima ili integraciju Tavus/HeyGen API-ja. Ostali modeli (Demucs v4, Faster-Whisper, SenseVoice, Qwen2-VL, Piper, OpenVoice v2) su pod komercijalno čistim licencama (MIT/Apache 2.0).
+  2. **Voice Cloning kontrole:** Definisali smo politiku saglasnosti (Active Consent Verification) kroz snimanje usmene izjave uživo, pretragu baze poznatih glasova radi sprečavanja impersonacije javnih ličnosti, SLA za takedown procedure i uvođenje steganografskog (nečujnog) vodenog žiga u generisani audio (AudioSeal od Meta AI).
+  3. **GDPR i EU AI Act (Transfer na Modal GPU):** Analizirali smo prenos biometrijskih i ličnih podataka iz EU (Hetzner) na Modal servere u SAD. Definisali smo pravne mere (potpisivanje DPA i SCC sa Modal Labs) i tehničke korake (minimizacija prenesenih podataka, zero-retention politika i prenos obrade u EU cloud regije). Definisali smo obaveze transparentnosti i označavanja sintetičkog sadržaja (Deepfake) prema EU AI Act-u.
+
 ## [2026-06-19 23:42:47] Faza 4: Modularni Refaktor
 - **Opis:**
   Uspešno smo završili Fazu 4 (Modularni refaktor) sa ciljem poboljšanja održavanja koda i strukturisanja u manja, koherentna logička celina:
