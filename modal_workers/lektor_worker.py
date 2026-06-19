@@ -44,7 +44,7 @@ def serve():
         "--served-model-name", "qwen-lektor",
         "--tensor-parallel-size", "1",
         "--gpu-memory-utilization", "0.95",
-        "--max-model-len", "4096",
+        "--max-model-len", "8192",
         "--enable-prefix-caching",
         "--enable-chunked-prefill",
         "--port", "8000"

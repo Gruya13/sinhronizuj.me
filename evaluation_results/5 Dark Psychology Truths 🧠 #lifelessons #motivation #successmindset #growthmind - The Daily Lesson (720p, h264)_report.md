@@ -1,44 +1,39 @@
 # Izveštaj o Evaluaciji Prevoda Videa
 
 **Video:** `5 Dark Psychology Truths 🧠 #lifelessons #motivation #successmindset #growthmind - The Daily Lesson (720p, h264).mp4`
-**Datum evaluacije:** 2026-06-14 10:57:23
-**Trajanje obrade:** ASR: 20.8s | Prevođenje: 87.8s | Ukupno: 126.2s
+**Datum evaluacije:** 2026-06-19 16:48:46
+**Trajanje obrade:** ASR: 454.9s | Prevođenje: 123.2s | Ukupno: 596.5s
 
 ---
 
 <think>
-Okay, let me start by looking at the translation provided. The user wants me to evaluate it based on four criteria: accuracy, tone and naturalness, glossary alignment, and segment length. 
+Okay, let's tackle this translation evaluation. First, I need to check each segment for accuracy. The user mentioned looking at meaning preservation and mistranslations. For example, in Seg 5, "is often protecting a heart that's breaking" is translated as "često zaštititi srce koje je slomilo." The verb tense here might be off. "Slomilo" is past tense, but the original is present participle "breaking." Maybe "slomljeno" would be better.
 
-First, checking accuracy. The first segment translates "Dark psychology. Number one." as "Tamna psihologija. Broj jedan." That seems correct. But in segment 1, "hard to read" is translated as "teško pročitati". Wait, "hard to read" here probably means someone who is difficult to read emotionally, so maybe "teško pročitati" is okay. But maybe "teško pročitati" is a bit literal. Let me check the rest. Segment 2: "stays calm in chaos" becomes "ostaje mirna u kaosu". That's accurate. 
+Next, tone and naturalness. Serbian should sound natural. Seg 0: "Tamna psihologija. Prvi broj." That's straightforward, but maybe "Prvi broj" could be "Prvi" to sound more like a list. Also, in Seg 2, "borila se sa olujama koje nikada nećeš videti" – "borila se" is past tense, but the original uses present perfect "has fought," so maybe "je borila se" is correct, but the structure feels a bit off.
 
-Tone and naturalness: The translations seem to be in a conversational tone, which fits the genre of a video transcript. However, in segment 5, "smehuje se svemu" – "smehuje" is "laughs", but "smehuje se svemu" might be a bit awkward. Maybe "smehuje se na sve" would be more natural. 
+Glossary alignment: Check if terms are consistent. The numbers are translated as "Prvi broj," "Drugi broj," etc. That's consistent. No brands or technical terms here, so probably okay.
 
-Glossary alignment: There are no technical terms or brands here, so this might not be an issue. 
+Segment length and speech tempo. Serbian is 20-30% longer. Let's check durations. Seg 1 is 5.1s with a longer sentence. The translation might be okay, but Seg 5's translation is a bit long for 5.4s. The sentence structure could be adjusted for smoother delivery.
 
-Segment length: The Serbian translations are a bit longer, which is expected. For example, segment 1's English is 5.1s and the Serbian is similar in length. But segment 4's translation is "ističe se bez objašnjenja" for "disappears without explanation". "Ističe se" usually means "stands out", so that's a mistranslation. It should be "izgubi se" or "nestane". 
-
-So the main issues are in segment 4's mistranslation of "disappears" and segment 5's awkward phrasing. Also, segment 1's "teško pročitati" might be a bit off. 
-
-For the quality score, considering these errors, maybe a 7.5/10. The translations are mostly accurate but have some key errors affecting meaning and naturalness.
+Now, compiling the report. The main issues are in Seg 5's tense and Seg 2's verb form. Also, Seg 4's "izgubi se" should be "izgubi se" but maybe "izgubi se" is correct. Wait, "izgubi se" is third person, but the original is "disappears," so "izgubi se" is correct. Hmm. Maybe that's okay. The main errors are in Seg 5 and Seg 2. The score would be around 8/10, considering the minor issues but overall good translation.
 </think>
 
-## Ocena kvaliteta: 7.5/10
+## Ocena kvaliteta: 8/10
 
 ## Rezime kvaliteta prevoda  
-Prevod je u većem delu tačan i prirodan, ali postoje greške u određenim segmentima koje utiču na preciznost i glatkoću. Tekst je prilagođen govoru, ali neki izrazi zvuče manje prirodno.
+Prevod je u celini tačan i prirodan, ali postoje sitne greške u gramatikama i tonu. Tekst je jasan, ali neki segmenti mogu biti optimizovani za prirodnost i ritam.
 
 ## Detaljna analiza po kriterijumima  
-1. **Tačnost**: Segment 4 ("ističe se bez objašnjenja") nije tačan – "ističe se" znači "istaknuti se", a ne "disappear". Treba "izgubi se" ili "nestane".  
-2. **Tone i prirodnost**: Segment 5 ("smehuje se svemu") zvuči nezgrapno. Prirodniji bi bio "smehuje se na sve".  
-3. **Segment dužina**: Segment 1 je prihvatljiv, ali segment 4 je kraći od originala, što može izazvati neusklađenost u tempu.
+1. **Tačnost**: Većina značenja je sačuvana, ali u Seg 5 "zaštititi srce koje je slomilo" nije savršeno usklađeno sa "protecting a heart that's breaking".  
+2. **Ton i prirodnost**: "Prvi broj" (Seg 0) zvuči mehanički; "Prvi" bi bilo prirodnije.  
+3. **Dugina rečenica**: Seg 1 (5.1s) je prihvatljiv, ali Seg 5 (5.4s) bi zvučao bolje sa kraćim rečenicama za brži govor.
 
 ## Spisak segmenata sa najvažnijim greškama  
-- **Seg 4**: "ističe se bez objašnjenja" → netočna prezentacija "disappears".  
-- **Seg 5**: "smehuje se svemu" → nezgrapan izraz.  
-- **Seg 1**: "teško pročitati" → može biti "teško pročitati emocije".
+- **Seg 5**: "zaštititi srce koje je slomilo" – netočan glagolski oblik i značenje.  
+- **Seg 2**: "je borila se sa olujama koje nikada nećeš videti" – "borila se" (prošli vreme) nije idealno za "has fought" (sadašnje perfekt).  
+- **Seg 0**: "Prvi broj" – neprirodan izraz za broj u listi.
 
 ## Preporuke za unapređenje  
-- Ispraviti segment 4 u "Osoba koja nestane bez objašnjenja...".  
-- U segmentu 5 koristiti "smehuje se na sve".  
-- U segmentu 1 dodati "emocije" za jasnoću.  
-- Proveriti dužinu rečenica da bi se održao prirodan temp govor.
+- U Seg 5 koristiti "zaštititi srce koje je slomljeno" ili "zaštititi slomljeno srce".  
+- U Seg 2 zamijeniti "je borila se" sa "je borila se" (ili "je borila se") za tačniji vremenski aspekt.  
+- U Seg 0 koristiti "Prvi" umesto "Prvi broj" za prirodnost.

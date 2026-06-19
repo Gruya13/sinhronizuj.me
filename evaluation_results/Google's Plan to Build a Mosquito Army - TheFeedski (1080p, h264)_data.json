@@ -1,183 +1,231 @@
 {
   "video_name": "Google's Plan to Build a Mosquito Army - TheFeedski (1080p, h264).mp4",
-  "evaluation_time": "2026-06-14T11:33:48.054770",
+  "evaluation_time": "2026-06-19T16:58:45.393749",
   "pipeline_durations": {
-    "asr_sec": 68.94394183158875,
-    "translation_sec": 197.46218705177307,
-    "total_sec": 287.22475481033325
+    "asr_sec": 174.67767763137817,
+    "translation_sec": 365.036657333374,
+    "total_sec": 595.6034460067749
   },
   "segments": [
     {
       "id": 0,
       "start": 0.0,
       "end": 5.96,
-      "text": "Google planira da pusti vojsku od trideset dva miliona komaraca da borav drugim komarcima i spasi živote.",
-      "original_text": "Google wants to release an army of 32 million mosquitoes to battle other mosquitoes and save lives."
+      "text": "Google želi da pusti vojsku od 32 miliona komaraca da boravi protiv drugih komaraca i spasi živote.",
+      "original_text": "Google wants to release an army of 32 million mosquitoes to battle other mosquitoes and save lives.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 1,
       "start": 5.96,
       "end": 11.04,
-      "text": "Ljudi su zabrinuti jer je poslednji put kada je to urađeno, stvoren je neki super komarac.",
-      "original_text": "But people are worried, because the last time this was done, a sort of super mosquito was bred."
+      "text": "Ljudi su zabrinuti jer je poslednji put kada je to urađeno, uzgojen je super komarac.",
+      "original_text": "But people are worried, because the last time this was done, a sort of super mosquito was bred.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 2,
       "start": 11.04,
       "end": 14.82,
-      "text": "Ljudi se pita zašto tehnička kompanija to radi?",
-      "original_text": "And people are also wondering, why is a tech company doing this?"
+      "text": "Ljudi se pita zašto tehnološka firma radi ovo?",
+      "original_text": "And people are also wondering, why is a tech company doing this?",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 3,
       "start": 14.82,
       "end": 16.4,
       "text": "Dakle, je li panika opravdana?",
-      "original_text": "So is the panic justified?"
+      "original_text": "So is the panic justified?",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 4,
       "start": 16.4,
       "end": 18.49,
-      "text": "Pa, evo svega što treba da znaš.",
-      "original_text": "Well, here's everything you need to know."
+      "text": "Evo, evo svega što trebaš da znaš.",
+      "original_text": "Well, here's everything you need to know.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 5,
       "start": 18.49,
       "end": 21.45,
-      "text": "Googleov plan je da masovno razmnoži mužjake komaraca",
-      "original_text": "Google's plan is to mass breed male mosquitoes that"
+      "text": "Googleov plan je da masovno uzgaja mužjake komaraca koji",
+      "original_text": "Google's plan is to mass breed male mosquitoes that",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 6,
       "start": 21.45,
       "end": 24.65,
-      "text": "koji su inficirani specifičnom bakterijom i otpuste ih.",
-      "original_text": "are infected with a specific bacteria and release them."
+      "text": "su zaraste konkretnom bakterijom i ispuste ih.",
+      "original_text": "are infected with a specific bacteria and release them.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 7,
       "start": 24.65,
       "end": 29.41,
-      "text": "Samo ženke komaraca kuse, što znači da su jedine koje",
-      "original_text": "Only female mosquitoes bite, meaning they're the only ones that can transmit diseases to humans."
+      "text": "Sam o ženke komaraca kuje, što znači da su jedine koje mogu prenositi bolesti ljudima.",
+      "original_text": "Only female mosquitoes bite, meaning they're the only ones that can transmit diseases to humans.",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 8,
       "start": 29.41,
       "end": 33.9,
-      "text": "Bakterija u mužjacima komaraca djeluje kao antikontraceptiv.",
-      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control."
+      "text": "Bakterija koja zaraste mužjake komaraca u laboratoriji u suštini deluje kao kontraceptiv.",
+      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 9,
       "start": 33.9,
       "end": 35.71,
       "text": "Oni će se pariti sa divljim ženkama,",
-      "original_text": "They will mate with wild females,"
+      "original_text": "They will mate with wild females,",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 10,
       "start": 35.71,
       "end": 36.86,
-      "text": "Jajima se neće izleći",
-      "original_text": "the eggs won't hatch,"
+      "text": "Jajima se neće izleži",
+      "original_text": "the eggs won't hatch,",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 11,
       "start": 36.86,
       "end": 41.96,
-      "text": "Očekuje se da će populacija komaraca koja prenosi dengu i žutu groznicu propasti",
-      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever collapses."
+      "text": "Nadamo se da će vrsta komaraca koja prenosi dengu i žutu groznicu izumreti",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever collapses.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 12,
       "start": 41.96,
       "end": 47.54,
-      "text": "E sad, vlade su primenile ovu tehniku decenijama sa nekim uspehom i nekim neuspehom",
-      "original_text": "Now, this technique has been done by governments for decades, with some success and some disaster."
+      "text": "E sad, ova tehnika se koristi decenijama, sa uspehom i neuspehom",
+      "original_text": "Now, this technique has been done by governments for decades, with some success and some disaster.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 13,
       "start": 47.54,
       "end": 51.5,
-      "text": "Google je industrijski razvio uzgoj sa Ej Ajem",
-      "original_text": "But Google has industrialized the breeding process with AI"
+      "text": "Google je industrializovao uzgoj Ej Ajem",
+      "original_text": "But Google has industrialized the breeding process with AI",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 14,
       "start": 51.5,
       "end": 54.77,
-      "text": "i robotiku na nivou koji samo tehnološki gigant može",
-      "original_text": "and robotics at a scale only a tech giant could."
+      "text": "Na nivou koji samo tehnološka gigantska firma može",
+      "original_text": "and robotics at a scale only a tech giant could.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 15,
       "start": 54.77,
       "end": 56.01,
-      "text": "Slični projekti proizveli neopasne komarce koji prenose bolesti ljudima.",
-      "original_text": "Similar projects produced harmless mosquitoes that can transmit diseases to humans."
+      "text": "Slični projekti proizveli su teško upravljive hibridne komarce u Brazilu koji su izazvali 350% porast denga groznice u Portoriku.",
+      "original_text": "Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico.",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 16,
       "start": 56.01,
-      "end": 58.12,
-      "text": "Bakterije u mužjacima laboratorijskih komaraca djeluju kao kontrola nad razmnožavanjem.",
-      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control."
+      "end": 57.94,
+      "text": "Bakterija koja zaraste mužjake komaraca u laboratoriji u suštini deluje kao kontraceptiv.",
+      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 17,
-      "start": 58.12,
-      "end": 58.94,
-      "text": "Spariće se sa divljim ženkama,",
-      "original_text": "They will mate with wild females,"
+      "start": 57.94,
+      "end": 58.68,
+      "text": "Oni će se pariti sa divljim ženkama,",
+      "original_text": "They will mate with wild females,",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 18,
-      "start": 58.94,
-      "end": 59.46,
-      "text": "jaja neće izleći,",
-      "original_text": "the eggs won't hatch,"
+      "start": 58.68,
+      "end": 59.16,
+      "text": "Jajima se neće izleži",
+      "original_text": "the eggs won't hatch,",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 19,
-      "start": 59.46,
-      "end": 61.53,
-      "text": "Cilj je specifična vrsta komaraca koja prenosi dengu i žutu groznicu.",
-      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever."
+      "start": 59.16,
+      "end": 61.27,
+      "text": "Nadamo se da će vrsta komaraca koja prenosi dengu i žutu groznicu izumreti",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever collapses.",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 20,
-      "start": 61.53,
-      "end": 63.79,
-      "text": "Dakle, kontrola hibridnih komaraca u Brazilu izazvala je porast denga groznice za 350 posto u Portoriku,",
-      "original_text": "So is the control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico,"
+      "start": 61.27,
+      "end": 63.9,
+      "text": "Slični projekti proizveli su teško upravljive hibridne komarce u Brazilu, što je izazvalo 350% porast denga groznice u Portoriku,",
+      "original_text": "Similar project produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico,",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 21,
-      "start": 63.79,
+      "start": 63.9,
       "end": 65.03,
-      "text": "ali bilo je izuzetno efikasno u Singapur.",
-      "original_text": "but it was also incredibly effective in Singapore."
+      "text": "ali bio je i izuzetno efikasan u Singapuru.",
+      "original_text": "but it was also incredibly effective in Singapore.",
+      "masks": {},
+      "confidence_score": 4
     },
     {
       "id": 22,
       "start": 65.03,
       "end": 65.72,
-      "text": "5. jun,",
-      "original_text": "On June 5th,"
+      "text": "5. juna,",
+      "original_text": "On June 5th,",
+      "masks": {},
+      "confidence_score": 5
     },
     {
       "id": 23,
       "start": 65.72,
       "end": 71.56,
-      "text": "EPA odlučuje da li će Google puštanje tih komaraca u Kaliforniji i Floridi.",
-      "original_text": "the EPA decides whether or not Google will be releasing those mosquitoes over California and Florida."
+      "text": "EPA odlučuje da li će Google pustiti te komarce u Kaliforniji i Floridi.",
+      "original_text": "the EPA decides whether or not Google will be releasing those mosquitoes over California and Florida.",
+      "masks": {},
+      "confidence_score": 5
     }
   ],
   "metrics": {
-    "translator_duration": 153.46209859848022,
-    "lektor_duration": 43.98357391357422
+    "translator_duration": 222.54626059532166,
+    "lektor_duration": 96.72213506698608
   }
 }

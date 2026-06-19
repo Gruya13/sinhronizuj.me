@@ -2794,3 +2794,16 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Stilska čišćenja u clean_translation_text:** Dodao dodatne regex zamene za prepoznavanje i korekciju neprirodnih konstrukcija modela ("postaje ludo" -> "postaje zanimljivo", "Ej-Aj" -> "Ej Aj").
     * **Verifikacija:** Proširena test skripta `scratch/test_untranslatable_and_negations.py` novim test primerima za sve padeže. Svi testovi, kao i kompletan `pytest` paket (19/19), uspešno prolaze.
 - **Status:** Završeno. Sve popravke i optimizacije su uspešno implementirane i verifikovane.
+
+### 19.06.2026. 17:10 — Refaktorisanje prevodioca, poboljšanje deduplikacije, maskiranje entiteta i Leak Guard
+- **Zahtevi:** Refaktorisati prevodilački i lektorski pipeline radi ubrzanja rada, bolje zaštite entiteta, sprečavanja ponavljanja i čišćenja dijalekata.
+- **Urađeno:**
+    * **Zaustavljanje evaluacije:** Prekinut pozadinski proces Runde 4 masovne evaluacije radi izvođenja i testiranja izmena.
+    * **Maskiranje Keep-original entiteta:** Dodato prepoznavanje i maskiranje u `translator.py` za standardne IT i komunikacione entitete (`Wi-Fi`, `WiFi`, `GPS`, `Bluetooth`) kako bi ostali neizmenjeni u svom originalnom obliku tokom celog toka prevođenja i lekture.
+    * **Ubrzanje prevodioca i ušteda tokena:** Izbačeno polje `"analysis"` iz preporučenog JSON šablona za grubi prevod u `translator.py` kako bi se skratio odgovor modela i smanjila potrošnja tokena.
+    * **Isključivanje Chain-of-Thought (razmišljanja):** Dodat parametar `"enable_thinking": False` u vLLM payload za pozivanje Lektor modela na Modalu kako bi se ubrzao odziv i uklonilo suvišno generisanje `<think>` tagova.
+    * **Deduplikacija i uklanjanje near-duplicate segmenata:** Implementirana funkcija `calculate_jaccard_similarity` za računanje Jaccard sličnosti između susednih segmenata. Dodat korak u `lektor_segments` koji briše duplirane prevode ako je sličnost na engleskom ili srpskom jeziku veća od 85%, sprečavajući ponavljanja (eho) u titlovima i TTS-u.
+    * **Maskiranje tokom lekture:** Proširen mehanizam maskiranja neprevodivih reči tako da se i grubi prevod maskira pre slanja Lektoru na lektorisanje, štiteći entitete kroz celu fazu uređivanja teksta pomoću mape `lektor_masks_map`.
+    * **Sveobuhvatni regionalni i ijekavski Leak Guard:** Značajno proširena funkcija `clean_translation_text` sa sveobuhvatnim skupom regex pravila za automatsku zamenu najčešćih ijekavizama i hrvatskih regionalizama u svim gramatičkim padežima i oblicima (npr. `dio` -> `deo`, `dijelovi` -> `delovi`, `sustav` -> `sistem`, `tisuća` -> `hiljada`, `tjedan` -> `nedelja`, `uvjet` -> `uslov`, `sučelje` -> `interfejs`, `zaslon` -> `ekran`, `tipkovnica` -> `tastatura`, `uvijek` -> `uvek`, `gdje` -> `gde`, `vidjeti` -> `videti`, `učinkovitost` -> `efikasnost`, `tvrtka` -> `firma`).
+    * **Verifikacija unit testova:** Svi pytest unit testovi uspešno prolaze (`5 passed`).
+- **Status:** Završeno. Sve izmene su uspešno integrisane, dokumentovane i verifikovane.

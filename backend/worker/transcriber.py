@@ -6,11 +6,24 @@ from backend.core.config import settings
 def clean_thought_tags(text: str) -> str:
     if not text:
         return ""
+    # Podrška i za <think> (DeepSeek) i za <thought> (Qwen)
     for tag in ["think", "thought"]:
         text = re.sub(rf'<{tag}>.*?</{tag}>', '', text, flags=re.DOTALL)
-        if f"<{tag}>" in text:
-            text = text.split(f"<{tag}>")[0]
+        
+    for tag in ["think", "thought"]:
+        start_tag = f"<{tag}>"
+        if start_tag in text:
+            idx = text.find(start_tag)
+            # Ako je tag na početku, a dalje imamo JSON/strukturu, uzmi je od prve otvorene zagrade
+            valid_braces = [pos for pos in [text.find('{'), text.find('[')] if pos != -1]
+            if valid_braces:
+                first_valid_brace = min(valid_braces)
+                if first_valid_brace > idx:
+                    text = text[first_valid_brace:]
+                    continue
+            text = text.split(start_tag)[0]
     return text.strip()
+
 
 def jaccard_similarity(str1: str, str2: str) -> float:
     if not str1 or not str2:

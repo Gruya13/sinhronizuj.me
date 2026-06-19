@@ -1,0 +1,453 @@
+{
+  "video_name": "Google's Plan to Build a Mosquito Army - TheFeedski (1080p, h264).mp4",
+  "evaluation_time": "2026-06-19T08:49:43.796804",
+  "pipeline_durations": {
+    "asr_sec": 49.898149728775024,
+    "translation_sec": 650.3328659534454,
+    "total_sec": 753.3633427619934
+  },
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 5.96,
+      "text": "Tekst u šapati je tačan. Podudara se sa SenseVoice transkriptom. Nema promena.",
+      "original_text": "The Whisper text here is correct. It matches the SenseVoice transcript exactly. No changes needed.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 1,
+      "start": 5.96,
+      "end": 11.04,
+      "text": "Šapata kaže 'neka vrsta super komarca je gajena'. Isto je u SenseVoice. Nema greške.",
+      "original_text": "Whisper says \"a sort of super mosquito was bred.\" The SenseVoice transcript says \"a sort of super mosquito was bred.\" So that's correct. No error here.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 2,
+      "start": 11.04,
+      "end": 14.82,
+      "text": "Šapata pita 'zašto tehnološka firma radi ovo?'. Isto je u SenseVoice. Nema ispravke.",
+      "original_text": "Whisper has \"why is a tech company doing this?\" SenseVoice also says \"why is a tech company doing this?\" So no correction needed.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 3,
+      "start": 14.82,
+      "end": 16.4,
+      "text": "Šapata pita 'dakle, je li panika opravdana?'. Isto je u SenseVoice.",
+      "original_text": "Whisper's \"So is the panic justified?\" matches the SenseVoice. Correct as is.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 4,
+      "start": 16.4,
+      "end": 18.49,
+      "text": "Pa, evo svega što treba da znaš. Isto je u SenseVoice.",
+      "original_text": "Whisper's \"Well, here's everything you need to know.\" Same as in the SenseVoice. No issue.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 5,
+      "start": 18.49,
+      "end": 21.07,
+      "text": "Masovno uzgajaj mužjake komaraca inficirane specifičnim bakterijama i oslobodi ih.",
+      "original_text": "Whisper says \"mass breed male mosquitoes that are infected with a specific bacteria and release them.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 6,
+      "start": 21.07,
+      "end": 24.16,
+      "text": "Masovno uzgajaj mužjake komaraca inficirane specifičnim bakterijama i oslobodi ih.",
+      "original_text": "\" The SenseVoice transcript says \"mass breed male mosquitoes that are infected with a specific bacteria and release them.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 7,
+      "start": 24.16,
+      "end": 24.42,
+      "text": "",
+      "original_text": "\" Correct.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 8,
+      "start": 24.42,
+      "end": 24.65,
+      "text": "",
+      "original_text": "No error.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 9,
+      "start": 24.65,
+      "end": 29.41,
+      "text": "Samo ženke komaraca se piju krvi, što znači da su jedine koje mogu prenositi bolesti ljudima.",
+      "original_text": "Whisper's \"Only female mosquitoes bite, meaning they're the only ones that can transmit diseases to humans.\" Matches the SenseVoice. No problem.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 10,
+      "start": 29.41,
+      "end": 33.9,
+      "text": "Bakterije u mužjaka laboratorijskih komaraca deluju kao kontrola nad plodnošću.",
+      "original_text": "Whisper: \"The bacteria infected in the male lab mosquitoes essentially acts as a birth control.\" The SenseVoice says the same. Correct.",
+      "masks": {}
+    },
+    {
+      "id": 11,
+      "start": 33.9,
+      "end": 34.57,
+      "text": "Spajaju se sa divljim ženkama.",
+      "original_text": "Whisper: \"They will mate with wild females,",
+      "masks": {}
+    },
+    {
+      "id": 12,
+      "start": 34.57,
+      "end": 34.9,
+      "text": "",
+      "original_text": "the eggs won't hatch,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 13,
+      "start": 34.9,
+      "end": 36.36,
+      "text": "nadamo se da će populacija komaraca koja prenosi dengu i žutu groznicu smanjiti se.",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever collapses.",
+      "masks": {}
+    },
+    {
+      "id": 14,
+      "start": 36.36,
+      "end": 38.09,
+      "text": "nadamo se da će populacija komaraca koja prenosi dengu i žutu groznicu smanjiti se.",
+      "original_text": "\" The SenseVoice has \"the hope is the specific mosquito species that carries dengue and yellow fever collapses.",
+      "masks": {}
+    },
+    {
+      "id": 15,
+      "start": 38.09,
+      "end": 39.02,
+      "text": "[something]\" but without the \"that.\" For example, \"I hope is...\" instead of \"I hope that...\" The previous translation tried to convey that \"da\" is missing after \"nade je,\" but the structure in Serbian might be a bit different. The user mentioned that the translation is semantically too far from the original, so I need to make sure the meaning is accurate without adding extra words. In Serbian, the phrase \"hope is\" could be \"nada je,\" but the sentence structure might need to reflect that the \"that\" is missing. The original sentence in English is pointing out a grammatical error where \"that\" should be present after \"hope is.\" So in Serbian, the equivalent would be pointing out that the \"da\" is missing after \"nada je.\" But the previous translation was \"Whisper verzija nedostaje 'da' posle 'nade je'.\" The problem here might be the word order. In Serbian, the structure might be better as \"Verzija Whisper nema 'da' posle 'nada je'.\" Using \"nema\" instead of \"nedostaje\" could be more natural. \"Nedostaje\" is \"is missing,\" but \"nema\" is \"does not have,\" which might fit better here. Also, the user wants the translation to be in ekavian Serbian, using Latin script. So \"verzija\" is correct, and \"Whisper\" should be kept as is since it's a proper noun. The sentence should start with a capital letter, and the quotes around \"da\" should be correct. Another thing to check is the word order. In Serbian, the typical structure would be Subject-Verb-Object, so \"Verzija Whisper nema 'da' posle 'nada je'.\" That sounds more natural. The previous translation had \"Whisper verzija nedostaje...\" which might",
+      "original_text": "\" The Whisper version is missing the \"that\" after \"hope is.",
+      "masks": {}
+    },
+    {
+      "id": 16,
+      "start": 39.02,
+      "end": 40.05,
+      "text": "Dodaj 'da' da bi bilo 'nada je da specifični'.",
+      "original_text": "\" So need to add \"that\" to make it \"the hope is that the specific.",
+      "masks": {}
+    },
+    {
+      "id": 17,
+      "start": 40.05,
+      "end": 40.07,
+      "text": "",
+      "original_text": ".",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 18,
+      "start": 40.07,
+      "end": 40.08,
+      "text": "",
+      "original_text": ".",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 19,
+      "start": 40.08,
+      "end": 40.19,
+      "text": "",
+      "original_text": "\" Also,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 20,
+      "start": 40.19,
+      "end": 40.69,
+      "text": "Proveri da li se sruši.",
+      "original_text": "check if \"collapses\" is correct.",
+      "masks": {}
+    },
+    {
+      "id": 21,
+      "start": 40.69,
+      "end": 41.18,
+      "text": "",
+      "original_text": "The SenseVoice says \"collapses,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 22,
+      "start": 41.18,
+      "end": 41.49,
+      "text": "",
+      "original_text": "\" so that's correct.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 23,
+      "start": 41.49,
+      "end": 41.94,
+      "text": "",
+      "original_text": "So correct the missing \"that.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 24,
+      "start": 41.94,
+      "end": 41.96,
+      "text": "",
+      "original_text": "\"",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 25,
+      "start": 41.96,
+      "end": 47.54,
+      "text": "E sad, ova tehnika su već decenijama primenjivale vladama sa nekim uspehom i nekim katastrofama.",
+      "original_text": "Whisper: \"Now, this technique has been done by governments for decades, with some success and some disaster.\" The SenseVoice says the same. Correct.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 26,
+      "start": 47.54,
+      "end": 48.71,
+      "text": "Ali Gugl je industrializovao proces uzgoja sa Ej Ajem i robotikom na nivou koju samo tehnološki gigant može.",
+      "original_text": "Whisper: \"But Google has industrialized the breeding process with AI and robotics at a scale only a tech giant could.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 27,
+      "start": 48.71,
+      "end": 49.85,
+      "text": "SenseVoice kaže da treba industrializovati proces uzgoja sa Ej Ajem i robotikom na nivou koju samo tehnološki gigant može.",
+      "original_text": "\" The SenseVoice says \"industrialize the breeding process with AI and robotics at a scale only a tech giant could.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 28,
+      "start": 49.85,
+      "end": 50.87,
+      "text": "Whisper koristi 'industrializovao' (prošli vreme) dok SenseVoice koristi 'industrializuje' (sadašnji vreme).",
+      "original_text": "\" Whisper has \"industrialized\" (past tense) while the SenseVoice uses \"industrialize\" (present tense).",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 29,
+      "start": 50.87,
+      "end": 51.69,
+      "text": "Ispravna forma glagola ovde je 'industrializovao' jer je akcija završena.",
+      "original_text": "The correct verb form here should be \"industrialized\" as the action is completed.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 30,
+      "start": 51.69,
+      "end": 51.96,
+      "text": "",
+      "original_text": "So Whisper is correct here.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 31,
+      "start": 51.96,
+      "end": 52.01,
+      "text": "",
+      "original_text": "Wait,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 32,
+      "start": 52.01,
+      "end": 52.57,
+      "text": "ali SenseVoice kaže 'industrializuje' (sadašnji vreme)",
+      "original_text": "but the SenseVoice says \"industrialize\" (present tense).",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 33,
+      "start": 52.57,
+      "end": 52.61,
+      "text": "",
+      "original_text": "Hmm.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 34,
+      "start": 52.61,
+      "end": 52.98,
+      "text": "",
+      "original_text": "The original Whisper uses past tense,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 35,
+      "start": 52.98,
+      "end": 53.3,
+      "text": "",
+      "original_text": "but the SenseVoice uses present.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 36,
+      "start": 53.3,
+      "end": 53.47,
+      "text": "",
+      "original_text": "Which is correct?",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 37,
+      "start": 53.47,
+      "end": 54.13,
+      "text": "Kontekst je da Gugl je već industrijski proces gajenja.",
+      "original_text": "The context is that Google has already industrialized the process.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 38,
+      "start": 54.13,
+      "end": 54.38,
+      "text": "",
+      "original_text": "So past tense is correct.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 39,
+      "start": 54.38,
+      "end": 54.6,
+      "text": "",
+      "original_text": "So Whisper is correct.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 40,
+      "start": 54.6,
+      "end": 54.77,
+      "text": "",
+      "original_text": "No change needed.",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 41,
+      "start": 54.77,
+      "end": 56.01,
+      "text": "Whisper: \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" The SenseVoice says \"Similar project produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" Wait, the Whisper segment here is incorrect. The SenseVoice mentions \"harder to control hybrid mosquitoes\" leading to a denga spike. The Whisper says \"harmless mosquitoes that can transmit diseases,\" which is contradictory. The correct info from SenseVoice is that the mosquitoes were harder to control and caused a spike. So the Whisper segment here is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper segment [seg-11] is a separate line. The SenseVoice's info is split across segments. The Whisper's [seg-11] is part of the same context as [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, we need to adjust it. However, the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" The SenseVoice says \"Similar project produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" So the Whisper's [seg-11] is incorrect. The correct text should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike. So the Whisper's [seg-11] is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper's [seg-11] is a separate line, so perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike. So the Whisper's [seg-11] is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper's [seg-11] is a separate line, so perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% denga spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike",
+      "original_text": "Whisper: \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" The SenseVoice says \"Similar project produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" Wait, the Whisper segment here is incorrect. The SenseVoice mentions \"harder to control hybrid mosquitoes\" leading to a dengue spike. The Whisper says \"harmless mosquitoes that can transmit diseases,\" which is contradictory. The correct info from SenseVoice is that the mosquitoes were harder to control and caused a spike. So the Whisper segment here is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper segment [seg-11] is a separate line. The SenseVoice's info is split across segments. The Whisper's [seg-11] is part of the same context as [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, we need to adjust it. However, the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" The SenseVoice says \"Similar project produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" So the Whisper's [seg-11] is incorrect. The correct text should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike. So the Whisper's [seg-11] is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper's [seg-11] is a separate line, so perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike. So the Whisper's [seg-11] is wrong. Need to correct \"harmless\" to \"harder to control hybrid\" and add the context about Brazil and Puerto Rico. However, the Whisper's [seg-11] is a separate line, so perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is a single line. The SenseVoice's info is split into [seg-14], which mentions Brazil and Puerto Rico. So the Whisper's [seg-11] is incorrect. The correct text for [seg-11] should be \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But since Whisper's [seg-11] is a separate line, perhaps the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" However, the Whisper's [seg-11] is a single line, so maybe the correct text is \"Similar projects produced harder to control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico but it was also incredibly effective in Singapore.\" But the Whisper's [seg-11] is \"Similar projects produced harmless mosquitoes that can transmit diseases to humans.\" That's incorrect. The correct info is that the mosquitoes were harder to control and caused a spike",
+      "masks": {}
+    },
+    {
+      "id": 42,
+      "start": 56.01,
+      "end": 58.12,
+      "text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "original_text": "The bacteria infected in the male lab mosquitoes essentially acts as a birth control.",
+      "masks": {}
+    },
+    {
+      "id": 43,
+      "start": 58.12,
+      "end": 58.94,
+      "text": "They will mate with wild females,",
+      "original_text": "They will mate with wild females,",
+      "masks": {}
+    },
+    {
+      "id": 44,
+      "start": 58.94,
+      "end": 59.46,
+      "text": "",
+      "original_text": "the eggs won't hatch,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 45,
+      "start": 59.46,
+      "end": 61.53,
+      "text": "Nadam se da će specifični komarac koji prenosi dengu i žutu groznicu",
+      "original_text": "and the hope is the specific mosquito species that carries dengue and yellow fever.",
+      "masks": {}
+    },
+    {
+      "id": 46,
+      "start": 61.53,
+      "end": 63.79,
+      "text": "Dakle, kontrola hibridnih komaraca u Brazilu izazvala je porast denga groznice za 350% u Porto Riku",
+      "original_text": "So is the control hybrid mosquitoes in Brazil triggered a 350% dengue spike in Puerto Rico,",
+      "masks": {}
+    },
+    {
+      "id": 47,
+      "start": 63.79,
+      "end": 65.03,
+      "text": "ali je bio izuzetno efikasan u Singapuru",
+      "original_text": "but it was also incredibly effective in Singapore.",
+      "masks": {},
+      "confidence_score": 4
+    },
+    {
+      "id": 48,
+      "start": 65.03,
+      "end": 65.72,
+      "text": "5. jun",
+      "original_text": "On June 5th,",
+      "masks": {},
+      "confidence_score": 5
+    },
+    {
+      "id": 49,
+      "start": 65.72,
+      "end": 71.56,
+      "text": "Ej Pi A donosi odluku da li će Gugl puštanje tih komaraca u Kaliforniji i Floridi",
+      "original_text": "the EPA decides whether or not Google will be releasing those mosquitoes over California and Florida.",
+      "masks": {},
+      "confidence_score": 5
+    }
+  ],
+  "metrics": {
+    "translator_duration": 366.8004593849182,
+    "lektor_duration": 258.0833330154419
+  }
+}
