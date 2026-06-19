@@ -1,3 +1,19 @@
+## [2026-06-19 23:42:47] Faza 4: Modularni Refaktor
+- **Opis:**
+  Uspešno smo završili Fazu 4 (Modularni refaktor) sa ciljem poboljšanja održavanja koda i strukturisanja u manja, koherentna logička celina:
+  1. **Kreiranje paketa `backend/worker/translation/`**: Podelili smo ogroman `translator.py` na sledeće podmodule:
+     - [__init__.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/__init__.py): Eksponira sve javne funkcije paketa.
+     - [masking.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/masking.py): Maskiranje neprevodivih entiteta (Wi-Fi, GPS, Bluetooth) i unmasking.
+     - [transliter.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/transliter.py): Cyrillic-to-Latin transliteracija i rečnik replacements.
+     - [dialect.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/dialect.py): Ekavizacija, leak guard i determinističke morfološke popravke.
+     - [glossary.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/glossary.py): Učitavanje glosara, globalni sažetak i detekcija tema/entiteta.
+     - [qe.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/qe.py): Računanje CometKiwi QE skora i očuvanje negacije.
+     - [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py): Prevođenje segmenata i self-critique petlja.
+     - [lektor.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/lektor.py): Lektura segmenata, programska deduplikacija i TTS-aware kompresija.
+  2. **Refaktorisana fasada `backend/worker/translator.py`**: Očistili smo translator modul i ostavili isključivo čistu fasadu koja uvozi i ponovo izvozi javne interfejse iz paketa `translation` i `utils`.
+  3. **Rešavanje mock-ovanja u testovima preko dinamičkih uvoza**: Uveli smo dinamički uvoz funkcija (`call_modal_endpoint`, `get_dynamic_glossary`, `generate_video_summary`, `lektor_segments`) unutar funkcija u modulima `translate.py`, `lektor.py` i `glossary.py` iz facade modula `backend.worker.translator`. Na ovaj način testovi uspešno patch-uju ove metode bez ikakvih izmena u test datotekama ili drugde u serveru.
+  4. **Verifikacija**: Pokrenuli smo sve unit testove u projektu (`venv/bin/pytest`) i svih 27 testova prolaze uspešno. Takođe smo pokrenuli video evaluaciju (`evaluate_video_pipeline.py`) nad held-out skupom rečenica i uspešno verifikovali ispravan rad čitavog pipeline-a.
+
 ## [2026-06-19 23:15:00] Faza 3: Arhitektura (Uklanjanje hardkodova, konverzija brojeva, ablaciona studija i LoRA dataset)
 - **Opis:**
   Uspešno smo završili implementaciju i verifikaciju Faze 3 (Arhitektura):
