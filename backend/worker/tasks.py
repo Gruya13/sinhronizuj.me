@@ -53,9 +53,7 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
         return False
 
 def get_redis_client():
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    return redis.Redis.from_url(settings.REDIS_URL)
 
 @celery_app.task(bind=True, name="analyze_video_task")
 def analyze_video_task(self, video_url: str, debug: bool = False, project_id: str = None):

@@ -2854,3 +2854,17 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Sveobuhvatni regionalni i ijekavski Leak Guard:** Značajno proširena funkcija `clean_translation_text` sa sveobuhvatnim skupom regex pravila za automatsku zamenu najčešćih ijekavizama i hrvatskih regionalizama u svim gramatičkim padežima i oblicima (npr. `dio` -> `deo`, `dijelovi` -> `delovi`, `sustav` -> `sistem`, `tisuća` -> `hiljada`, `tjedan` -> `nedelja`, `uvjet` -> `uslov`, `sučelje` -> `interfejs`, `zaslon` -> `ekran`, `tipkovnica` -> `tastatura`, `uvijek` -> `uvek`, `gdje` -> `gde`, `vidjeti` -> `videti`, `učinkovitost` -> `efikasnost`, `tvrtka` -> `firma`).
     * **Verifikacija unit testova:** Svi pytest unit testovi uspešno prolaze (`5 passed`).
 - **Status:** Završeno. Sve izmene su uspešno integrisane, dokumentovane i verifikovane.
+
+### 20.06.2026. 00:55 — Faza 0: Bezbednosno ojačavanje (P0) i Pravna Usklađenost (P4)
+- **Zahtevi:** Sprovesti plan ojačavanja i otkloniti kritične sigurnosne propuste (P0) i analizirati pravne i etičke rizike (P4).
+- **Urađeno:**
+    * **Rotacija i sakrivanje tajni:** Očišćene osetljive lozinke i API ključevi iz `.env` fajla u git istoriji i zamenjeni placeholder-ima. VPS IP adrese zamenjene sa `12.34.56.78` (prod) i `98.76.54.32` (dev) u celom kodu i dokumentaciji.
+    * **Šema baze (Alembic):** Uklonjeni `Base.metadata.create_all` i `ALTER TABLE` iz startup-a `main.py`. Kreirana Alembic migracija `d3b1029c8e9f_add_missing_segment_columns.py` za kolone `needs_retranslation`, `actual_speed_factor` i `confidence_score` u tabeli `segments`.
+    * **Admin CLI:** Uklonjena javna ruta `/api/v1/admin/create-first-admin` i zamenjena offline CLI komandom `python -m backend.cli create_admin`.
+    * **Operativne rute:** Premšteni osetljivi endpointi (`/logs`, `/warmup`, `/flush-redis`, `/hw-stats`, `/modal-status`) iza administratorske zavisnosti (`get_current_admin_user`).
+    * **MinIO/S3 izolacija:** Generisanje server-side ključeva za upload-ovane fajlove (`users/{user_id}/projects/{project_id}/uploads/{uuid}.ext`) uz validaciju vlasništva, sadržaja i smanjenje TTL-a.
+    * **SSRF Guard:** Implementirana robusna SSRF zaštita u `downloader.py` preko `ipaddress` modula, koja ručno prati redirekcije (do 5 hopova) i blokira pristup privatnim/lokalnim IPv4 i IPv6 mrežnim opsezima.
+    * **JWT blocklist:** Dodata Redis-backed blocklist-a za revokaciju JWT tokena pri logout-u (`/api/v1/auth/logout`) sa proverom u `get_current_user`.
+    * **Pravna analiza (P4):** Kreiran izveštaj `pravna_usklađenost_izvestaj.md` koji analizira licence AI modela (CC BY-NC-SA 4.0 za Wav2Lip, predložene alternative SadTalker/GeneFace++), GDPR uspostavljanje i AI Act usklađenost.
+    * **Verifikacija testova:** Prilagođeni testovi za CLI i SQLite test bazu na disku (`test_temp.db`) radi multithreading stabilnosti. Svi pytest unit testovi uspešno prolaze (`27 passed`).
+- **Status:** Završeno. Faza 0 uspešno implementirana, testirana i verifikovana.

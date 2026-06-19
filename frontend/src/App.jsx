@@ -18,7 +18,7 @@ import LoginRegister from './components/Auth/LoginRegister';
 import LandingPage from './components/Landing/LandingPage';
 import AdminPanel from './components/Admin/AdminPanel';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://12.34.56.78:8000";
 
 function App() {
   const [showLogin, setShowLogin] = useState(false);

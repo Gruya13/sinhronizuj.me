@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 # Postavljamo testni DATABASE_URL na SQLite pre uvoza bilo kog backend modula
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["DATABASE_URL"] = "sqlite:///test_temp.db"
 os.environ["REDIS_URL"] = "memory://"
 
 # Dodajemo koren projekta u python path
@@ -14,11 +14,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.main import app
 from backend.core.database import Base, get_db
+from backend.core.models import User, Project, Segment, Glossary, Waitlist
 from unittest.mock import MagicMock
 
 
-# --- KONFIGURACIJA TESTNE BAVE (SQLite in-memory) ---
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+# --- KONFIGURACIJA TESTNE BAVE (SQLite test_temp.db) ---
+SQLALCHEMY_DATABASE_URL = "sqlite:///test_temp.db"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
@@ -26,7 +27,13 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Preglašavamo engine i SessionLocal u bazi podataka da svi koriste naš in-memory engine sa StaticPool
+import backend.core.database as db_mod
+db_mod.engine = engine
+db_mod.SessionLocal = TestingSessionLocal
+
 def override_get_db():
+    print("\n[OVERRIDE_GET_DB] Pozvan override!", flush=True)
     db = TestingSessionLocal()
     try:
         yield db
@@ -47,6 +54,14 @@ def setup_database():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    # Zatvaramo konekcije engine-a kako bi se fajl otključao
+    engine.dispose()
+    # Brišemo privremeni fajl baze
+    if os.path.exists("test_temp.db"):
+        try:
+            os.remove("test_temp.db")
+        except Exception:
+            pass
 
 @pytest.fixture(autouse=True)
 def clean_db_tables():
@@ -71,9 +86,14 @@ def mock_redis(session_mocker):
     import backend.main as main_mod
     session_mocker.patch.object(main_mod, "get_redis_client", return_value=mock_client)
     
+    # Mock-ujemo get_redis_client iz auth.py
+    import backend.core.auth as auth_mod
+    session_mocker.patch.object(auth_mod, "get_redis_client", return_value=mock_client)
+    
     # Mock-ujemo redis modul uopste
     import redis
     session_mocker.patch("redis.Redis", return_value=mock_client)
+    session_mocker.patch("redis.Redis.from_url", return_value=mock_client)
     return mock_client
 
 @pytest.fixture(scope="session", autouse=True)

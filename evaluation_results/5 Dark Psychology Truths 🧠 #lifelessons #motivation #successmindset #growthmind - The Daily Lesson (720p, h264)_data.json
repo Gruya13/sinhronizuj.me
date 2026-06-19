@@ -1,87 +1,147 @@
 {
   "video_name": "5 Dark Psychology Truths 🧠 #lifelessons #motivation #successmindset #growthmind - The Daily Lesson (720p, h264).mp4",
-  "evaluation_time": "2026-06-19T16:48:46.022271",
+  "evaluation_time": "2026-06-19T17:43:47.947625",
   "pipeline_durations": {
-    "asr_sec": 454.86808013916016,
-    "translation_sec": 123.23938035964966,
-    "total_sec": 596.4639694690704
+    "asr_sec": 50.16065716743469,
+    "translation_sec": 165.53874683380127,
+    "total_sec": 318.0066931247711
   },
-  "segments": [
-    {
-      "id": 0,
-      "start": 0.0,
-      "end": 1.35,
-      "text": "Tamna psihologija. Prvi broj.",
-      "original_text": "Dark psychology. Number one.",
-      "masks": {},
-      "confidence_score": 4
-    },
-    {
-      "id": 1,
-      "start": 1.35,
-      "end": 6.4,
-      "text": "Osoba kojoj je teško za čitanje često je ona koja najdublje oseća.",
-      "original_text": "The person who is hard to read is often the one who feels the deepest.",
-      "masks": {},
-      "confidence_score": 5
-    },
-    {
-      "id": 2,
-      "start": 6.4,
-      "end": 11.04,
-      "text": "Drugi broj. Osoba koja ostaje mirna u haosu je borila se sa olujama koje nikada nećeš videti.",
-      "original_text": "Number two. The person who stays calm in chaos has fought storms. you'll never see.",
-      "masks": {},
-      "confidence_score": 4
-    },
-    {
-      "id": 3,
-      "start": 11.6,
-      "end": 12.35,
-      "text": "Treći broj.",
-      "original_text": "Number three.",
-      "masks": {},
-      "confidence_score": 5
-    },
-    {
-      "id": 4,
-      "start": 12.35,
-      "end": 17.67,
-      "text": "Onaj koji izgubi se bez objašnjenja naučio je moć zaštite svoje energije.",
-      "original_text": "The one who disappears without explanation has learned the power of protecting their energy.",
-      "masks": {},
-      "confidence_score": 5
-    },
-    {
-      "id": 5,
-      "start": 17.67,
-      "end": 23.12,
-      "text": "Četvrti broj. Onaj koji sme se svemu često zaštititi srce koje je slomilo.",
-      "original_text": "Number four. The one who laughs at everything is often protecting a heart that's breaking.",
-      "masks": {},
-      "confidence_score": 5
-    },
-    {
-      "id": 6,
-      "start": 23.12,
-      "end": 24.13,
-      "text": "Peti broj.",
-      "original_text": "Number five.",
-      "masks": {},
-      "confidence_score": 5
-    },
-    {
-      "id": 7,
-      "start": 24.13,
-      "end": 29.84,
-      "text": "Onaj koji daje najbolji savet obično se borio sam.",
-      "original_text": "The one who gives the best advice is usually fighting battles alone.",
-      "masks": {},
-      "confidence_score": 5
-    }
-  ],
   "metrics": {
-    "translator_duration": 86.20433139801025,
-    "lektor_duration": 28.221320390701294
+    "translator_duration": 122.00952672958374,
+    "lektor_duration": 35.496076822280884
+  },
+  "evaluation": {
+    "primary_overall": 7.666666666666667,
+    "secondary_overall": 9.0,
+    "overall_discrepancy": 1.333333333333333,
+    "segments": [
+      {
+        "id": 0,
+        "eng": "Dark psychology. Number one.",
+        "srb": "Tamna psihologija. Broj jedan.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      },
+      {
+        "id": 1,
+        "eng": "The person who is hard to read is often the one who feels the deepest.",
+        "srb": "Ljudi koji su teški za razumevanje često imaju najdublje osećaje.",
+        "primary_scores": [
+          5.0,
+          5.0,
+          5.0
+        ],
+        "errors": [
+          {
+            "segment_id": 1,
+            "category": "Accuracy",
+            "severity": "Major",
+            "explanation": ""
+          }
+        ],
+        "mean_score": 5.0,
+        "std_dev": 0.0,
+        "secondary_score": 9.0,
+        "discrepancy": 4.0
+      },
+      {
+        "id": 2,
+        "eng": "Number two. The person who stays calm in chaos has fought storms you'll never see.",
+        "srb": "Broj dva. Osoba koja ostaje mirna u haosu već je preživela oluje koje nikada nećeš videti.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      },
+      {
+        "id": 3,
+        "eng": "Number three.",
+        "srb": "Broj tri.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      },
+      {
+        "id": 4,
+        "eng": "The one who disappears without explanation has learned the power of protecting their energy.",
+        "srb": "Ona koja nestane bez objašnjenja naučila je moć zaštite svoje energije.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 9.0,
+        "discrepancy": 1.0
+      },
+      {
+        "id": 5,
+        "eng": "Number four. The one who laughs at everything is often protecting a heart that's breaking.",
+        "srb": "Četvrti. Onaj koji se smeši svemu često zaštitjuje srce koje krvari.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      },
+      {
+        "id": 6,
+        "eng": "Number five.",
+        "srb": "Broj pet.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      },
+      {
+        "id": 7,
+        "eng": "The one who gives the best advice is usually fighting battles alone.",
+        "srb": "Onaj koji daje najbolji savet najčešće se bori sam.",
+        "primary_scores": [
+          10.0,
+          10.0,
+          10.0
+        ],
+        "errors": [],
+        "mean_score": 10.0,
+        "std_dev": 0.0,
+        "secondary_score": 10.0,
+        "discrepancy": 0.0
+      }
+    ]
   }
 }

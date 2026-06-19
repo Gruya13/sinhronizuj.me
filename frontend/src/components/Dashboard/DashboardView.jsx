@@ -3,7 +3,7 @@ import { Paperclip, ArrowRight, Play } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import ProjectList from './ProjectList';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://178.104.214.78:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://12.34.56.78:8000";
 
 export default function DashboardView() {
   const {

@@ -7,9 +7,34 @@ import socket
 from urllib.parse import urlparse
 from backend.core.config import settings
 
+import ipaddress
+
+def resolve_and_check_ip(hostname: str) -> bool:
+    """
+    Razrešava hostname i proverava da li su sve IP adrese (IPv4 i IPv6) bezbedne.
+    """
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+        for family, _, _, _, sockaddr in infos:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private or 
+                ip.is_loopback or 
+                ip.is_link_local or 
+                ip.is_multicast or 
+                ip.is_reserved or
+                ip.is_unspecified
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
 def is_safe_url(url: str) -> bool:
     """
-    Proverava da li je URL bezbedan i sprečava SSRF napade ka lokalnoj mreži.
+    Proverava da li je URL bezbedan i sprečava SSRF napade ka lokalnoj mreži,
+    prateći redirekcije i proveravajući svaki hop.
     """
     try:
         parsed_url = urlparse(url)
@@ -20,25 +45,33 @@ def is_safe_url(url: str) -> bool:
         if parsed_url.scheme not in ["http", "https"]:
             return False
             
-        hostname = parsed_url.hostname
-        if not hostname:
-            return False
-            
-        # Rezolucija IP adrese
-        ip = socket.gethostbyname(hostname)
+        current_url = url
+        import httpx
+        from urllib.parse import urljoin
         
-        # Provera privatnih i loopback opsega (RFC 1918 i localhost)
-        ip_parts = list(map(int, ip.split('.')))
-        if (
-            ip_parts[0] == 127 or                  # Loopback
-            ip_parts[0] == 10 or                   # Klasa A
-            (ip_parts[0] == 172 and 16 <= ip_parts[1] <= 31) or # Klasa B
-            (ip_parts[0] == 192 and ip_parts[1] == 168) or      # Klasa C
-            ip == "0.0.0.0"
-        ):
-            print(f"[SSRF BLOCKED] Odbijen pristup privatnom mrežnom opsegu: {ip} za URL: {url}")
-            return False
-            
+        # Pratimo redirekcije ručno da proverimo svaki hop (maksimalno 5 redirekcija)
+        for _ in range(5):
+            parsed = urlparse(current_url)
+            hostname = parsed.hostname
+            if not hostname:
+                return False
+                
+            if not resolve_and_check_ip(hostname):
+                print(f"[SSRF BLOCKED] Odbijen pristup nebezbednom mrežnom opsegu za URL: {current_url}")
+                return False
+                
+            # HEAD zahtev bez automatskog praćenja redirekcija kako bismo sami kontrolisali sledeći hop
+            with httpx.Client(verify=False) as client:
+                response = client.head(current_url, follow_redirects=False, timeout=2.0)
+                if response.is_redirect:
+                    next_url = response.headers.get("Location")
+                    if not next_url:
+                        break
+                    if not next_url.startswith("http"):
+                        next_url = urljoin(current_url, next_url)
+                    current_url = next_url
+                else:
+                    break
         return True
     except Exception as e:
         print(f"[SSRF ERROR] Greška pri validaciji URL-a: {e}")

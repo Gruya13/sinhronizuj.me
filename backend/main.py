@@ -20,7 +20,7 @@ from backend.worker.celery_app import celery_app
 from backend.core.config import settings
 from backend.core.database import engine, get_db, Base
 from backend.core.models import User, Project, Segment, Glossary, Waitlist
-from backend.core.auth import get_password_hash, verify_password, create_access_token, get_current_user, get_current_admin_user
+from backend.core.auth import get_password_hash, verify_password, create_access_token, get_current_user, get_current_admin_user, oauth2_scheme
 from botocore.config import Config
 
 import sentry_sdk
@@ -34,21 +34,7 @@ if getattr(settings, "SENTRY_DSN", None):
     )
     print("[SENTRY INIT] Sentry monitoring je uspešno inicijalizovan za FastAPI.", flush=True)
 
-# Automatsko kreiranje tabela u bazi podataka pri startu servera
-from sqlalchemy import text
-Base.metadata.create_all(bind=engine)
-
-# Pokretanje alter table migracije za is_admin u PostgreSQL ili SQLite i nove kolone u segments
-with engine.connect() as conn:
-    try:
-        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;"))
-        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS needs_retranslation BOOLEAN DEFAULT FALSE;"))
-        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS actual_speed_factor DOUBLE PRECISION DEFAULT 1.0;"))
-        conn.execute(text("ALTER TABLE segments ADD COLUMN IF NOT EXISTS confidence_score INTEGER DEFAULT 5;"))
-        conn.commit()
-        print("[STARTUP MIGRATION SUCCESS] Kolona is_admin i nove kolone za segments su proverene/kreirane.", flush=True)
-    except Exception as e:
-        print(f"[STARTUP MIGRATION WARNING] Greška pri startup migraciji: {e}.", flush=True)
+# Inicijalizacija baze se vrši isključivo preko Alembic migracija
 
 # Inicijalizacija Rate Limiter-a sa Redis storage-om za deljenje stanja i perzistenciju
 limiter = Limiter(key_func=get_remote_address, storage_uri=settings.REDIS_URL)
@@ -70,11 +56,9 @@ app.mount("/videos", StaticFiles(directory=settings.TEMP_WORKSPACE), name="video
 
 # Pomoćna funkcija za Redis konekciju
 def get_redis_client():
-    match = re.search(r'@([^:/]+)', settings.REDIS_URL)
-    redis_host = match.group(1) if match else "redis"
-    return redis.Redis(host=redis_host, password=settings.REDIS_PASSWORD, port=6379, db=0)
+    return redis.Redis.from_url(settings.REDIS_URL)
 
-def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: int = 3600) -> str:
+def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: int = 300) -> str:
     if not object_key:
         return ""
     if object_key.startswith("http://") or object_key.startswith("https://"):
@@ -250,13 +234,56 @@ def get_me(current_user: User = Depends(get_current_user)):
         "is_admin": getattr(current_user, "is_admin", False)
     }
 
+@app.post("/api/v1/auth/logout")
+def logout(token: str = Depends(oauth2_scheme), current_user: User = Depends(get_current_user)):
+    """
+    Dodaje trenutni JWT token u blocklistu u Redisu do isteka njegovog važenja.
+    """
+    if not token:
+        return {"status": "success"}
+    try:
+        import jwt as pyjwt
+        payload = pyjwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        exp = payload.get("exp")
+        if exp:
+            from datetime import datetime
+            now = datetime.utcnow().timestamp()
+            ttl = int(exp - now)
+            if ttl > 0:
+                r = get_redis_client()
+                r.setex(f"token_blocklist:{token}", ttl, "revoked")
+    except Exception:
+        pass
+    return {"status": "success", "message": "Uspešno ste se odjavili."}
+
 # --- RUTE ZA UPLOAD I OBRADU VIDEA ---
 
 @app.get("/api/v1/storage/upload_url")
-def get_upload_url(filename: str, content_type: str = 'video/mp4', current_user: User = Depends(get_current_user)):
+def get_upload_url(
+    filename: str, 
+    project_id: str,
+    content_type: str = 'video/mp4', 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    p = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
+    if not p:
+        raise HTTPException(status_code=403, detail="Nemate pravo pristupa ovom projektu ili projekat ne postoji.")
+        
+    allowed_types = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-matroska"]
+    if content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Nedozvoljen tip sadržaja. Podržani su samo video fajlovi.")
+        
+    import uuid
+    ext = filename.split('.')[-1] if '.' in filename else 'mp4'
+    if ext.lower() not in ['mp4', 'webm', 'ogg', 'mov', 'mkv']:
+        ext = 'mp4'
+    
+    safe_filename = f"users/{current_user.id}/projects/{project_id}/uploads/{uuid.uuid4()}.{ext}"
+    
     s3_internal = boto3.client(
         's3',
-        endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
@@ -282,15 +309,15 @@ def get_upload_url(filename: str, content_type: str = 'video/mp4', current_user:
             ClientMethod='put_object',
             Params={
                 'Bucket': settings.MINIO_BUCKET, 
-                'Key': filename,
+                'Key': safe_filename,
                 'ContentType': content_type
             },
-            ExpiresIn=3600
+            ExpiresIn=300
         )
         return {
             "upload_url": url, 
-            "file_key": filename,
-            "s3_url": f"s3://{settings.MINIO_BUCKET}/{filename}"
+            "file_key": safe_filename,
+            "s3_url": f"s3://{settings.MINIO_BUCKET}/{safe_filename}"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1011,7 +1038,7 @@ def get_task_status(task_id: str, current_user: User = Depends(get_current_user)
     return response
 
 @app.post("/api/v1/warmup")
-async def warmup_workers(current_user: User = Depends(get_current_user)):
+async def warmup_workers(current_user: User = Depends(get_current_admin_user)):
     import asyncio
     import httpx
     
@@ -1041,7 +1068,7 @@ async def warmup_workers(current_user: User = Depends(get_current_user)):
     return {"status": "success", "message": "Zahtevi za zagrevanje su poslati."}
 
 @app.get("/api/v1/modal-status")
-def get_modal_global_status(current_user: User = Depends(get_current_user)):
+def get_modal_global_status(current_user: User = Depends(get_current_admin_user)):
     return {
         "status": "Spreman",
         "active_workers": "Auto-Scale",
@@ -1050,7 +1077,7 @@ def get_modal_global_status(current_user: User = Depends(get_current_user)):
     }
 
 @app.get("/api/v1/hw-stats")
-async def hw_stats(current_user: User = Depends(get_current_user)):
+async def hw_stats(current_user: User = Depends(get_current_admin_user)):
     try:
         from backend.worker.hw_monitor import get_gpu_stats, get_system_stats
         sys_stats = get_system_stats()
@@ -1065,7 +1092,7 @@ async def hw_stats(current_user: User = Depends(get_current_user)):
         return {"status": "error", "message": str(e)}
 
 @app.get("/api/v1/logs")
-def get_worker_logs(current_user: User = Depends(get_current_user)):
+def get_worker_logs(current_user: User = Depends(get_current_admin_user)):
     log_path = os.path.join(os.path.dirname(__file__), "../worker.log")
     if not os.path.exists(log_path):
         return {"logs": "Log fajl još uvek nije generisan..."}
@@ -1078,7 +1105,7 @@ def get_worker_logs(current_user: User = Depends(get_current_user)):
         return {"error": str(e)}
 
 @app.post("/api/v1/flush-redis")
-def flush_redis(current_user: User = Depends(get_current_user)):
+def flush_redis(current_user: User = Depends(get_current_admin_user)):
     """
     Čisti Redis keš (samo neaktivne projekte stare preko 7 dana).
     """
@@ -1348,27 +1375,5 @@ def get_admin_project_detail(project_id: str, current_user: User = Depends(get_c
         "logs": project_logs[-100:]  # Vraćamo poslednjih 100 log linija
     }
 
-@app.post("/api/v1/admin/create-first-admin")
-def create_first_admin(request: UserLoginRequest, db: Session = Depends(get_db)):
-    """
-    Pomoćna ruta za kreiranje prvog administratora. 
-    Dozvoljena je samo ako u bazi ne postoji nijedan korisnik označen kao is_admin=True.
-    """
-    admin_exists = db.query(User).filter(User.is_admin == True).first()
-    if admin_exists:
-        raise HTTPException(status_code=400, detail="Administrator već postoji u sistemu. Ova akcija je onemogućena.")
-        
-    # Proveri da li korisnik sa ovim email-om već postoji
-    user = db.query(User).filter(User.email == request.email).first()
-    if user:
-        user.is_admin = True
-        db.commit()
-        return {"status": "success", "message": f"Korisnik {user.email} je promovisan u prvog administratora."}
-    else:
-        hashed_pwd = get_password_hash(request.password)
-        new_admin = User(email=request.email, password_hash=hashed_pwd, is_admin=True)
-        db.add(new_admin)
-        db.commit()
-        db.refresh(new_admin)
-        return {"status": "success", "message": f"Novi nalog {new_admin.email} je kreiran i promovisan u administratora."}
+
 

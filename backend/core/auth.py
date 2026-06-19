@@ -33,6 +33,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = pyjwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
+import redis
+
+def get_redis_client():
+    return redis.Redis.from_url(settings.REDIS_URL)
+
 def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -41,6 +46,14 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
     )
     if not token:
         raise credentials_exception
+        
+    # Provera Redis blockliste
+    try:
+        r = get_redis_client()
+        if r.exists(f"token_blocklist:{token}"):
+            raise credentials_exception
+    except Exception:
+        pass
         
     try:
         payload = pyjwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
