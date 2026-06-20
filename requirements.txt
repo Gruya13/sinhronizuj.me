@@ -25,3 +25,4 @@ slowapi==0.1.9
 bcrypt==5.0.0
 sentry-sdk[fastapi]==2.5.1
 sentence-transformers
+mediapipe
