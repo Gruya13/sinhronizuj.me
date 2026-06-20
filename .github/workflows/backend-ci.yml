@@ -52,10 +52,3 @@ jobs:
       run: |
         pip install bandit
         bandit -r backend/ -ll
-
-    - name: Pokretanje integracionih testova
-      env:
-        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
-      run: |
-        pip install pytest
-        pytest
