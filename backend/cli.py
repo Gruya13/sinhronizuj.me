@@ -13,8 +13,9 @@ def create_admin(email, password, db=None):
         user = db.query(User).filter(User.email == email).first()
         if user:
             user.is_admin = True
+            user.password_hash = get_password_hash(password)
             db.commit()
-            print(f"Korisnik {email} je promovisan u administratora.")
+            print(f"Korisnik {email} je promovisan u administratora i lozinka mu je ažurirana.")
         else:
             hashed_pwd = get_password_hash(password)
             new_admin = User(email=email, password_hash=hashed_pwd, is_admin=True)
