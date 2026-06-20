@@ -1,3 +1,10 @@
+## [2026-06-20 07:25:00] Integracija i verifikacija Faze 2 (P2 Skalabilnost i optimizacija troškova + P3 Kvalitet koda i testiranje)
+- **Opis:**
+  Završeno je spajanje i uspešna verifikacija izmena oba subagenta na grani `hardening/p2-scalability-quality`:
+  1. **Rešavanje konflikata:** Razrešeni su merge konflikti u `backend/main.py` i `istorija_izrade.md`. Zadržana je čista modularna struktura FastAPI aplikacije koju je uveo P3 subagent.
+  2. **Integracija API kvota i limita:** Logika za proveru veličine i trajanja videa prebačena je iz starog `main.py` u refaktorisani ruter [backend/routes/projects.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/projects.py), uz uvođenje potrebnih zavisnosti (`yt_dlp`, `subprocess`, `datetime`).
+  3. **Verifikacija testova:** Pokrenut je pytest i potvrđeno je da svih 30 testova (uključujući nove golden testove za A/V sinhronizaciju, ducking i koliziju) uspešno prolaze na PostgreSQL bazi.
+
 ## [2026-06-20 07:15:00] Prioritet P3: Kvalitet koda i testiranje (hardening/p2-scalability-quality)
 - **Opis:**
   U okviru prioritetne faze P3 (Kvalitet koda i testiranje) na grani hardening/p2-scalability-quality uspešno su implementirana sledeća unapređenja:
