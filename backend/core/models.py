@@ -73,6 +73,7 @@ class Project(Base):
 
     user = relationship("User", back_populates="projects")
     segments = relationship("Segment", back_populates="project", cascade="all, delete-orphan")
+    jobs = relationship("Job", back_populates="project", cascade="all, delete-orphan")
 
 class Segment(Base):
     __tablename__ = "segments"
@@ -118,3 +119,20 @@ class Waitlist(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="pending") # pending, approved, rejected
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String, nullable=False) # e.g. "dubbing"
+    status = Column(String, default="pending") # pending, running, completed, failed
+    current_phase = Column(String, nullable=True) # e.g. "transcription", "translation", "tts", "mixing"
+    attempt = Column(Integer, default=1, server_default="1")
+    current_artifact_keys = Column(JSON, nullable=True)
+    error_code = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("Project", back_populates="jobs")

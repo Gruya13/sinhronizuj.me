@@ -1,3 +1,18 @@
+## [2026-06-20 06:17:00] Faza 1: Ojačavanje pouzdanosti sistema (P1 Reliability)
+- **Opis:**
+  Uspešno smo implementirali i verifikovali sve aspekte ojačavanja pouzdanosti sistema (Faza 1 - Prioritet P1):
+  1. **Redis perzistencija:** Konfigurisali smo AOF (Append Only File) sa perzistentnim volumenom `redis_data` u `docker-compose.yml` kako se poslovi u Celery-ju ne bi izgubili pri restartu sistema.
+  2. **Upravljanje stanjem poslova (Job State Machine):** Primenu nove tabele `jobs` u PostgreSQL bazi podataka za praćenje stanja obrade po fazama u realnom vremenu (pending -> running -> completed/failed, sa fazama poput downloading, separating, transcribing, translating, diarizing, mixing, lipsyncing). Kreirana i uspešno primenjena Alembic migracija `9d45a91db31f` za tabelu `jobs`.
+  3. **Idempotentnost i S3 keširanje:** Implementirali smo keširanje intermedijalnih rezultata na S3/MinIO kako bismo izbegli ponovno izvršavanje skupih AI operacija pri padu radnika:
+     - Separacija zvuka: kešira se na osnovu hash-a ulaznog zvuka (`cache/separation/{hash}_vocals.wav`).
+     - Transkripcija: kešira se na osnovu hash-a vokalne trake i prompta (`cache/transcription/{hash}.json`).
+     - Prevođenje: kešira se na osnovu hash-a transkripta i videa (`cache/translation/{hash}.json`).
+     - TTS sinteza: kešira se po pojedinačnim segmentima na osnovu teksta i parametara (`cache/tts/{hash}.wav`), što dramatično smanjuje troškove na Modalu kod ponovnog renderovanja.
+  4. **Celery Queue Hardening:** Konfigurisali smo automatske retry mehanizme sa eksponencijalnim backoff-om (`max_retries=3`, `retry_backoff=True`), timeout-e po zadacima (`time_limit` i `soft_time_limit`) i rukovanje greškama koje automatski ažurira status posla u bazi i šalje podatke o grešci u Redis Dead Letter Queue (DLQ).
+  5. **Uklanjanje mutacije globalnog okruženja:** Eksplicitno smo prosledili radne putanje umesto izmena globalnog `settings.TEMP_WORKSPACE` i ispravili UnboundLocalError u `lipsync.py`.
+  6. **Backup i Restore procedure:** Kreirane su bash i python skripte za automatsko pravljenje rezervnih kopija baze i S3 skladišta (`scripts/backup.sh`, `scripts/backup_s3.py`) i oporavak sistema (`scripts/restore.sh`, `scripts/restore_s3.py`). Kreirano je detaljno uputstvo [backup_restore_uputstvo.md](file:///home/gruya/Projektri/sinhronizuj.me/backup_restore_uputstvo.md) i uspešno testirana procedura oporavka (Restore Drill).
+  7. **Verifikacija:** Svi unit testovi (27/27) uspešno prolaze.
+
 ## [2026-06-20 00:35:00] Analiza pravne usklađenosti i izrada izveštaja (Wav2Lip licence, Voice Cloning i GDPR/EU AI Act)
 - **Opis:**
   Sproveli smo sveobuhvatnu pravnu i etičku analizu celokupnog staka modela i arhitekture projekta sinhronizuj.me pred javno lansiranje (P4). Detaljan izveštaj je sačuvan u [pravna_usklađenost_izvestaj.md](file:///home/gruya/.gemini/antigravity/brain/bf11e4db-91f7-4c6e-a67c-cd38dff657a5/.system_generated/worktrees/subagent-Legal-and-Ethical-Compliance-Officer-LegalComplianceAgent-37fcb52a/doc/pravna_usklađenost_izvestaj.md):

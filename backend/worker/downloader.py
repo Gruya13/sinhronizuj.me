@@ -77,23 +77,23 @@ def is_safe_url(url: str) -> bool:
         print(f"[SSRF ERROR] Greška pri validaciji URL-a: {e}")
         return False
 
-def download_video(url: str) -> dict:
+def download_video(url: str, workspace_path: str = None) -> dict:
     """
     Glavna funkcija za dobavljanje videa. Podržava YouTube i S3.
     """
     if not is_safe_url(url):
         return {"status": "error", "message": "Zabranjen ili neispravan URL (SSRF zaštita)."}
 
-    if not os.path.exists(settings.TEMP_WORKSPACE):
-        os.makedirs(settings.TEMP_WORKSPACE)
-
+    workspace = workspace_path or settings.TEMP_WORKSPACE
+    if not os.path.exists(workspace):
+        os.makedirs(workspace)
 
     if url.startswith("s3://"):
-        return _download_from_s3(url)
+        return _download_from_s3(url, workspace)
     else:
-        return _download_from_youtube(url)
+        return _download_from_youtube(url, workspace)
 
-def _download_from_s3(s3_url: str) -> dict:
+def _download_from_s3(s3_url: str, workspace: str) -> dict:
     """
     Preuzima fajl direktno sa našeg MinIO storage-a.
     Format: s3://bucket_name/filename
@@ -103,7 +103,7 @@ def _download_from_s3(s3_url: str) -> dict:
         bucket = parts[0]
         key = "/".join(parts[1:])
         
-        local_video_path = os.path.join(settings.TEMP_WORKSPACE, key)
+        local_video_path = os.path.join(workspace, key)
         local_audio_path = local_video_path.rsplit(".", 1)[0] + ".wav"
         
         s3 = boto3.client(
@@ -132,12 +132,12 @@ def _download_from_s3(s3_url: str) -> dict:
     except Exception as e:
         return {"status": "error", "message": f"S3 Download Error: {str(e)}"}
 
-def _download_from_youtube(url: str) -> dict:
+def _download_from_youtube(url: str, workspace: str) -> dict:
     """
     Standardni YouTube download koristeći yt-dlp.
     """
     video_id = uuid.uuid4().hex[:8]
-    output_template = os.path.join(settings.TEMP_WORKSPACE, f"{video_id}.%(ext)s")
+    output_template = os.path.join(workspace, f"{video_id}.%(ext)s")
     
     ydl_opts = {
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',

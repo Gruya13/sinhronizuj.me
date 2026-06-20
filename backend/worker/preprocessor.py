@@ -3,13 +3,14 @@ import os
 import uuid
 from backend.core.config import settings
 
-def extract_visual_context(video_path: str, interval: int = 4) -> str:
+def extract_visual_context(video_path: str, interval: int = 4, workspace_path: str = None) -> str:
     """
     Ekstrahuje frejmove iz videa i pravi lagani preview klip (bez zvuka).
     Pomaže LLM-u da vidi kontekst bez gušenja mreže.
     """
     output_filename = f"preview_{uuid.uuid4().hex}.mp4"
-    output_path = os.path.join(settings.TEMP_WORKSPACE, output_filename)
+    workspace = workspace_path or settings.TEMP_WORKSPACE
+    output_path = os.path.join(workspace, output_filename)
     
     # FFMPEG komanda: 
     # - 1 frejm na svakih 'interval' sekundi

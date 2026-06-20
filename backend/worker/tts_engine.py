@@ -8,7 +8,7 @@ from backend.worker.preprocessor import upload_to_minio
 
 def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", 
                      disable_openvoice: bool = False, disable_enhance: bool = False,
-                     progress_callback=None, all_segments: list = None) -> dict:
+                     progress_callback=None, all_segments: list = None, workspace_path: str = None) -> dict:
     """
     Poziva Modal Serverless Fish Speech (TTS) za paralelnu sintezu segmenata.
     Zatim spaja izgenerisane audio delove na tacne vremenske pozicije pomocu pydub-a.
@@ -191,7 +191,8 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
                 
                 # Snimamo pojedinačni segment u privremeni fajl za dinamičko rastezanje
                 seg_filename = f"tts_seg_{uuid.uuid4().hex[:8]}_{seg_id}.wav"
-                seg_path = os.path.join(settings.TEMP_WORKSPACE, seg_filename)
+                workspace = workspace_path or settings.TEMP_WORKSPACE
+                seg_path = os.path.join(workspace, seg_filename)
                 seg_audio.export(seg_path, format="wav")
                 
                 duration = len(seg_audio) / 1000.0
@@ -227,7 +228,8 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
 
         # Cuvanje u lokalni fajl za kompatibilnost
         local_filename = f"dubbed_{uuid.uuid4().hex[:8]}.wav"
-        local_path = os.path.join(settings.TEMP_WORKSPACE, local_filename)
+        workspace = workspace_path or settings.TEMP_WORKSPACE
+        local_path = os.path.join(workspace, local_filename)
         
         final_mix.export(local_path, format="wav")
                     

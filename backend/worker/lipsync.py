@@ -47,12 +47,13 @@ def has_sufficient_faces(video_path: str, sample_rate: int = 30, threshold_perce
     
     return face_percentage >= threshold_percentage
 
-def apply_lip_sync(video_path: str, audio_path: str) -> dict:
+def apply_lip_sync(video_path: str, audio_path: str, workspace_path: str = None) -> dict:
     """
     Pokrece masivni Wav2Lip model kao eksterni pod-proces na osnovu zvuka i slike.
     """
     print("[FAZA 7] Lica potvrdjena! Iniciram Wav2Lip modul (Lip Sync u toku)...")
-    output_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_lipsync_{uuid.uuid4().hex[:6]}.mp4")
+    workspace = workspace_path or settings.TEMP_WORKSPACE
+    output_path = os.path.join(workspace, f"sinhronizuj_me_lipsync_{uuid.uuid4().hex[:6]}.mp4")
     
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")
     
@@ -80,10 +81,11 @@ def apply_lip_sync(video_path: str, audio_path: str) -> dict:
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -> dict:
+def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, workspace_path: str = None) -> dict:
     """
     Pokreće Wav2Lip selektivno samo na onim segmentima gde je active_speaker == True.
     """
+    workspace = workspace_path or settings.TEMP_WORKSPACE
     print("[SELECTIVE LIP SYNC] Započinjem selektivnu obradu usana...", flush=True)
     final_output_path = None
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")
@@ -160,7 +162,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
             if duration < 0.05:
                 continue
                 
-            sub_video_path = os.path.join(settings.TEMP_WORKSPACE, f"sub_video_{idx}_{uuid.uuid4().hex[:6]}.mp4")
+            sub_video_path = os.path.join(workspace, f"sub_video_{idx}_{uuid.uuid4().hex[:6]}.mp4")
             temp_files_to_clean.append(sub_video_path)
             
             # Sečenje videa pomoću FFmpeg-a
@@ -179,7 +181,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
                 print(f"[SELECTIVE LIP SYNC] Segment {idx}: Obrada usana (Wav2Lip) od {start:.2f}s do {end:.2f}s...", flush=True)
                 
                 # Isecanje audio dela
-                sub_audio_path = os.path.join(settings.TEMP_WORKSPACE, f"sub_audio_{idx}_{uuid.uuid4().hex[:6]}.wav")
+                sub_audio_path = os.path.join(workspace, f"sub_audio_{idx}_{uuid.uuid4().hex[:6]}.wav")
                 temp_files_to_clean.append(sub_audio_path)
                 
                 cmd_cut_audio = [
@@ -192,7 +194,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
                 subprocess.run(cmd_cut_audio, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
                 # Pokretanje Wav2Lip-a na ovom malom delu
-                sub_lipsync_path = os.path.join(settings.TEMP_WORKSPACE, f"sub_lipsync_{idx}_{uuid.uuid4().hex[:6]}.mp4")
+                sub_lipsync_path = os.path.join(workspace, f"sub_lipsync_{idx}_{uuid.uuid4().hex[:6]}.mp4")
                 temp_files_to_clean.append(sub_lipsync_path)
                 
                 command = [
@@ -218,7 +220,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
             return {"status": "error", "message": "Nijedan video segment nije izgenerisan."}
 
         # Kreiranje concat tekstualnog fajla
-        concat_list_path = os.path.join(settings.TEMP_WORKSPACE, f"concat_list_{uuid.uuid4().hex[:6]}.txt")
+        concat_list_path = os.path.join(workspace, f"concat_list_{uuid.uuid4().hex[:6]}.txt")
         temp_files_to_clean.append(concat_list_path)
         
         with open(concat_list_path, "w") as f:
@@ -227,7 +229,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
                 f.write(f"file '{os.path.abspath(clip)}'\n")
                 
         # Spajanje svih isečaka pomoću concat demuxer-a
-        joined_video_path = os.path.join(settings.TEMP_WORKSPACE, f"joined_video_{uuid.uuid4().hex[:6]}.mp4")
+        joined_video_path = os.path.join(workspace, f"joined_video_{uuid.uuid4().hex[:6]}.mp4")
         temp_files_to_clean.append(joined_video_path)
         
         concat_cmd = [
@@ -241,7 +243,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list) -
         subprocess.run(concat_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Spajanje videa bez zvuka sa finalnom dubbed audio trakom
-        final_output_path = os.path.join(settings.TEMP_WORKSPACE, f"final_lipsync_{uuid.uuid4().hex[:6]}.mp4")
+        final_output_path = os.path.join(workspace, f"final_lipsync_{uuid.uuid4().hex[:6]}.mp4")
         
         merge_cmd = [
             "ffmpeg", "-y",

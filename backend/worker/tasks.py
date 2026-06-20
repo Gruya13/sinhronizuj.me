@@ -8,11 +8,145 @@ import redis
 import re
 import time
 import threading
+import hashlib
 from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.config import Config
 from backend.core.database import SessionLocal
-from backend.core.models import Project, Segment
+from backend.core.models import Project, Segment, Job
+
+def get_file_sha256(file_path: str) -> str:
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(65536), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+def get_sha256_of_data(data: str) -> str:
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()
+
+def check_s3_file_exists(bucket_name: str, object_key: str) -> bool:
+    s3_internal = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
+    try:
+        s3_internal.head_object(Bucket=bucket_name, Key=object_key)
+        return True
+    except Exception:
+        return False
+
+def create_or_update_job(project_id: str, job_type: str, status: str, current_phase: str = None, attempt: int = None, artifact_keys: dict = None, error_code: str = None, error_message: str = None, job_id: str = None):
+    db = SessionLocal()
+    try:
+        import uuid
+        job = None
+        if job_id:
+            try:
+                job_uuid = uuid.UUID(job_id)
+                job = db.query(Job).filter(Job.id == job_uuid).first()
+            except ValueError:
+                pass
+        if not job:
+            try:
+                project_uuid = uuid.UUID(project_id)
+                job = db.query(Job).filter(Job.project_id == project_uuid, Job.type == job_type).order_by(Job.created_at.desc()).first()
+            except ValueError:
+                pass
+            
+        if not job:
+            job = Job(
+                id=uuid.UUID(job_id) if job_id else uuid.uuid4(),
+                project_id=uuid.UUID(project_id),
+                type=job_type,
+                status=status,
+                current_phase=current_phase,
+                attempt=attempt or 1,
+                current_artifact_keys=artifact_keys or {},
+                error_code=error_code,
+                error_message=error_message
+            )
+            db.add(job)
+        else:
+            job.status = status
+            if current_phase:
+                job.current_phase = current_phase
+            if attempt is not None:
+                job.attempt = attempt
+            if artifact_keys:
+                existing_keys = job.current_artifact_keys or {}
+                existing_keys.update(artifact_keys)
+                job.current_artifact_keys = existing_keys
+            if error_code is not None:
+                job.error_code = error_code
+            if error_message is not None:
+                job.error_message = error_message
+                
+        db.commit()
+        return str(job.id)
+    except Exception as e:
+        db.rollback()
+        print(f"[STATE MACHINE ERROR] Greška pri ažuriranju posla u bazi: {e}", flush=True)
+        return job_id
+    finally:
+        db.close()
+
+def handle_task_failure(self, exc, task_id, args, kwargs, einfo):
+    print(f"[CELERY FAILURE HANDLER] Task {self.name} failed. Task ID: {task_id}. Exc: {exc}", flush=True)
+    project_id = None
+    if self.name == "analyze_video_task":
+        project_id = kwargs.get("project_id") or (args[2] if len(args) > 2 else task_id)
+    elif self.name == "render_video_task":
+        project_id = kwargs.get("project_id") or (args[0] if len(args) > 0 else None)
+    elif self.name == "process_video_task":
+        project_id = task_id
+        
+    if project_id:
+        create_or_update_job(
+            project_id=project_id,
+            job_type="analysis" if self.name == "analyze_video_task" else ("render" if self.name == "render_video_task" else "dubbing"),
+            status="failed",
+            error_code=type(exc).__name__,
+            error_message=str(exc)
+        )
+        
+    try:
+        r_client = get_redis_client()
+        dlq_payload = {
+            "task_id": task_id,
+            "task_name": self.name,
+            "args": [str(a) for a in args],
+            "kwargs": {k: str(v) for k, v in kwargs.items()},
+            "exception": type(exc).__name__,
+            "error_message": str(exc),
+            "traceback": einfo.traceback if einfo else "",
+            "failed_at": datetime.now(timezone.utc).isoformat()
+        }
+        r_client.rpush("dead_letter_queue", json.dumps(dlq_payload))
+        print(f"[DLQ] Uspešno poslata poruka u dead_letter_queue za task {task_id}", flush=True)
+    except Exception as redis_err:
+        print(f"[DLQ ERROR] Greška pri slanju u Redis DLQ: {redis_err}", flush=True)
+
+def handle_task_success(self, retval, task_id, args, kwargs):
+    print(f"[CELERY SUCCESS HANDLER] Task {self.name} completed successfully. Task ID: {task_id}", flush=True)
+    project_id = None
+    if self.name == "analyze_video_task":
+        project_id = kwargs.get("project_id") or (args[2] if len(args) > 2 else task_id)
+    elif self.name == "render_video_task":
+        project_id = kwargs.get("project_id") or (args[0] if len(args) > 0 else None)
+    elif self.name == "process_video_task":
+        project_id = task_id
+        
+    if project_id:
+        create_or_update_job(
+            project_id=project_id,
+            job_type="analysis" if self.name == "analyze_video_task" else ("render" if self.name == "render_video_task" else "dubbing"),
+            status="completed"
+        )
 
 def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str):
     if not os.path.exists(file_path):
@@ -55,12 +189,36 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
 def get_redis_client():
     return redis.Redis.from_url(settings.REDIS_URL)
 
-@celery_app.task(bind=True, name="analyze_video_task")
+@celery_app.task(
+    bind=True,
+    name="analyze_video_task",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    time_limit=1200,
+    soft_time_limit=1100,
+    on_failure=handle_task_failure,
+    on_success=handle_task_success
+)
 def analyze_video_task(self, video_url: str, debug: bool = False, project_id: str = None):
     print(f"--- [CELERY TASK] Započeta FAZA 1 (Analiza). Debug: {debug}, project_id: {project_id} ---", flush=True)
     r_client = get_redis_client()
     task_id = self.request.id
     effective_project_id = project_id if project_id else task_id
+    
+    # Inicijalizacija stanja u Job tabeli
+    attempt_num = self.request.retries + 1
+    create_or_update_job(
+        project_id=effective_project_id,
+        job_type="analysis",
+        status="running",
+        current_phase="downloading",
+        attempt=attempt_num,
+        job_id=task_id
+    )
 
     # Uspostavljanje izolovanog radnog prostora za ovaj task
     original_temp_workspace = settings.TEMP_WORKSPACE
@@ -137,36 +295,67 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             return result
         update_progress(completed_step="Preuzimanje završeno")
         
+        # Izračunavanje hash-a preuzetog fajla
+        video_hash = get_file_sha256(result["video_path"])
+        audio_hash = get_file_sha256(result["audio_path"])
+        
         # Pokrećemo ekstrakciju vizuelnog konteksta u pozadini
         vc_thread = threading.Thread(target=run_vc_extraction, args=(result["video_path"],))
         vc_thread.daemon = True
         vc_thread.start()
         
         # --- KORAK 2: Separacija Zvuka ---
-        update_progress("Izolacija vokala...", 25, detail="Pokretanje Demucs modela na Modalu...")
-        from backend.worker.audio_sep import separate_audio
-        t_start_sep = time.time()
-        sep_result = separate_audio(
-            result['audio_path'],
-            progress_callback=lambda detail: update_progress(detail=detail)
-        )
-        duration_sep = time.time() - t_start_sep
-        if sep_result["status"] == "error": 
-            return sep_result
-        add_phase_cost("separation", "Izolacija vokala (Demucs)", "T4", duration_sep, 0.00018)
-        update_progress(completed_step="Vokal izolovan")
+        create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="separating", job_id=task_id)
+        update_progress("Izolacija vokala...", 25, detail="Provera keša za izolaciju vokala...")
         
-        # Kopiramo vokal i no-vocal fajlove u privremeni direktorijum koji ostaje dostupan i nakon gašenja taska
+        vocals_cache_key = f"cache/separation/{audio_hash}_vocals.wav"
+        no_vocals_cache_key = f"cache/separation/{audio_hash}_no_vocals.wav"
+        
         vocals_filename = f"vocals_{effective_project_id}.wav"
         no_vocals_filename = f"no_vocals_{effective_project_id}.wav"
         stable_vocals_path = os.path.join(original_temp_workspace, vocals_filename)
         stable_no_vocals_path = os.path.join(original_temp_workspace, no_vocals_filename)
         
-        shutil.copy2(sep_result["vocals_path"], stable_vocals_path)
-        shutil.copy2(sep_result["no_vocals_path"], stable_no_vocals_path)
+        if check_s3_file_exists(settings.MINIO_BUCKET, vocals_cache_key) and check_s3_file_exists(settings.MINIO_BUCKET, no_vocals_cache_key):
+            print(f"[CACHE HIT] Separacija vokala pronađena u kešu na S3. Preuzimam...", flush=True)
+            update_progress("Izolacija vokala...", 25, detail="Preuzimam izolovani vokal iz keša...")
+            download_file_from_s3(settings.MINIO_BUCKET, vocals_cache_key, stable_vocals_path)
+            download_file_from_s3(settings.MINIO_BUCKET, no_vocals_cache_key, stable_no_vocals_path)
+            add_phase_cost("separation", "Izolacija vokala (Keširano)", "Nema GPU", 0.0, 0.0)
+        else:
+            from backend.worker.audio_sep import separate_audio
+            t_start_sep = time.time()
+            sep_result = separate_audio(
+                result['audio_path'],
+                progress_callback=lambda detail: update_progress(detail=detail)
+            )
+            duration_sep = time.time() - t_start_sep
+            if sep_result["status"] == "error": 
+                return sep_result
+            add_phase_cost("separation", "Izolacija vokala (Demucs)", "T4", duration_sep, 0.00018)
+            
+            # Kopiramo u stabilnu lokaciju
+            shutil.copy2(sep_result["vocals_path"], stable_vocals_path)
+            shutil.copy2(sep_result["no_vocals_path"], stable_no_vocals_path)
+            
+            # Otpremamo u keš na S3
+            upload_file_to_s3(stable_vocals_path, settings.MINIO_BUCKET, vocals_cache_key)
+            upload_file_to_s3(stable_no_vocals_path, settings.MINIO_BUCKET, no_vocals_cache_key)
+            
+        update_progress(completed_step="Vokal izolovan")
+        
+        # Zabeležimo intermedijalni rezultat u Job tabeli
+        create_or_update_job(
+            project_id=effective_project_id,
+            job_type="analysis",
+            status="running",
+            artifact_keys={"vocals_s3_key": vocals_cache_key, "no_vocals_s3_key": no_vocals_cache_key},
+            job_id=task_id
+        )
         
         # --- KORAK 3: Transkripcija ---
-        update_progress("Prepoznavanje govora (Whisper)...", 50, detail="Slanje vokalne trake na Modal Whisper...")
+        create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="transcribing", job_id=task_id)
+        update_progress("Prepoznavanje govora (Whisper)...", 50, detail="Provera keša za transkripciju...")
         
         video_title = result.get("title", "")
         video_tags = result.get("tags", [])
@@ -179,20 +368,52 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         if keywords_str:
             initial_prompt = f"This is a video about {keywords_str}. Please use correct punctuation: dots, commas, and capital letters. Spell names and technical terms correctly."
             
-        from backend.worker.transcriber import transcribe_audio
-        t_start_trans = time.time()
-        transcription_result = transcribe_audio(
-            stable_vocals_path,
-            initial_prompt=initial_prompt,
-            progress_callback=lambda detail: update_progress(detail=detail)
-        )
-        duration_trans = time.time() - t_start_trans
-        if transcription_result["status"] == "error": 
-            return transcription_result
-        add_phase_cost("transcription", "Prepoznavanje govora (Whisper)", "T4", duration_trans, 0.00018)
+        vocals_hash = get_file_sha256(stable_vocals_path)
+        transcription_hash = get_sha256_of_data(vocals_hash + initial_prompt)
+        trans_cache_key = f"cache/transcription/{transcription_hash}.json"
+        
+        transcription_result = None
+        if check_s3_file_exists(settings.MINIO_BUCKET, trans_cache_key):
+            print(f"[CACHE HIT] Transkripcija pronađena u kešu na S3. Preuzimam...", flush=True)
+            update_progress("Prepoznavanje govora (Whisper)...", 50, detail="Preuzimam transkripciju iz keša...")
+            local_trans_path = os.path.join(task_workspace, "trans_cache.json")
+            if download_file_from_s3(settings.MINIO_BUCKET, trans_cache_key, local_trans_path):
+                with open(local_trans_path, "r", encoding="utf-8") as f:
+                    transcription_result = json.load(f)
+                add_phase_cost("transcription", "Prepoznavanje govora (Keširano)", "Nema GPU", 0.0, 0.0)
+                
+        if not transcription_result:
+            from backend.worker.transcriber import transcribe_audio
+            t_start_trans = time.time()
+            transcription_result = transcribe_audio(
+                stable_vocals_path,
+                initial_prompt=initial_prompt,
+                progress_callback=lambda detail: update_progress(detail=detail)
+            )
+            duration_trans = time.time() - t_start_trans
+            if transcription_result["status"] == "error": 
+                return transcription_result
+            add_phase_cost("transcription", "Prepoznavanje govora (Whisper)", "T4", duration_trans, 0.00018)
+            
+            # Otpremamo u keš na S3
+            local_trans_path = os.path.join(task_workspace, "trans_cache.json")
+            with open(local_trans_path, "w", encoding="utf-8") as f:
+                json.dump(transcription_result, f, ensure_ascii=False)
+            upload_file_to_s3(local_trans_path, settings.MINIO_BUCKET, trans_cache_key)
+            if os.path.exists(local_trans_path):
+                os.remove(local_trans_path)
+                
         update_progress(completed_step="Govor prepoznat")
+        create_or_update_job(
+            project_id=effective_project_id,
+            job_type="analysis",
+            status="running",
+            artifact_keys={"transcription_s3_key": trans_cache_key},
+            job_id=task_id
+        )
         
         # --- KORAK 4: Prevođenje & Lektura ---
+        create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="translating", job_id=task_id)
         update_progress("Prevođenje (Modal + Multimodal)...", 75, detail="Čekam pozadinsku ekstrakciju slika...")
         
         if vc_thread.is_alive():
@@ -204,9 +425,6 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             update_progress(visual_context_url=visual_context_url)
         add_phase_cost("visual_context", "Generisanje vizuelnog konteksta (Lokalno)", "Lokalni VPS", duration_vc, 0.0)
         
-        update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Prevođenje i lektura teksta preko Qwen modela...")
-        from backend.worker.translator import translate_segments
-        
         # Kopiramo originalni video u stabilnu lokaciju
         video_filename = f"video_{effective_project_id}.mp4"
         stable_video_path = os.path.join(original_temp_workspace, video_filename)
@@ -215,26 +433,60 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         from backend.worker.segment_optimizer import optimize_segments_for_translation
         optimized_segments = optimize_segments_for_translation(transcription_result["segments"])
         
-        translation_result = translate_segments(
-            optimized_segments,
-            video_path=stable_video_path,
-            progress_callback=lambda detail: update_progress(detail=detail)
-        )
-        if translation_result["status"] == "error": 
-            return translation_result
+        # Provera keša za prevod
+        video_hash = get_file_sha256(stable_video_path)
+        translation_hash = get_sha256_of_data(json.dumps(optimized_segments) + video_hash)
+        translation_cache_key = f"cache/translation/{translation_hash}.json"
         
-        metrics = translation_result.get("metrics", {})
-        duration_translate = metrics.get("translator_duration", 0.0)
-        duration_lektor = metrics.get("lektor_duration", 0.0)
-        
-        if duration_translate > 0:
-            add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_translate, 0.00033)
-        if duration_lektor > 0:
-            add_phase_cost("lektor", "Lektura teksta (Qwen 32B AWQ)", "A10G", duration_lektor, 0.00033)
+        translation_result = None
+        if check_s3_file_exists(settings.MINIO_BUCKET, translation_cache_key):
+            print(f"[CACHE HIT] Prevod pronađen u kešu na S3. Preuzimam...", flush=True)
+            update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Preuzimam prevod iz keša...")
+            local_trans_path = os.path.join(task_workspace, "translation_cache.json")
+            if download_file_from_s3(settings.MINIO_BUCKET, translation_cache_key, local_trans_path):
+                with open(local_trans_path, "r", encoding="utf-8") as f:
+                    translation_result = json.load(f)
+                add_phase_cost("translation", "Prevođenje (Keširano)", "Nema GPU", 0.0, 0.0)
+                
+        if not translation_result:
+            update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Prevođenje i lektura teksta preko Qwen modela...")
+            from backend.worker.translator import translate_segments
+            translation_result = translate_segments(
+                optimized_segments,
+                video_path=stable_video_path,
+                progress_callback=lambda detail: update_progress(detail=detail)
+            )
+            if translation_result["status"] == "error": 
+                return translation_result
             
+            metrics = translation_result.get("metrics", {})
+            duration_translate = metrics.get("translator_duration", 0.0)
+            duration_lektor = metrics.get("lektor_duration", 0.0)
+            
+            if duration_translate > 0:
+                add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_translate, 0.00033)
+            if duration_lektor > 0:
+                add_phase_cost("lektor", "Lektura teksta (Qwen 32B AWQ)", "A10G", duration_lektor, 0.00033)
+                
+            # Otpremamo u keš na S3
+            local_trans_path = os.path.join(task_workspace, "translation_cache.json")
+            with open(local_trans_path, "w", encoding="utf-8") as f:
+                json.dump(translation_result, f, ensure_ascii=False)
+            upload_file_to_s3(local_trans_path, settings.MINIO_BUCKET, translation_cache_key)
+            if os.path.exists(local_trans_path):
+                os.remove(local_trans_path)
+                
         update_progress(completed_step="Prevedeno i lekturisano", percentage=85)
+        create_or_update_job(
+            project_id=effective_project_id,
+            job_type="analysis",
+            status="running",
+            artifact_keys={"translation_s3_key": translation_cache_key},
+            job_id=task_id
+        )
         
         # --- KORAK 5: Lokalna detekcija roda i govornika (diarizacija i ASD) ---
+        create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="diarizing", job_id=task_id)
         update_progress("Diarizacija i vizuelna analiza...", 90, detail="Analiziram govornike i pokrete usana na ekranu...")
         
         from backend.worker.audio_gender import detect_gender_from_audio
@@ -265,6 +517,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             })
             
         update_progress(completed_step="Diarizacija i vizuelna analiza završene", percentage=100)
+        create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="ready", job_id=task_id)
             
         # Inicijalni naziv i kreiranje datuma za metapodatke
         created_at_val = datetime.now().isoformat()
@@ -403,12 +656,36 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
-@celery_app.task(bind=True, name="render_video_task")
+@celery_app.task(
+    bind=True,
+    name="render_video_task",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    time_limit=1800,
+    soft_time_limit=1700,
+    on_failure=handle_task_failure,
+    on_success=handle_task_success
+)
 def render_video_task(self, project_id: str, voice_type: str = "clone", background_vol: float = -5.0, dubbed_vol: float = 0.0):
     print(f"--- [CELERY TASK] Započeta FAZA 2 (Render). Projekat: {project_id} ---", flush=True)
     r_client = get_redis_client()
     task_id = self.request.id
     
+    # Inicijalizacija stanja u Job tabeli
+    attempt_num = self.request.retries + 1
+    create_or_update_job(
+        project_id=project_id,
+        job_type="render",
+        status="running",
+        current_phase="tts",
+        attempt=attempt_num,
+        job_id=task_id
+    )
+
     # 1. Učitavamo projekat i segmente iz PostgreSQL-a da bismo bili potpuno stateless i ažurni
     db = SessionLocal()
     try:
@@ -505,7 +782,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         
         missing_tts_segments = []
         
-        # Proveravamo koji segmenti nemaju generisan audio i preuzimamo postojeće
+        # Proveravamo koji segmenti nemaju generisan audio i preuzimamo postojeće (projekat-specifične ili iz globalnog keša)
         for s in segments:
             local_path = os.path.join(task_workspace, f"tts_seg_{s['id']}.wav")
             s["tts_path"] = local_path
@@ -516,7 +793,44 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 if not os.path.exists(local_path):
                     missing_tts_segments.append(s)
             else:
-                missing_tts_segments.append(s)
+                # Provera globalnog keša na osnovu teksta i modifikatora
+                text = s.get("translated", "") or ""
+                v_type = s.get("voice_type", "clone")
+                vol = s.get("volume", 0.0)
+                spd = s.get("speed", 1.0)
+                ptc = s.get("pitch", 0.0)
+                tts_data_str = f"{text}|{v_type}|{vol:.2f}|{spd:.2f}|{ptc:.2f}"
+                tts_hash = get_sha256_of_data(tts_data_str)
+                tts_cache_key = f"cache/tts/{tts_hash}.wav"
+                
+                if check_s3_file_exists(settings.MINIO_BUCKET, tts_cache_key):
+                    print(f"[CACHE HIT] Pronađen TTS za segment {s['id']} u kešu S3. Preuzimam...", flush=True)
+                    if download_file_from_s3(settings.MINIO_BUCKET, tts_cache_key, local_path):
+                        s["tts_s3_key"] = tts_cache_key
+                        # Izmerimo trajanje
+                        try:
+                            from pydub import AudioSegment
+                            aud = AudioSegment.from_wav(local_path)
+                            s["tts_duration"] = len(aud) / 1000.0
+                        except Exception:
+                            s["tts_duration"] = s.get("end", 0.0) - s.get("start", 0.0)
+                            
+                        # Ažuriramo u bazi podataka odmah
+                        db = SessionLocal()
+                        try:
+                            db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == s["id"]).first()
+                            if db_seg:
+                                db_seg.tts_s3_key = tts_cache_key
+                                db_seg.tts_duration = s["tts_duration"]
+                                db.commit()
+                        except Exception:
+                            db.rollback()
+                        finally:
+                            db.close()
+                    else:
+                        missing_tts_segments.append(s)
+                else:
+                    missing_tts_segments.append(s)
                 
         if missing_tts_segments:
             update_progress("Sinteza govora...", 30, detail=f"Sinteza preostalih {len(missing_tts_segments)} segmenata na Modalu...")
@@ -579,9 +893,20 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                         except Exception:
                             actual_duration = res_seg["duration"]
                             
-                        # Upload na S3
+                        # Upload na S3 (projekat-specifičan)
                         tts_s3_key = f"projects/{project_id}/tts_seg_{s['id']}.wav"
                         upload_file_to_s3(local_processed_path, settings.MINIO_BUCKET, tts_s3_key)
+                        
+                        # Upload na S3 (globalni keš)
+                        text = s.get("translated", "") or ""
+                        v_type = s.get("voice_type", "clone")
+                        vol = s.get("volume", 0.0)
+                        spd = s.get("speed", 1.0)
+                        ptc = s.get("pitch", 0.0)
+                        tts_data_str = f"{text}|{v_type}|{vol:.2f}|{spd:.2f}|{ptc:.2f}"
+                        tts_hash = get_sha256_of_data(tts_data_str)
+                        tts_cache_key = f"cache/tts/{tts_hash}.wav"
+                        upload_file_to_s3(local_processed_path, settings.MINIO_BUCKET, tts_cache_key)
                         
                         if os.path.exists(local_raw_path):
                             os.remove(local_raw_path)
@@ -606,9 +931,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             if "dubbed_audio_path" in tts_result and os.path.exists(tts_result["dubbed_audio_path"]):
                 os.remove(tts_result["dubbed_audio_path"])
             
-        update_progress(completed_step="Svi vokali sintetizovani")
-        
-        # --- KORAK 2: FFmpeg merger i Dynamic Time Stretching ---
+           # --- KORAK 2: FFmpeg merger i Dynamic Time Stretching ---
+        create_or_update_job(project_id=project_id, job_type="render", status="running", current_phase="mixing", job_id=task_id)
         update_progress("Finalni miks (FFmpeg)...", 60, detail="Dynamic time stretching i miksovanje zvuka...")
         
         # Formiramo tts_segments listu za merger
@@ -634,7 +958,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         duration_merge = time.time() - t_start_merge
         if merge_result["status"] == "error":
             return merge_result
-
+        
         # --- FEEDBACK PETLJA POREĐENJA BRZINA GOVORA ---
         # Računamo prosečan istorijski speedup korisnika za potrebe kalibracije limita
         db = SessionLocal()
@@ -809,6 +1133,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         update_progress(completed_step="Miks završen")
         
         # --- KORAK 3: Lip Sync ---
+        create_or_update_job(project_id=project_id, job_type="render", status="running", current_phase="lipsyncing", job_id=task_id)
         update_progress("Lip Sync sinhronizacija...", 80, detail="Analiza i pokretanje Wav2Lip-a...")
         from backend.worker.lipsync import has_sufficient_faces, apply_selective_lip_sync
         
@@ -888,6 +1213,16 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             meta = json.loads(meta_bytes)
             meta["status"] = "completed"
             r_client.hset("projects:metadata", project_id, json.dumps(meta))
+            
+        # Ažuriranje završne faze u Job tabeli
+        create_or_update_job(
+            project_id=project_id,
+            job_type="render",
+            status="completed",
+            current_phase="completed",
+            artifact_keys={"final_video_s3_key": final_video_s3_key},
+            job_id=task_id
+        )
         
         return {
             "status": "completed",
@@ -914,9 +1249,22 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         settings.TEMP_WORKSPACE = original_temp_workspace
         if os.path.exists(task_workspace):
             shutil.rmtree(task_workspace, ignore_errors=True)
-
+ 
 # Definišemo legacy celery task radi kompatibilnosti, ali on sada interno poziva Fazu 1 i Fazu 2 za redom
-@celery_app.task(bind=True, name="process_video_task")
+@celery_app.task(
+    bind=True,
+    name="process_video_task",
+    acks_late=True,
+    reject_on_worker_lost=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    time_limit=2400,
+    soft_time_limit=2300,
+    on_failure=handle_task_failure,
+    on_success=handle_task_success
+)
 def process_video_task(self, video_url: str, debug: bool = False):
     """
     Legacy task koji automatski radi i analizu i render (1-pass) bez prekidanja,

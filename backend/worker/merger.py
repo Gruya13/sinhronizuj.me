@@ -30,7 +30,7 @@ def speedup_audio_file(input_path: str, speedup: float) -> str:
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return output_path
 
-def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: str, background_vol: float = -5.0, dubbed_vol: float = 0.0) -> dict:
+def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: str, background_vol: float = -5.0, dubbed_vol: float = 0.0, workspace_path: str = None) -> dict:
     """
     Klasično spajanje (statički tajminzi):
     Spaja originalnu pozadinsku muziku/efekte sa nasim novim srpskim glasom koristeći
@@ -51,7 +51,8 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
         ]
         subprocess.run(postprocess_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        final_video_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_final_{uuid.uuid4().hex[:6]}.mp4")
+        workspace = workspace_path or settings.TEMP_WORKSPACE
+        final_video_path = os.path.join(workspace, f"sinhronizuj_me_final_{uuid.uuid4().hex[:6]}.mp4")
         
         # Podešavanje glasnoće
         bg_vol_str = f"volume={background_vol}dB" if background_vol != 0.0 else "volume=1.0"
@@ -103,7 +104,8 @@ def merge_audio_and_video_dynamic(
     tts_segments: list,
     background_vol: float = -5.0,
     dubbed_vol: float = 0.0,
-    max_video_stretch: float = 1.05
+    max_video_stretch: float = 1.05,
+    workspace_path: str = None
 ) -> dict:
     """
     Dinamički video time stretching:
@@ -283,8 +285,9 @@ def merge_audio_and_video_dynamic(
         
         filter_complex = "; ".join(video_filters + audio_mix_filters + audio_voc_filters + [concat_video_str, concat_mix_str, concat_voc_str])
         
-        final_video_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_final_stretched_{uuid.uuid4().hex[:6]}.mp4")
-        final_vocals_path = os.path.join(settings.TEMP_WORKSPACE, f"sinhronizuj_me_vocals_stretched_{uuid.uuid4().hex[:6]}.wav")
+        workspace = workspace_path or settings.TEMP_WORKSPACE
+        final_video_path = os.path.join(workspace, f"sinhronizuj_me_final_stretched_{uuid.uuid4().hex[:6]}.mp4")
+        final_vocals_path = os.path.join(workspace, f"sinhronizuj_me_vocals_stretched_{uuid.uuid4().hex[:6]}.wav")
         
         command = ["ffmpeg", "-y"]
         command.extend(cmd_inputs)

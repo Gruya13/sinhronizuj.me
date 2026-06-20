@@ -3,7 +3,7 @@ import base64
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
-def separate_audio(audio_path: str, progress_callback=None) -> dict:
+def separate_audio(audio_path: str, progress_callback=None, workspace_path: str = None) -> dict:
     """
     Koristi Demucs na Modal.com za odvajanje vokala od pozadinske muzike.
     Zahvaljujući --two-stems vocals, Demucs generiše samo dva fajla:
@@ -35,7 +35,8 @@ def separate_audio(audio_path: str, progress_callback=None) -> dict:
             return {"status": "error", "message": output["error"]}
 
         # Kreiramo lokalni direktorijum za izlaz
-        output_dir = os.path.join(settings.TEMP_WORKSPACE, "demucs_output")
+        workspace = workspace_path or settings.TEMP_WORKSPACE
+        output_dir = os.path.join(workspace, "demucs_output")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
