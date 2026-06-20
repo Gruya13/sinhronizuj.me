@@ -1,3 +1,10 @@
+## [2026-06-20 09:55:00] Otklanjanje CI/CD blokada (Ruff linter, npm audit) i priprema za usklađivanje admin lozinke
+- **Opis:**
+  Nakon što je detektovan prekid u CI/CD pipeline-u za produkciju i nemogućnost prijave korisnika na produkcijskom serveru, sprovedene su sledeće ispravke:
+  1. **Popravka Ruff Lintera (Backend/Modal Workers):** Uklonjen je suvišni lokalni import `os` unutar `handle_request` funkcija u [modal_workers/sensevoice_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/sensevoice_worker.py) i [modal_workers/stt_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/stt_worker.py), čime je otklonjena greška `F823 Local variable os referenced before assignment` i omogućeno uspešno izvršavanje lintera u CI.
+  2. **Otklanjanje ranjivosti (Frontend npm audit):** Pokrenut je `npm audit fix` u direktorijumu `frontend/` koji je ažurirao ranjive pakete (`vite`, `undici`, `@babel/core`, `js-yaml`) na sigurne verzije. Broj bezbednosnih ranjivosti na frontendu je sveden na 0, čime je rešena blokada na CI koraku `npm audit`.
+  3. **Priprema za usklađivanje admin lozinke:** Identifikovano je neslaganje u lozinki administratora (uneta lozinka sa malim `b` na kraju `E89120d9dfeb#` u odnosu na ranije definisano veliko `B`). Nakon što novi kod prođe CI i bude automatski deploy-ovan na produkciju, lozinka će biti resetovana preko CLI alata.
+
 ## [2026-06-20 09:30:00] Uspešno Puštanje Ojačanog Sistema u Produkciju (Go-Live)
 - **Opis:**
   Nakon verifikacije i odobrenja finalnog izveštaja o ojačavanju, celokupna rešenja iz Faze 0, Faze 1 i Faze 2 (P0, P1, P2, P3, P4) su puštena u produkciju:

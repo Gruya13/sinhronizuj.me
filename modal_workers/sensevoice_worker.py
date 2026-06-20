@@ -67,7 +67,6 @@ class SenseVoiceWorker:
 
             import base64
             import tempfile
-            import os
             
             data = await request.json()
             audio_b64 = data.get("audio_base64")
