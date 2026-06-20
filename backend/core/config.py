@@ -76,7 +76,7 @@ class Settings:
     DATABASE_URL: str = _db_url
 
     # Security & CORS
-    ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    ALLOWED_ORIGINS: list = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://sinhronizuj.me,https://api.sinhronizuj.me").split(",")
 
     # Monitoring
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
