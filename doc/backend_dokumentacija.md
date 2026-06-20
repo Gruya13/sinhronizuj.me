@@ -9,32 +9,34 @@ Ovaj dokument pruža detaljan pregled FastAPI serverske aplikacije, autentifikac
 FastAPI je izabran kao primarni web server zbog svojih izuzetnih performansi (zasnovan na ASGI i Uvicorn-u), automatske validacije podataka preko Pydantic-a i asinhronog rada.
 
 ### 1.1. Struktura API Ruta
-Glavna startna tačka je [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py). API rute su podeljene u sledeće celine:
+Glavna startna tačka je [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) koji sada služi isključivo kao orkestrator (registruje middleware, slowapi limiter, static mounts i rutere). API rute su modularno podeljene u paketu `backend/routes/` i registrovane u aplikaciji:
 
-*   **Javne i Waitlist rute**:
-    *   `POST /api/v1/waitlist`: Prijava email-a u zatvorenu betu. Koristi rate-limiting.
-*   **Autentifikacione rute**:
+*   **Autentifikacija (`routes/auth.py`)**:
     *   `POST /api/v1/auth/register`: Registracija korisnika (podložna odobrenju sa waitlist-a).
-    *   `POST /api/v1/auth/login`: Prijavljivanje korisnika, vraća JWT token i korisničke podatke (uključujući `is_admin` fleg).
-    *   `GET /api/v1/auth/me`: Vraća podatke o trenutno ulogovanom korisniku na osnovu JWT tokena.
-*   **Storage i Učitavanje**:
-    *   `GET /api/v1/storage/upload_url`: Generiše pre-potpisani URL za direktan upload video fajlova na MinIO S3 skladište.
-*   **Upravljanje Projektima i DAW-om**:
+    *   `POST /api/v1/auth/login`: Prijavljivanje korisnika, vraća JWT token.
+    *   `GET /api/v1/auth/me`: Podaci o trenutnom korisniku.
+    *   `POST /api/v1/auth/logout`: Odjavljivanje korisnika uz upis tokena u Redis blocklist.
+*   **Waitlist (`routes/system.py` za waitlist i status)**:
+    *   `POST /api/v1/waitlist`: Prijava email-a u zatvorenu betu. Koristi rate-limiting.
+    *   `GET /api/v1/status/{task_id}`: Provera statusa asinhronog Celery zadatka u realnom vremenu.
+*   **Projekti i Storage (`routes/projects.py`)**:
+    *   `GET /api/v1/storage/upload_url`: Generiše pre-potpisani URL za direktan upload video fajlova na S3 skladište (sa server-side UUID generisanjem i proverom vlasništva).
     *   `GET /api/v1/projects`: Listanje svih projekata ulogovanog korisnika.
     *   `POST /api/v1/project`: Kreiranje novog praznog projekta.
-    *   `GET /api/v1/project/{project_id}`: Učitavanje svih detalja i segmenata projekta.
-    *   `POST /api/v1/project/{project_id}/save`: Snimanje trenutnih modifikacija nad segmentima.
-    *   `DELETE /api/v1/project/{project_id}`: Kaskadno brisanje projekta, segmenata i povezanih S3 fajlova.
-*   **Procesiranje Videa i Zvuka**:
-    *   `POST /api/v1/process-video`: Inicijalizuje Celery task za analizu (Demucs + Faster-Whisper/SenseVoice STT + prevod).
+    *   `GET /api/v1/project/{project_id}`: Učitavanje nacrta i svih segmenata projekta.
+    *   `POST /api/v1/project/{project_id}/save`: Snimanje izmena na segmentima.
+    *   `DELETE /api/v1/project/{project_id}`: Kaskadno brisanje projekta i povezanih S3 resursa.
+    *   `POST /api/v1/process-video`: Inicijalizuje Celery task za analizu (sa proverom vlasništva, video formata, trajanja i dnevnih korisničkih kvota).
+*   **Segmenti i Zvuk (`routes/segments.py`)**:
     *   `POST /api/v1/project/{project_id}/segment/{segment_id}/tts`: Generiše srpski TTS/OpenVoice audio za specifičan segment.
-    *   `POST /api/v1/project/{project_id}/generate-all-tts`: Pokreće paralelnu sintezu za sve segmente u projektu.
-    *   `POST /api/v1/project/{project_id}/render`: Inicijalizuje Celery task za sklapanje finalnog sinhronizovanog videa.
-    *   `GET /api/v1/status/{task_id}`: Provera statusa asinhronog Celery zadatka u realnom vremenu.
-*   **Monitoring i Logovi**:
-    *   `GET /api/v1/hw-stats`: Vraća iskorišćenost CPU, RAM i diska na host serveru.
-    *   `GET /api/v1/modal-status`: Proverava status serverless radnika na Modalu.
-    *   `POST /api/v1/warmup`: Šalje zahtev Modalu da unapred podigne instance (warmup) kako bi se izbegao "cold start" prilikom obrade.
+    *   `POST /api/v1/project/{project_id}/segment/{segment_id}/shorten`: Poziva Modal Lektor za skraćivanje teksta segmenta.
+    *   `POST /api/v1/project/{project_id}/generate-all-tts`: Pokreće sintezu za sve segmente u projektu.
+    *   `POST /api/v1/project/{project_id}/render`: Inicijalizuje Celery task za finalno renderovanje videa.
+*   **Sistemske rute (`routes/system.py`)**:
+    *   `GET /api/v1/hw-stats`: Vraća iskorišćenost resursa host VPS-a (samo za administratora).
+    *   `GET /api/v1/modal-status`: Proverava status serverless radnika na Modalu (samo za admina).
+    *   `POST /api/v1/warmup`: Podizanje Modal radnika unapred (samo za admina).
+
 
 ### 1.2. Zaštićene Admin Rute
 Admin rute zahtevaju JWT token sa `is_admin=True` privilegijom i zaštićene su zavisnošću `get_current_admin_user` u [backend/core/auth.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/core/auth.py):
@@ -91,10 +93,11 @@ Zaštita produkcionog VPS servera implementirana je kroz više slojeva:
 
 Backend koristi **pytest** i **httpx** za integraciono i API testiranje.
 
-*   **Lokalna baza za testove**: Tokom pokretanja testova, kreira se privremena SQLite baza podataka u memoriji kako se ne bi remetila lokalna razvojna PostgreSQL baza.
-*   **Struktura testova**: Smešteni su u direktorijum `tests/` (npr. `tests/test_auth.py`, `tests/test_admin.py`).
+*   **Lokalna baza za testove**: Testovi su konfigurisani u [tests/conftest.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/conftest.py) da koriste PostgreSQL test bazu umesto SQLite-a. Ovo omogućava verodostojno testiranje UUID kolona i JSON tipova podataka, dok SQLite služi kao automatski fallback ukoliko Postgres nije dostupan.
+*   **Struktura testova**: Smešteni su u direktorijum `tests/` i pokrivaju autentifikaciju, rute za projekte, administrativne komande, kao i složene integracione provere (A/V merger sa ducking-om, segmentne kolizije, active speaker detekciju i selektivni lipsync).
 *   **Pokretanje testova**:
     ```bash
-    pytest
+    pytest tests/
     ```
-    Svi testovi (15 integracionih testova) uspešno prolaze na lokalnoj mašini i automatski se pokreću pri svakom push-u na GitHub kroz `.github/workflows/backend-ci.yml`.
+    Svi testovi (30 integracionih i golden testova) uspešno prolaze i automatski se pokreću u CI pipeline-u kroz [.github/workflows/backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml).
+

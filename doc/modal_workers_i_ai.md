@@ -42,6 +42,11 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 ### 2.5. Lektura teksta (`lektor_worker.py`)
 *   **Funkcija**: Brza provera gramatike i stila prevedenog teksta na srpskom jeziku pre nego što se pošalje na zvučnu sintezu.
 
+### 2.6. LipSync vizuelna sinhronizacija (`wav2lip_worker.py`)
+*   **Model**: Wav2Lip.
+*   **GPU zahtev**: Nvidia T4 (16GB VRAM) sa NFS skladištem za keširanje modela.
+*   **Funkcija**: Ugrađen je serverless radnik koji vrši fotorealističnu sinhronizaciju pokreta usana na osnovu spojenog srpskog govora i originalnog videa, čime se eliminiše potreba za izvođenjem teške Wav2Lip inferencije na lokalnom VPS-u.
+
 ---
 
 ## 3. Optimizacija Troškova GPU-a po Videu
@@ -53,12 +58,14 @@ Na osnovu testiranja obavljenih na platformi, troškovi obrade su izuzetno optim
 | **Demucs Separacija** | Nvidia T4 (GPU) | ~30 sekundi | $0.59 / h | ~$0.005 |
 | **STT Transkripcija** | Nvidia T4 (GPU) | ~15 sekundi | $0.59 / h | ~$0.003 |
 | **Prevođenje** | Nvidia A10G (GPU) | ~10 sekundi | $1.10 / h | ~$0.003 |
-| **OpenVoice TTS (Kloniranje)**| Nvidia L4 (GPU) | ~60 sekundi (ukupno za sve segmente) | $1.25 / h | ~$0.021 |
+| **OpenVoice TTS (Kloniranje)**| Nvidia L4 (GPU) | ~60 sekundi (paralelno) | $1.25 / h | ~$0.021 |
+| **Wav2Lip LipSync** | Nvidia T4 (GPU) | ~90 sekundi (selektivno) | $0.59 / h | ~$0.015 |
 | **Sklapanje Videa (FFmpeg)** | CPU (Shared na hostu) | ~15 sekundi | - (Host resurs) | $0.000 |
-| **Ukupno** | - | **~2.2 minuta** | - | **~$0.032 (oko 3.5 dinara)** |
+| **Ukupno** | - | **~3.7 minuta** | - | **~$0.047 (oko 5.5 dinara)** |
 
 > [!TIP]
-> Prosečna cena obrade 5-minutnog videa iznosi **manje od 0.03 USD (oko 3 dinara)**. Čak i pod maksimalnim opterećenjem i dužim hladnim startovima, trošak ne prelazi **0.05 USD** po videu, što platformu sinhronizuj.me čini izuzetno profitabilnom i skalabilnom za masovnu upotrebu.
+> Prosečna cena obrade 5-minutnog videa iznosi **manje od 0.05 USD (oko 5.5 dinara)**. Čak i pod maksimalnim opterećenjem i dužim hladnim startovima, trošak ne prelazi **0.07 USD** po videu, što platformu sinhronizuj.me čini izuzetno profitabilnom i skalabilnom za masovnu upotrebu.
+
 
 ---
 

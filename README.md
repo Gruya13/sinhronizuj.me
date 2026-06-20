@@ -8,7 +8,7 @@
 
 ## 🚀 Ključne Karakteristike
 
-*   **Hibridna Cloud Arhitektura**: Kontrolna logika, baza podataka, asinhroni Celery radnik i S3 skladište nalaze se na Hetzner VPS-u (gde se lokalno izvršava i Wav2Lip LipSync), dok se teške AI operacije (separacija zvuka, STT, prevod, lektura i kloniranje glasa) izvršavaju serverless na **Modal.com** (T4, L4 i A10G GPU-ovi) uz model plaćanja po utrošku (scale-to-zero).
+*   **Hibridna Cloud Arhitektura**: Kontrolna logika, baza podataka, asinhroni Celery radnik i S3 kompatibilno skladište nalaze se na Hetzner VPS-u, dok se teške AI operacije (separacija zvuka, STT, prevod, lektura, kloniranje glasa i Wav2Lip LipSync) izvršavaju serverless na **Modal.com** (T4, L4, A10G i A100 GPU-ovi) uz model plaćanja po utrošku (scale-to-zero).
 *   **Modularni Frontend (DAW Studio)**: Korisnički interfejs je kompletno refaktorisan u modularne komponente. Sadrži:
     *   `StudioTimeline`: Interaktivni prikaz vremenske linije sa waveform-om originalnog zvuka.
     *   `SegmentEditor`: Uređivanje prevoda, izbor glasa i kontrola brzine, jačine i visine tona po segmentu.
@@ -21,6 +21,8 @@
 *   **Kloniranje Glasa i Audio Poboljšanje**: **Piper TTS** (srpski model Marko) generiše bazni govor, a **OpenVoice v2** vrši prenos boje glasa iz originalnog audio snimka (Speaker Embedding izvučen iz čistog originalnog audia). CFM model (Resemble Enhance) dodatno otklanja šum i podiže frekvenciju na 44.1kHz.
 *   **Dinamičko Uklapanje vremena (`merger.py`)**: Ukoliko je izgenerisani srpski govor duži od originalnog segmenta, sistem automatski primenjuje ubrzavanje (`speedup_audio_file` preko FFmpeg-a) kako bi sprečio kolizije sa sledećim segmentima i desinhronizaciju videa.
 *   **Kompletan Admin Panel**: Administratorski interfejs sa praćenjem waitlist-a (zatvorene bete), upravljanjem korisnicima (dodeljivanje admin privilegija), zbirnom statistikom i live pretragom logova Celery radnika za svaki pojedinačni projekat.
+*   **Bezbednost i Kvote**: Implementirane su bezbednosne provere i limiti na nivou API-ja za veličinu pojedinačnog fajla, dnevni upload u MB i ukupno dnevno trajanje obrade videa po korisniku.
+
 
 ---
 
@@ -43,10 +45,9 @@ flowchart TD
         Frontend["sinhronizuj-frontend (Nginx Port 3000)"]
         API["sinhronizuj-api (FastAPI Port 8000)"]
         Celery["sinhronizuj-celery (Celery Worker)"]
-        Redis["sinhronizuj-redis (Message Broker)"]
+        Redis["sinhronizuj-redis (Message Broker - AOF perzistentan)"]
         Postgres[(PostgreSQL Baza)]
-        MinIO[(MinIO S3 Skladište)]
-        Wav2Lip["Wav2Lip (LipSync - Lokalni CPU/GPU)"]
+        S3[(S3 Skladište - MinIO/R2/Hetzner)]
         DockerDaemon["Docker Engine (Upravljanje Slikama)"]
     end
 
@@ -57,6 +58,7 @@ flowchart TD
         Translator["Translator Worker (Qwen2-VL - A10G GPU)"]
         Lektor["Lektor Worker (Qwen Lektor - A10G GPU)"]
         TTS["TTS OpenVoice Worker (Piper+OpenVoice - L4 GPU)"]
+        Wav2Lip["Wav2Lip Worker (LipSync - T4 GPU)"]
     end
 
     subgraph GitHubFlow ["CI/CD Pipeline"]
@@ -72,8 +74,8 @@ flowchart TD
 
     %% API veze
     API --> Postgres
-    API --> MinIO
-    Browser --> MinIO
+    API --> S3
+    Browser --> S3
     API --> Redis
     Redis --> Celery
 
@@ -94,7 +96,7 @@ flowchart TD
     TTS -.-> Celery
     Wav2Lip -.-> Celery
 
-    Celery --> MinIO
+    Celery --> S3
     Celery --> Postgres
 
     %% CI/CD Tok
@@ -111,8 +113,9 @@ flowchart TD
 | Sloj | Tehnologije i Modeli |
 | :--- | :--- |
 | **Frontend** | React (Vite), Vanilla CSS (Premium Glassmorphism), HTML5 Audio API |
-| **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker), PostgreSQL (Baza), MinIO S3 (Skladište), **Wav2Lip** (Lokalni LipSync usana) |
-| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **Faster-Whisper** (Primarni STT), **SenseVoice Small** (Sekundarni ASR), **Qwen2-VL-7B** (Prevod), **Qwen Lektor** (Lektura i arbitraža), **Piper TTS (Marko) & OpenVoice v2** (Sinteza/Kloniranje) |
+| **Control Plane (VPS)** | FastAPI (API server), Celery (Asinhroni radnik), Redis (Message Broker sa AOF perzistencijom), PostgreSQL (Baza), S3 kompatibilno skladište (MinIO, Cloudflare R2 ili Hetzner S3) |
+| **Compute Plane (Modal)** | **Demucs v4** (Separacija vokala), **Faster-Whisper** (Primarni STT), **SenseVoice Small** (Sekundarni ASR), **Qwen2-VL-7B** (Prevod), **Qwen Lektor** (Lektura), **Piper TTS (Marko) & OpenVoice v2** (Sinteza/Kloniranje), **Wav2Lip** (LipSync vizuelna sinhronizacija) |
+
 
 ---
 
@@ -121,42 +124,55 @@ flowchart TD
 ```
 sinhronizuj.me/
 ├── .github/workflows/       # CI/CD Workflows (GitHub Actions)
-│   ├── backend-ci.yml       # Pokretanje pytest-a pri push-u
-│   ├── frontend-ci.yml      # Pokretanje vitest-a pri push-u
-│   └── deploy.yml           # CD na Hetzner VPS (Development / Production)
+│   ├── backend-ci.yml       # Pokretanje pytest-a pri push-u (sa Postgres uslugom)
+│   ├── frontend-ci.yml      # Pokretanje vitest-a i Playwright-a pri push-u
+│   └── deploy.yml           # CD na Hetzner VPS (Staging / Production)
 ├── backend/
-│   ├── main.py              # FastAPI server (API endpointovi i startup logika lifespan-a)
+│   ├── main.py              # FastAPI server (API gateway orkestrator i lifespan inicijalizacija)
 │   ├── alembic/             # Alembic konfiguracija i migracione skripte
 │   ├── core/
-│   │   ├── config.py        # Centralna konfiguracija (očišćena od legacy RunPod ključeva)
+│   │   ├── config.py        # Centralna konfiguracija (limiti, kvote, S3 provajderi)
 │   │   ├── database.py      # SQLAlchemy povezivanje baze
-│   │   └── models.py        # SQLAlchemy modeli (User, Project, Segment, Glossary, Waitlist)
+│   │   ├── auth.py          # JWT autentifikacija i blocklist validacija
+│   │   ├── limiter.py       # SlowAPI limiter stopa
+│   │   └── models.py        # SQLAlchemy modeli (User, Project, Segment, Glossary, Waitlist, Job)
+│   ├── routes/              # Modularni FastAPI APIRouter-i
+│   │   ├── auth.py          # Rute za registraciju, login, me i logout
+│   │   ├── projects.py      # Rute za projekte, upload url i analizu (process-video)
+│   │   ├── segments.py      # Rute za editovanje, preview, shorten i renderovanje
+│   │   ├── admin.py         # Rute za statistike, waitlist i upravljanje korisnicima
+│   │   └── system.py        # Rute za hardver, warmup i status poslova
+│   ├── services/            # Pomoćni servisi
+│   │   ├── redis.py         # Klijent za Redis
+│   │   └── s3.py            # Klijent za S3 kompatibilno skladište
 │   └── worker/
-│       ├── tasks.py         # Celery taskovi (workspace izolacija, analyze i render zadaci)
-│       ├── downloader.py    # Preuzimanje videa sa S3
+│       ├── tasks.py         # Celery taskovi (workspace izolacija, caching, analyze i render zadaci)
+│       ├── downloader.py    # Preuzimanje videa sa S3 i SSRF zaštita
 │       ├── translator.py    # Pozivanje Modal Translator i Lektor API-ja sa glosarima
 │       ├── tts_engine.py    # Priprema referentnog audia
 │       └── merger.py        # FFmpeg/pydub audio miksovanje i dinamički speedup
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx          # React ruter i globalni raspored
+│   │   ├── App.jsx          # React ruter i globalni raspored (Studio DAW)
 │   │   ├── components/      # Modularne komponente (Dashboard, Studio, Admin, Auth, Common, Landing)
-│   │   │   ├── Studio/      # StudioTimeline, SegmentEditor, AudioMixer, MixerPanel
+│   │   │   ├── Studio/      # StudioTimeline, SegmentEditor, AudioMixer
 │   │   │   ├── Dashboard/   # DashboardView, ProjectList
 │   │   │   ├── Admin/       # AdminPanel
 │   │   │   ├── Landing/     # LandingPage.jsx
 │   │   │   └── Common/      # Header, HardwareMonitor, Knob
 │   │   ├── context/         # StudioContext.jsx (globalno stanje i undo/redo stek)
-│   │   ├── services/        # api.js (integrisane klijentske API funkcije)
+│   │   ├── services/        # api.js (klijentske API funkcije)
 │   │   └── index.css        # Globalni CSS (Glassmorphism, custom scroll, responzivnost)
-│   └── package.json         # Konfiguracija i skripta "test:run": "vitest run"
+│   └── package.json         # Konfiguracija i skripte
 ├── modal_workers/           # Serverless radnici na Modal.com
 │   ├── demucs_worker.py     # Demucs separacija vokala (T4 GPU)
 │   ├── sensevoice_worker.py # SenseVoice STT transkripcija (T4 GPU)
 │   ├── translator_worker.py # Qwen2-VL prevodilac (A10G GPU)
 │   ├── tts_openvoice.py     # OpenVoice + Piper kloniranje (L4 GPU)
-│   └── lektor_worker.py     # Lektorisanje i skraćivanje teksta
-├── sicret doc/              # [IGNORISANO] Tajna, detaljna tehnička dokumentacija
+│   ├── lektor_worker.py     # Lektorisanje i skraćivanje teksta
+│   └── wav2lip_worker.py    # Wav2Lip vizuelna sinhronizacija (T4 GPU)
+├── finalni_izvestaj_ojacavanja.md # Završni tehnički izveštaj o ojačavanju sistema
+├── istorija_izrade.md       # Istorija implementacije i razvoja
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, API)
 └── Dockerfile               # API/Worker Docker slika za server
 ```
@@ -202,10 +218,11 @@ npm run dev
 
 ### 5. Pokretanje Testova
 Sistem poseduje automatizovane testove i na backendu i na frontendu:
-*   **Backend testovi** (pytest sa SQLite in-memory bazom):
+*   **Backend testovi** (pytest sa PostgreSQL test bazom i SQLite fallback-om):
     ```bash
-    pytest
+    pytest tests/
     ```
+
 *   **Frontend testovi** (Vitest):
     ```bash
     cd frontend
@@ -219,32 +236,57 @@ Sistem poseduje automatizovane testove i na backendu i na frontendu:
 Kreirajte `.env` datoteku u korenu projekta sa sledećim varijablama:
 
 ```env
-# Konfiguracija baze podataka (Docker)
+# Konfiguracija baze podataka (Docker/Postgres)
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=tvoja_db_lozinka
 POSTGRES_DB=sinhronizuj_db
+DATABASE_URL=postgresql://postgres:tvoja_db_lozinka@db:5432/sinhronizuj_db
 
-# JWT i Admin parametri na startup-u
-SECRET_KEY=tvoj_jwt_secret_key
-ADMIN_EMAIL=admin@sinhronizuj.me
-ADMIN_PASSWORD=tvoja_admin_lozinka_na_startu
+# JWT parametri
+JWT_SECRET=tvoj_jwt_secret_key
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 
 # Modal Serverless Endpoints
 MODAL_STT_URL=https://tvoj-username--sm-stt-only-sttworker-task.modal.run
+MODAL_SENSEVOICE_URL=https://tvoj-username--sm-sensevoice-stt-sensevoice-task.modal.run
 MODAL_TRANSLATOR_URL=https://tvoj-username--sm-translator-serve.modal.run
 MODAL_LEKTOR_URL=https://tvoj-username--sinhronizuj-lektor-serve.modal.run
 MODAL_TTS_URL=https://tvoj-username--sm-tts-v110-workerv110-task.modal.run
+MODAL_WAV2LIP_URL=https://tvoj-username--wav2lip-worker-render-task.modal.run
 
 # Prekidači za audio kvalitet
 DISABLE_OPENVOICE=False
 DISABLE_ENHANCE=False
 
-# Mrežni parametri
+# Redis i Mrežni parametri
 REDIS_URL=redis://redis:6379/0
-MINIO_ENDPOINT=tvoja-vps-ip:9000
-MINIO_ACCESS_KEY=sinhronizuj_storage
-MINIO_SECRET_KEY=tvoja_s3_lozinka
+REDIS_PASSWORD=tvoja_redis_lozinka
+
+# S3 Storage Konfiguracija (podržava minio, hetzner, r2, s3)
+STORAGE_PROVIDER=minio
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=uploads
+MINIO_PUBLIC_ENDPOINT=http://localhost:9000
+MINIO_SECURE=False
+
+# Eksterni S3 Parametri (koriste se ako je STORAGE_PROVIDER=hetzner, r2 ili s3)
+S3_ENDPOINT=https://tvoj-s3-endpoint
+S3_ACCESS_KEY=tvoj-s3-access-key
+S3_SECRET_KEY=tvoj-s3-secret-key
+S3_BUCKET=tvoj-s3-bucket
+S3_PUBLIC_ENDPOINT=https://tvoj-public-s3-endpoint
+S3_SECURE=True
+S3_REGION=us-east-1
+
+# Kvote i limiti po korisniku
+MAX_SINGLE_FILE_SIZE_MB=250
+MAX_DAILY_UPLOAD_MB=1000
+MAX_DAILY_DURATION_SEC=3600
+```
+
 ```
 
 ---

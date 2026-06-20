@@ -12,11 +12,11 @@ Platforma se zasniva na troslojnoj (3-tier) distribuiranoj arhitekturi, optimizo
 graph TD
     Client[React/Vite Frontend] <-->|HTTP / JSON / JWT| API[FastAPI Gateway]
     API <-->|SQLAlchemy / PostgreSQL| DB[(PostgreSQL Database)]
-    API <-->|Redis Broker| Celery[Celery Backend Workers]
-    Celery <-->|HTTP / API Call| Modal[Modal Serverless GPU Cluster]
+    API <-->|Redis Broker / State| Celery[Celery Backend Workers]
+    Celery <-->|HTTP / API Call / Async Polling| Modal[Modal Serverless GPU Cluster]
     Celery <-->|FFmpeg / pydub| AudioMerge[Audio & Video Merger]
-    Celery <-->|Lokalni podproces| Wav2Lip[Wav2Lip LipSync - Lokalni CPU/GPU]
-    Modal <-->|Upload / Download| S3[(MinIO S3 Object Storage)]
+    Modal <-->|Wav2Lip LipSync| Wav2Lip[Wav2Lip - Serverless GPU]
+    Modal <-->|Upload / Download| S3[(S3 Object Storage - MinIO/R2/Hetzner)]
     Celery <-->|Upload / Download| S3
     API <-->|Upload / Download| S3
 ```
@@ -24,11 +24,11 @@ graph TD
 ### Slojevi sistema:
 1.  **Klijentski sloj (Frontend)**: React.js aplikacija izgrađena pomoću Vite-a. Komunicira sa FastAPI backendom preko REST API-ja. Koristi JWT autentifikaciju za bezbedan pristup resursima.
 2.  **Aplikacioni / Orkestracioni sloj (Backend & Celery)**:
-    *   **FastAPI API Gateway**: Prihvata zahteve klijenata, upravlja sesijama, validira podatke, generiše S3 upload URL-ove i šalje dugotrajne poslove (analiza, renderovanje) u asinhroni red.
-    *   **Celery Workers (Host mašina)**: Pokreću se na CPU resursima host servera. Koriste Redis kao broker. Zaduženi su za orkestraciju poslova obrade videa, preuzimanje fajlova, lokalno procesiranje i spajanje audia/videa pomoću FFmpeg/pydub biblioteka.
+    *   **FastAPI API Gateway**: Modularni ruter koji prihvata zahteve klijenata, upravlja sesijama, validira podatke preko Pydantic šema, generiše S3 upload URL-ove, primenjuje kvote i limite i šalje dugotrajne poslove (analiza, renderovanje) u asinhroni red.
+    *   **Celery Workers (Host mašina)**: Pokreću se na CPU resursima host servera. Koriste Redis kao broker sa AOF perzistencijom. Zaduženi su za orkestraciju poslova obrade videa, preuzimanje fajlova, lokalno procesiranje i spajanje audia/videa pomoću FFmpeg/pydub biblioteka.
 3.  **AI Računarski sloj (Modal Serverless GPU)**:
-    *   Modal serverless klaster koji se dinamički skalira (scale-to-zero) i koristi GPU instance po potrebi (T4, A10G ili L4).
-    *   Izvršava modele za prepoznavanje govora (SenseVoice), razdvajanje audio izvora (Demucs), mašinsko prevođenje i kloniranje glasa (OpenVoice/TTS).
+    *   Modal serverless klaster koji se dinamički skalira (scale-to-zero) i koristi GPU instance po potrebi (T4, A10G, L4 ili A100).
+    *   Izvršava modele za prepoznavanje govora (SenseVoice / Faster-Whisper), razdvajanje audio izvora (Demucs), mašinsko prevođenje (Qwen2-VL), lekturu (Qwen3), glasovnu sintezu sa kloniranjem (Piper + OpenVoice v2) i vizuelni lipsync (Wav2Lip).
 
 ---
 
@@ -151,16 +151,32 @@ Evidentira korisnike koji su se prijavili za zatvorenu beta fazu projekta.
 | `created_at` | `DateTime` | Default=UTC.now | Vreme podnošenja prijave |
 | `status` | `String` | Default="pending" | Status prijave (`pending`, `approved`, `rejected`) |
 
+### 3.6. Tabela Poslova (`jobs`)
+Prati stanje izvršavanja asinhronih zadataka u realnom vremenu (State Machine).
+
+| Kolona | Tip Podataka | Ograničenja | Opis |
+| :--- | :--- | :--- | :--- |
+| `id` | `GUID` | Primary Key, Default UUID | Jedinstveni identifikator posla |
+| `project_id` | `GUID` | ForeignKey(projects.id, CASCADE), Nullable=True | Projekat povezan sa poslom |
+| `status` | `String` | Default="pending" | Status posla (`pending`, `running`, `completed`, `failed`) |
+| `phase` | `String` | Default="pending" | Aktivna faza (`downloading`, `separating`, `transcribing`, `translating`, `diarizing`, `mixing`, `lipsyncing`) |
+| `attempt` | `Integer` | Default=1 | Trenutni pokušaj izvršavanja |
+| `max_attempts` | `Integer` | Default=3 | Maksimalni dozvoljeni broj pokušaja |
+| `error_message` | `String` | Nullable=True | Poruka o grešci u slučaju neuspeha |
+| `created_at` | `DateTime` | Default=UTC.now | Vreme kreiranja posla |
+| `updated_at` | `DateTime` | Default=UTC.now, onupdate | Vreme poslednjeg ažuriranja |
+
 ---
 
-## 4. Startup Inicijalizacija i Baza Podataka
+## 4. Inicijalizacija i Upravljanje Bazom Podataka
 
-U [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) se na samom startu servera (globalni nivo prilikom učitavanja modula) vrše sledeće kritične operacije:
-
-1.  **Povezivanje sa bazom podataka**: Inicijalizuje SQLAlchemy `engine` i uspostavlja sinhronu vezu sa PostgreSQL-om.
-2.  **Automatsko kreiranje tabela**: Poziva se `Base.metadata.create_all()` kako bi se osiguralo da sve SQLAlchemy tabele postoje u bazi podataka.
-3.  **Provera/Migracija kolona**: Pokreće se brza alter table komanda koja dodaje kolonu `is_admin` u tabelu `users` ukoliko ona već ne postoji.
-4.  **Kreiranje prvog Administratora**: Za razliku od automatskog kreiranja na startu, sistem nudi specijalnu administrativnu rutu `POST /api/v1/admin/create-first-admin`. Ova ruta je dozvoljena za pozivanje samo ako u bazi podataka ne postoji nijedan administrator sa privilegijom `is_admin=True`. Korisnik može poslati email i lozinku, te promovisati postojeći ili kreirati novi admin nalog.
+U sklopu bezbednosnog i arhitekturnog ojačavanja (Hardening):
+1. **Bezbedan start aplikacije**: Iz [backend/main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) su uklonjeni svi startup DDL iskazi poput `Base.metadata.create_all()` i direktne `ALTER TABLE` komande.
+2. **Autoritet šeme**: Sve tabele i izmene na šemi se primenjuju isključivo preko Alembic migracionog alata.
+3. **Offline Kreiranje Administratora**: Uklonjen je javni API endpoint `/api/v1/admin/create-first-admin` iz bezbednosnih razloga. Novi administratori se kreiraju i promovišu isključivo offline preko CLI komande na host VPS-u:
+   ```bash
+   python -m backend.cli create_admin --email [EMAIL] --password [PASSWORD]
+   ```
 
 ---
 
@@ -183,3 +199,4 @@ U cilju bezbedne nadogradnje šeme baze podataka bez gubitka podataka u produkci
     ```bash
     alembic upgrade head
     ```
+

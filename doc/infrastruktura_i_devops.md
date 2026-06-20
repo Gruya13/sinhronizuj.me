@@ -30,20 +30,23 @@ Lokalni compose podiže bazu (`db`), Redis, Celery radnika, beat i FastAPI API. 
 ### 2.2. Produkciono Okruženje ([docker-compose.prod.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/hetzner/docker-compose.prod.yml))
 Produkciono okruženje je optimizovano za visoke performanse, bezbednost i monitoring:
 *   **Bezbednost portova**: Portovi baze (`5432`) i Redis-a (`6379`) su uklonjeni i nisu izloženi internetu. Dostupni su isključivo unutar izolovane Docker mreže (`sinhronizuj-net`).
+*   **Redis Perzistencija**: Redis se pokreće sa `--appendonly yes` flegom (AOF) i montiranim perzistentnim volumenom `redis_data` kako se Celery poslovi ne bi izgubili u slučaju restartovanja.
 *   **Healthcheck-ovi**: Postgres i Redis imaju ugrađene zdravstvene provere, a ostali servisi zavise od njih preko `condition: service_healthy`.
-*   **Ograničenje resursa**: Kontejnerima su definisani limiti za procesorsko vreme i memoriju (1 CPU / 1G RAM za API, 2 CPU / 2G RAM za teške AI Celery radnike) kako bi se osigurala stabilnost host VPS-a.
+*   **Ograničenje resursa**: Kontejnerima su definisani limiti za procesorsko vreme i memoriju (1 CPU / 1G RAM za API, 2 CPU / 2G RAM za teške Celery radnike) kako bi se osigurala stabilnost host VPS-a.
 *   **Log rotacija**: Konfigurisana je log rotacija na nivou Docker-a (maksimalno 3 fajla po 10MB) kako logovi ne bi popunili hard disk servera.
 *   **Kontejnerizovan Frontend**: Klijentska React/Vite aplikacija se servira kroz laganu Nginx instancu unutar Docker kontejnera na portu `3000`.
 
 ---
 
-## 3. Automatski Backup Sistem sa Rotacijom
+## 3. Automatski Backup & Restore Sistem
 
-Za sprečavanje gubitka podataka, postavljen je automatski backup sistem koji se izvršava svake noći u 02:00h preko cron posla na VPS-u:
+Za sprečavanje gubitka podataka, postavljen je automatski backup sistem sa rotacijom i testiranim procedurama oporavka, koji se izvršava svake noći u 02:00h preko cron posla na VPS-u:
 
-1.  **Dampovanje baze**: Izvršava se komanda `pg_dump` unutar `sinhronizuj-db` kontejnera kako bi se dobio kompresovani SQL fajl sa kompletnom šemom i podacima.
-2.  **Otpremanje na S3**: Skripta [backup.py](file:///home/gruya/Projektri/sinhronizuj.me/infra/backup.py) otprema arhivu na zasebno S3 kompatibilno skladište (npr. eksterni MinIO ili AWS S3).
-3.  **Rotacija od 7 dana**: Skripta proverava datume kreiranja backupa na S3 i automatski briše sve arhive starije od 7 dana kako bi se optimizovao prostor na skladištu.
+1.  **Dampovanje baze**: Skripta [scripts/backup.sh](file:///home/gruya/Projektri/sinhronizuj.me/scripts/backup.sh) pokreće `pg_dump` unutar PostgreSQL kontejnera i kreira vremenski označen SQL dump.
+2.  **Otpremanje S3 skladišta**: Skripta [scripts/backup_s3.py](file:///home/gruya/Projektri/sinhronizuj.me/scripts/backup_s3.py) pravi rezervnu kopiju svih fajlova iz aktivnog S3 bucketa u bekap arhivu.
+3.  **Rotacija**: Arhive se automatski šalju na zasebno S3 skladište za bekap, a skripte primenjuju pravilo zadržavanja poslednjih 7 dana, automatski uklanjajući starije arhive.
+4.  **Restore drill (Oporavak)**: Detaljno uputstvo i koraci za oporavak u slučaju katastrofe nalaze se u [backup_restore_uputstvo.md](file:///home/gruya/Projektri/sinhronizuj.me/backup_restore_uputstvo.md). Oporavak baze i S3 skladišta se vrši pomoću skripti `scripts/restore.sh` i `scripts/restore_s3.py`.
+
 
 ---
 
@@ -73,7 +76,8 @@ Proces testiranja, izgradnje slika i isporuke je automatizovan i podeljen na če
 
 ### 4.1. Backend Testovi ([backend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/backend-ci.yml))
 *   **Triger**: Push ili Pull Request na grane `main` i `development`.
-*   **Koraci**: Podizanje Python okruženja, instalacija zavisnosti, Ruff linting, i pokretanje integracionih testova preko `pytest`. Ignoriše pomoćne skripte zahvaljujući [pytest.ini](file:///home/gruya/Projektri/sinhronizuj.me/pytest.ini) konfiguraciji.
+*   **Koraci**: Podizanje Python okruženja, pokretanje PostgreSQL servisnog kontejnera u GitHub Actions-u, instalacija zavisnosti, Ruff linting, i pokretanje integracionih i golden testova preko `pytest`. Ignoriše pomoćne skripte zahvaljujući [pytest.ini](file:///home/gruya/Projektri/sinhronizuj.me/pytest.ini) konfiguraciji. Testovi se izvršavaju nad realnom Postgres test bazom.
+
 
 ### 4.2. Frontend Testovi ([frontend-ci.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/frontend-ci.yml))
 *   **Triger**: Push ili Pull Request na grane `main` i `development`.
