@@ -5,8 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
-# Postavljamo testni DATABASE_URL na SQLite pre uvoza bilo kog backend modula
-os.environ["DATABASE_URL"] = "sqlite:///test_temp.db"
+# Proveravamo da li je u okruženju već postavljen DATABASE_URL za PostgreSQL test bazu
+# Ako nije, podrazumevano koristimo SQLite test_temp.db za lokalne testove
+database_url = os.environ.get("DATABASE_URL")
+if not database_url or not (database_url.startswith("postgresql") or database_url.startswith("postgres")):
+    database_url = "sqlite:///test_temp.db"
+
+os.environ["DATABASE_URL"] = database_url
 os.environ["REDIS_URL"] = "memory://"
 
 # Dodajemo koren projekta u python path
@@ -18,16 +23,25 @@ from backend.core.models import User, Project, Segment, Glossary, Waitlist
 from unittest.mock import MagicMock
 
 
-# --- KONFIGURACIJA TESTNE BAVE (SQLite test_temp.db) ---
-SQLALCHEMY_DATABASE_URL = "sqlite:///test_temp.db"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# --- KONFIGURACIJA TESTNE BAZE ---
+SQLALCHEMY_DATABASE_URL = database_url
+
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    # Za PostgreSQL koristimo standardni engine sa pool-om, bez StaticPool i check_same_thread
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        pool_pre_ping=True
+    )
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Preglašavamo engine i SessionLocal u bazi podataka da svi koriste naš in-memory engine sa StaticPool
+# Preglašavamo engine i SessionLocal u bazi podataka da svi koriste naš test engine
 import backend.core.database as db_mod
 db_mod.engine = engine
 db_mod.SessionLocal = TestingSessionLocal
@@ -56,8 +70,8 @@ def setup_database():
     Base.metadata.drop_all(bind=engine)
     # Zatvaramo konekcije engine-a kako bi se fajl otključao
     engine.dispose()
-    # Brišemo privremeni fajl baze
-    if os.path.exists("test_temp.db"):
+    # Brišemo privremeni fajl baze ukoliko se koristi SQLite
+    if SQLALCHEMY_DATABASE_URL.startswith("sqlite") and os.path.exists("test_temp.db"):
         try:
             os.remove("test_temp.db")
         except Exception:
