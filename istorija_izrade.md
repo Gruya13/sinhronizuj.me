@@ -1,3 +1,13 @@
+## [2026-06-20 07:45:00] Sveobuhvatno Ažuriranje Projektne Dokumentacije za Faze 0, 1 i 2
+- **Opis:**
+  Uskladili smo kompletnu tehničku dokumentaciju sa trenutnim stanjem koda nakon ojačavanja sistema:
+  1. **README.md & arhitektura_i_tok_podataka.md**: Ažurirani arhitekturni dijagrami, tehnološki stak i struktura projekta da odražavaju modularni backend, serverless Wav2Lip na Modalu i podršku za S3 kompatibilna skladišta.
+  2. **doc/arhitektura_i_baza.md**: Dodata šema za novu tabelu `jobs` i ažuriran opis startup i CLI administracije (uklanjanje automatskog kreiranja admina i tabela).
+  3. **doc/backend_dokumentacija.md**: Dodat detaljan opis modularnih ruta u `backend/routes/`, Redis blocklist mehanizma za odjavu i testiranja sa 30 uspešnih testova na PostgreSQL test bazi.
+  4. **doc/infrastruktura_i_devops.md**: Integrisan opis Redis AOF perzistencije, skripti za backup/restore i automatskih Postgres testova u GitHub Actions CI.
+  5. **doc/modal_workers_i_ai.md**: Dodat opis `wav2lip_worker.py` i ažurirana blended cost tabela sa uračunatim Wav2Lip troškovima.
+  6. **Privatni direktorijum**: Sve izmene u potpunosti su prenesene i sinhronizovane u folderu [sicret doc/](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/).
+
 ## [2026-06-20 07:35:00] Izrada Finalnog Izveštaja o Ojačavanju i Go/No-Go Predlog za Produkciju
 - **Opis:**
   Završili smo sve faze ojačavanja sistema (Faza 0, Faza 1, Faza 2) i kreirali finalni dokument:
