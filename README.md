@@ -124,7 +124,7 @@ flowchart TD
 ```
 sinhronizuj.me/
 ├── .github/workflows/       # CI/CD Workflows (GitHub Actions)
-│   ├── backend-ci.yml       # Pokretanje pytest-a pri push-u (sa Postgres uslugom)
+│   ├── backend-ci.yml       # Linter provera koda (Ruff) i bezbednosno skeniranje (Bandit SAST)
 │   ├── frontend-ci.yml      # Pokretanje vitest-a i Playwright-a pri push-u
 │   └── deploy.yml           # CD na Hetzner VPS (Staging / Production)
 ├── backend/
@@ -148,8 +148,17 @@ sinhronizuj.me/
 │   └── worker/
 │       ├── tasks.py         # Celery taskovi (workspace izolacija, caching, analyze i render zadaci)
 │       ├── downloader.py    # Preuzimanje videa sa S3 i SSRF zaštita
-│       ├── translator.py    # Pozivanje Modal Translator i Lektor API-ja sa glosarima
-│       ├── tts_engine.py    # Priprema referentnog audia
+│       ├── numbers_to_words.py # Konverzija brojeva i procenata u ekavske reči na srpskom
+│       ├── translation/     # Paket za EN->SR prevodilački i lektorski pipeline
+│       │   ├── masking.py   # Maskiranje IT entiteta (Wi-Fi, GPS...)
+│       │   ├── transliter.py # Transliteracija i rečničke zamene
+│       │   ├── dialect.py   # Ekavizacija i morfološke popravke
+│       │   ├── glossary.py  # Integracija glosara i analiza tema
+│       │   ├── qe.py        # CometKiwi QE procena kvaliteta i gating
+│       │   ├── translate.py # Prevođenje i self-critique petlja
+│       │   └── lektor.py    # Lektura, deduplikacija i vremenska kompresija
+│       ├── translator.py    # Fasada za translator/lektor servise
+│       ├── tts_engine.py    # Priprema referentnog audia i OpenVoice integracija
 │       └── merger.py        # FFmpeg/pydub audio miksovanje i dinamički speedup
 ├── frontend/
 │   ├── src/
@@ -171,8 +180,6 @@ sinhronizuj.me/
 │   ├── tts_openvoice.py     # OpenVoice + Piper kloniranje (L4 GPU)
 │   ├── lektor_worker.py     # Lektorisanje i skraćivanje teksta
 │   └── wav2lip_worker.py    # Wav2Lip vizuelna sinhronizacija (T4 GPU)
-├── finalni_izvestaj_ojacavanja.md # Završni tehnički izveštaj o ojačavanju sistema
-├── istorija_izrade.md       # Istorija implementacije i razvoja
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, API)
 └── Dockerfile               # API/Worker Docker slika za server
 ```
@@ -217,16 +224,12 @@ npm run dev
 ```
 
 ### 5. Pokretanje Testova
-Sistem poseduje automatizovane testove i na backendu i na frontendu:
-*   **Backend testovi** (pytest sa PostgreSQL test bazom i SQLite fallback-om):
-    ```bash
-    pytest tests/
-    ```
-
-*   **Frontend testovi** (Vitest):
+Sistem poseduje automatizovane testove na frontendu za komponente i E2E provere:
+*   **Frontend testovi** (Vitest unit testovi i Playwright E2E):
     ```bash
     cd frontend
-    npm run test:run
+    npm run test:run     # Pokretanje Vitest unit testova komponenata
+    npx playwright test  # Pokretanje Playwright E2E testova
     ```
 
 ---
