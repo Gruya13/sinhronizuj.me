@@ -70,7 +70,7 @@ def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: in
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     try:
         url = s3_public.generate_presigned_url(
@@ -287,7 +287,7 @@ def get_upload_url(
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     s3_public = boto3.client(
@@ -296,7 +296,7 @@ def get_upload_url(
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     try:
@@ -326,7 +326,7 @@ def get_upload_url(
 @limiter.limit("5/hour")
 def process_video(request: Request, data: VideoRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    Pokreće asinhronu analizu videa (Faza 1). Zahteva proveru vlasništva.
+    Pokreće asinhronu analizu videa (Faza 1). Zahteva proveru vlasništva, kvota i limita.
     """
     print(f"--- [API RECEIVE] Pokrećem FAZU 1 (Analiza): url={data.url}, project_id={data.project_id}", flush=True)
     
@@ -335,14 +335,121 @@ def process_video(request: Request, data: VideoRequest, current_user: User = Dep
         if not p:
             raise HTTPException(status_code=403, detail="Nemate pravo pristupa ovom projektu.")
             
+    # --- KVOTE I LIMITI (Zadatak 4) ---
+    file_size_bytes = 0
+    video_duration_sec = 0.0
+    
+    s3 = boto3.client(
+        's3',
+        endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name=settings.S3_REGION
+    )
+    
+    if data.url.startswith("s3://"):
+        try:
+            parts = data.url.replace("s3://", "").split("/")
+            bucket = parts[0]
+            key = "/".join(parts[1:])
+            
+            meta = s3.head_object(Bucket=bucket, Key=key)
+            file_size_bytes = meta.get("ContentLength", 0)
+            
+            presigned = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={'Bucket': bucket, 'Key': key},
+                ExpiresIn=300
+            )
+            
+            import subprocess
+            cmd = [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                presigned
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if res.returncode == 0:
+                video_duration_sec = float(res.stdout.strip())
+        except Exception as e:
+            print(f"[QUOTA WARNING] Greška pri dobijanju metapodataka za S3 video: {e}")
+    else:
+        try:
+            import yt_dlp
+            ydl_opts = {'quiet': True, 'no_warnings': True}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(data.url, download=False)
+                file_size_bytes = info.get("filesize", info.get("filesize_approx", 0))
+                video_duration_sec = float(info.get("duration", 0.0))
+        except Exception as e:
+            print(f"[QUOTA WARNING] Greška pri dobijanju metapodataka za eksterni video: {e}")
+            try:
+                import subprocess
+                cmd = [
+                    "ffprobe", "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    data.url
+                ]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                if res.returncode == 0:
+                    video_duration_sec = float(res.stdout.strip())
+            except Exception:
+                pass
+
+    file_size_mb = file_size_bytes / (1024 * 1024) if file_size_bytes > 0 else 0.0
+    print(f"[QUOTA CHECK] Korisnik: {current_user.id}, Fajl: {file_size_mb:.2f} MB, Trajanje: {video_duration_sec:.2f} s")
+
+    if settings.MAX_SINGLE_FILE_SIZE_MB > 0 and file_size_mb > settings.MAX_SINGLE_FILE_SIZE_MB:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Veličina fajla ({file_size_mb:.2f} MB) prelazi limit od {settings.MAX_SINGLE_FILE_SIZE_MB} MB."
+        )
+
+    r = get_redis_client()
+    from datetime import datetime
+    
+    now = datetime.utcnow()
+    end_of_day = datetime(now.year, now.month, now.day, 23, 59, 59)
+    ttl_seconds = int((end_of_day - now).total_seconds())
+    if ttl_seconds <= 0:
+        ttl_seconds = 3600
+        
+    daily_bytes_key = f"user:{current_user.id}:daily_bytes"
+    daily_duration_key = f"user:{current_user.id}:daily_duration"
+    
+    current_daily_bytes = float(r.get(daily_bytes_key) or 0.0)
+    current_daily_duration = float(r.get(daily_duration_key) or 0.0)
+    
+    current_daily_mb = current_daily_bytes / (1024 * 1024)
+    
+    if settings.MAX_DAILY_UPLOAD_MB > 0 and (current_daily_mb + file_size_mb) > settings.MAX_DAILY_UPLOAD_MB:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Prekoračen dnevni limit za upload. Preostalo: {settings.MAX_DAILY_UPLOAD_MB - current_daily_mb:.2f} MB. Zahtevano: {file_size_mb:.2f} MB."
+        )
+        
+    if settings.MAX_DAILY_DURATION_SEC > 0 and (current_daily_duration + video_duration_sec) > settings.MAX_DAILY_DURATION_SEC:
+        allowed_mins = settings.MAX_DAILY_DURATION_SEC / 60
+        used_mins = current_daily_duration / 60
+        raise HTTPException(
+            status_code=400,
+            detail=f"Prekoračen dnevni limit za trajanje videa ({allowed_mins:.1f} min). Danas ste već obradili {used_mins:.1f} min. Zahtevano: {video_duration_sec/60:.1f} min."
+        )
+
+    r.incrbyfloat(daily_bytes_key, file_size_bytes)
+    r.incrbyfloat(daily_duration_key, video_duration_sec)
+    r.expire(daily_bytes_key, ttl_seconds)
+    r.expire(daily_duration_key, ttl_seconds)
+    # ----------------------------------
+
     from backend.worker.tasks import analyze_video_task
     task = analyze_video_task.delay(data.url, data.debug, project_id=data.project_id)
     
-    r = get_redis_client()
     if data.project_id:
         r.set(f"task:{task.id}:project_id", data.project_id, ex=86400) # 24h
-        
-        # Ažuriramo status projekta u bazi
         p.status = "analyzing"
         db.commit()
                 
@@ -412,7 +519,7 @@ def delete_project(project_id: str, current_user: User = Depends(get_current_use
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     # Brišemo fajlove sa S3
@@ -646,7 +753,7 @@ def generate_segment_tts(request: Request, project_id: str, segment_id: int, dat
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     is_fast_adjust = (
@@ -827,7 +934,7 @@ def generate_all_tts(request: Request, project_id: str, data: GenerateAllTTSRequ
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     # Preuzmi vocals sa S3

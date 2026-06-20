@@ -2,6 +2,7 @@ import os
 import cv2
 import subprocess
 import uuid
+import base64
 from backend.core.config import settings
 
 def has_sufficient_faces(video_path: str, sample_rate: int = 30, threshold_percentage: float = 10.0) -> bool:
@@ -49,17 +50,54 @@ def has_sufficient_faces(video_path: str, sample_rate: int = 30, threshold_perce
 
 def apply_lip_sync(video_path: str, audio_path: str, workspace_path: str = None) -> dict:
     """
-    Pokrece masivni Wav2Lip model kao eksterni pod-proces na osnovu zvuka i slike.
+    Pokreće Wav2Lip model. Može raditi preko serverless Modal GPU workera ili lokalnog podprocesa.
     """
     print("[FAZA 7] Lica potvrdjena! Iniciram Wav2Lip modul (Lip Sync u toku)...")
     workspace = workspace_path or settings.TEMP_WORKSPACE
     output_path = os.path.join(workspace, f"sinhronizuj_me_lipsync_{uuid.uuid4().hex[:6]}.mp4")
     
+    # 1. Pokušavamo preko serverless Modal GPU workera ako je URL definisan
+    modal_url = os.getenv("MODAL_WAV2LIP_URL", "")
+    if modal_url:
+        print(f"[FAZA 7] Koristim serverless Modal GPU worker za Wav2Lip na: {modal_url}")
+        try:
+            from backend.worker.utils import call_modal_endpoint
+            
+            with open(video_path, "rb") as f_vid:
+                video_b64 = base64.b64encode(f_vid.read()).decode('utf-8')
+            with open(audio_path, "rb") as f_aud:
+                audio_b64 = base64.b64encode(f_aud.read()).decode('utf-8')
+                
+            payload = {
+                "video_base64": video_b64,
+                "audio_base64": audio_b64
+            }
+            
+            res = call_modal_endpoint(modal_url, payload, timeout_seconds=900)
+            if "error" in res:
+                raise Exception(res["error"])
+                
+            out_vid_b64 = res.get("video_base64")
+            if not out_vid_b64:
+                raise Exception("Modal radnik nije vratio video_base64.")
+                
+            with open(output_path, "wb") as f_out:
+                f_out.write(base64.b64decode(out_vid_b64))
+                
+            return {
+                "status": "success",
+                "lipsync_video_path": output_path,
+                "skipped": False,
+                "provider": "modal"
+            }
+        except Exception as modal_err:
+            print(f"[FAZA 7 WARNING] Greška pri pozivanju serverless Wav2Lip-a: {modal_err}. Pokušavam lokalni fallback...")
+            
+    # 2. Lokalni fallback
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")
-    
     if not os.path.exists(wav2lip_dir):
         print("[FAZA 7 UPOZORENJE] Wav2Lip folder nije pronadjen na serveru. Preskacem Lip Sync obradu i vracam sinhronizovan original.")
-        return {"status": "success", "lipsync_video_path": video_path, "skipped": True}
+        return {"status": "success", "lipsync_video_path": video_path, "skipped": True, "provider": "skipped"}
         
     command = [
         "python", os.path.join(wav2lip_dir, "inference.py"),
@@ -74,7 +112,8 @@ def apply_lip_sync(video_path: str, audio_path: str, workspace_path: str = None)
         return {
             "status": "success",
             "lipsync_video_path": output_path,
-            "skipped": False
+            "skipped": False,
+            "provider": "local"
         }
     except subprocess.CalledProcessError as e:
         return {"status": "error", "message": f"Wav2Lip greska procesa: {e.stderr.decode('utf-8', errors='ignore')}"}
@@ -88,10 +127,14 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
     workspace = workspace_path or settings.TEMP_WORKSPACE
     print("[SELECTIVE LIP SYNC] Započinjem selektivnu obradu usana...", flush=True)
     final_output_path = None
+    
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")
-    if not os.path.exists(wav2lip_dir):
-        print("[SELECTIVE LIP SYNC WARNING] Wav2Lip folder nije pronađen na serveru. Vraćam originalni video.", flush=True)
-        return {"status": "success", "lipsync_video_path": video_path, "skipped": True}
+    modal_url = os.getenv("MODAL_WAV2LIP_URL", "")
+    
+    # Ako nemamo ni Modal ni lokalni Wav2Lip, vraćamo original
+    if not modal_url and not os.path.exists(wav2lip_dir):
+        print("[SELECTIVE LIP SYNC WARNING] Ni Modal ni lokalni Wav2Lip folder nisu dostupni. Vraćam originalni video.", flush=True)
+        return {"status": "success", "lipsync_video_path": video_path, "skipped": True, "provider": "skipped"}
 
     # Učitavamo trajanje originalnog videa preko OpenCV-a
     cap = cv2.VideoCapture(video_path)
@@ -151,6 +194,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
 
     sub_clips = []
     temp_files_to_clean = []
+    used_providers = []
     
     try:
         for idx, interval in enumerate(intervals):
@@ -158,7 +202,7 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
             end = interval["end"]
             duration = end - start
             
-            # Ako je trajanje premalo (npr. manje od 50ms), preskačemo da izbegnemo greške u FFmpeg-u
+            # Ako je trajanje premalo, preskačemo
             if duration < 0.05:
                 continue
                 
@@ -193,24 +237,62 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
                 ]
                 subprocess.run(cmd_cut_audio, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 
-                # Pokretanje Wav2Lip-a na ovom malom delu
+                # Pokretanje Wav2Lip-a
                 sub_lipsync_path = os.path.join(workspace, f"sub_lipsync_{idx}_{uuid.uuid4().hex[:6]}.mp4")
                 temp_files_to_clean.append(sub_lipsync_path)
                 
-                command = [
-                    "python", os.path.join(wav2lip_dir, "inference.py"),
-                    "--checkpoint_path", os.path.join(wav2lip_dir, "checkpoints", "wav2lip_gan.pth"),
-                    "--face", sub_video_path,
-                    "--audio", sub_audio_path,
-                    "--outfile", sub_lipsync_path
-                ]
+                success_lipsync = False
                 
-                res = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if res.returncode == 0 and os.path.exists(sub_lipsync_path) and os.path.getsize(sub_lipsync_path) > 0:
+                # Prvi pokušaj: Serverless Modal
+                if modal_url:
+                    print(f"[SELECTIVE LIP SYNC] Segment {idx}: Koristim serverless Modal za Wav2Lip...", flush=True)
+                    try:
+                        from backend.worker.utils import call_modal_endpoint
+                        
+                        with open(sub_video_path, "rb") as f_vid:
+                            video_b64 = base64.b64encode(f_vid.read()).decode('utf-8')
+                        with open(sub_audio_path, "rb") as f_aud:
+                            audio_b64 = base64.b64encode(f_aud.read()).decode('utf-8')
+                            
+                        payload = {
+                            "video_base64": video_b64,
+                            "audio_base64": audio_b64
+                        }
+                        
+                        res = call_modal_endpoint(modal_url, payload, timeout_seconds=600)
+                        if "error" not in res and "video_base64" in res:
+                            with open(sub_lipsync_path, "wb") as f_out:
+                                f_out.write(base64.b64decode(res["video_base64"]))
+                            success_lipsync = True
+                            used_providers.append("modal")
+                        else:
+                            err_msg = res.get("error", "Nepoznata greška")
+                            print(f"[SELECTIVE LIP SYNC WARNING] Modal greška za segment {idx}: {err_msg}", flush=True)
+                    except Exception as modal_err:
+                        print(f"[SELECTIVE LIP SYNC WARNING] Greška pri pozivanju serverless Wav2Lip za segment {idx}: {modal_err}", flush=True)
+                
+                # Drugi pokušaj (fallback): Lokalni podproces
+                if not success_lipsync and os.path.exists(wav2lip_dir):
+                    print(f"[SELECTIVE LIP SYNC] Segment {idx}: Koristim lokalni fallback...", flush=True)
+                    command = [
+                        "python", os.path.join(wav2lip_dir, "inference.py"),
+                        "--checkpoint_path", os.path.join(wav2lip_dir, "checkpoints", "wav2lip_gan.pth"),
+                        "--face", sub_video_path,
+                        "--audio", sub_audio_path,
+                        "--outfile", sub_lipsync_path
+                    ]
+                    
+                    res = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if res.returncode == 0 and os.path.exists(sub_lipsync_path) and os.path.getsize(sub_lipsync_path) > 0:
+                        success_lipsync = True
+                        used_providers.append("local")
+                    else:
+                        err = res.stderr.decode('utf-8', errors='ignore')
+                        print(f"[SELECTIVE LIP SYNC WARNING] Lokalni Wav2Lip nije uspeo za segment {idx}: {err}. Koristim original.", flush=True)
+                
+                if success_lipsync:
                     sub_clips.append(sub_lipsync_path)
                 else:
-                    err = res.stderr.decode('utf-8', errors='ignore')
-                    print(f"[SELECTIVE LIP SYNC WARNING] Wav2Lip nije uspeo za segment {idx}: {err}. Koristim original.", flush=True)
                     sub_clips.append(sub_video_path)
             else:
                 print(f"[SELECTIVE LIP SYNC] Segment {idx}: Preskačem obradu usana (original) od {start:.2f}s do {end:.2f}s...", flush=True)
@@ -225,7 +307,6 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
         
         with open(concat_list_path, "w") as f:
             for clip in sub_clips:
-                # Koristimo apsolutnu putanju
                 f.write(f"file '{os.path.abspath(clip)}'\n")
                 
         # Spajanje svih isečaka pomoću concat demuxer-a
@@ -257,11 +338,13 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
         ]
         subprocess.run(merge_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        print("[SELECTIVE LIP SYNC SUCCESS] Selektivna sinhronizacija usana završena.", flush=True)
+        provider = "modal" if "modal" in used_providers else ("local" if "local" in used_providers else "skipped")
+        print(f"[SELECTIVE LIP SYNC SUCCESS] Selektivna sinhronizacija usana završena (provajder: {provider}).", flush=True)
         return {
             "status": "success",
             "lipsync_video_path": final_output_path,
-            "skipped": False
+            "skipped": False,
+            "provider": provider
         }
         
     except Exception as e:
@@ -269,7 +352,6 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
         return {"status": "error", "message": str(e)}
         
     finally:
-        # Čišćenje privremenih fajlova osim finalnog video rezultata i prosleđenih
         for temp_file in temp_files_to_clean:
             if temp_file != final_output_path and os.path.exists(temp_file):
                 try:

@@ -108,9 +108,10 @@ def _download_from_s3(s3_url: str, workspace: str) -> dict:
         
         s3 = boto3.client(
             's3',
-            endpoint_url=f"http://{settings.MINIO_ENDPOINT}",
+            endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
             aws_access_key_id=settings.MINIO_ACCESS_KEY,
-            aws_secret_access_key=settings.MINIO_SECRET_KEY
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name=settings.S3_REGION
         )
         
         print(f"[FAZA 1] Preuzimam sa S3: {s3_url} -> {local_video_path}")

@@ -55,7 +55,7 @@ def upload_to_minio(file_path: str, bucket_name: str = "previews") -> str:
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     # 2. Javni klijent za generisanje URL-a koji RunPod moze da vidi
@@ -65,7 +65,7 @@ def upload_to_minio(file_path: str, bucket_name: str = "previews") -> str:
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     
     try:

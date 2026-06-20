@@ -32,7 +32,7 @@ def check_s3_file_exists(bucket_name: str, object_key: str) -> bool:
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     try:
         s3_internal.head_object(Bucket=bucket_name, Key=object_key)
@@ -158,7 +158,7 @@ def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str):
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     try:
         s3_internal.upload_file(file_path, bucket_name, object_key)
@@ -175,7 +175,7 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        region_name=settings.S3_REGION
     )
     try:
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
@@ -1148,9 +1148,13 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         else:
             final_output = merge_result["final_video_path"]
             
+        provider = lip_result.get("provider", "local") if 'lip_result' in locals() else "skipped"
         duration_lip = time.time() - t_start_lip
         if needs_lipsync:
-            add_phase_cost("lipsync", "Lip Sync sinhronizacija (Wav2Lip)", "Lokalni VPS", duration_lip, 0.0)
+            if provider == "modal":
+                add_phase_cost("lipsync", "Lip Sync sinhronizacija (Wav2Lip na Modalu)", "T4", duration_lip, 0.00018)
+            else:
+                add_phase_cost("lipsync", "Lip Sync sinhronizacija (Lokalni fallback)", "Lokalni VPS", duration_lip, 0.0)
         else:
             add_phase_cost("lipsync", "Lip Sync preskočen (nema lica)", "Lokalni VPS", duration_lip, 0.0)
             
