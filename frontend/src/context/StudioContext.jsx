@@ -568,7 +568,7 @@ export function StudioProvider({ children }) {
     setError(null);
 
     try {
-      const { upload_url, s3_url } = await api.getUploadUrl(file.name, file.type);
+      const { upload_url, s3_url } = await api.getUploadUrl(file.name, file.type, currentProjectId);
 
       const xhr = new XMLHttpRequest();
       xhr.upload.onprogress = (event) => {

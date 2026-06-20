@@ -167,9 +167,9 @@ export const api = {
   /**
    * Dobavlja presigned URL za upload lokalnog fajla na MinIO.
    */
-  async getUploadUrl(filename, contentType) {
+  async getUploadUrl(filename, contentType, projectId) {
     return authFetch(
-      `${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(filename)}&content_type=${encodeURIComponent(contentType)}`
+      `${API_BASE_URL}/api/v1/storage/upload_url?filename=${encodeURIComponent(filename)}&content_type=${encodeURIComponent(contentType)}&project_id=${encodeURIComponent(projectId)}`
     );
   },
 
