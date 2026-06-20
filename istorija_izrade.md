@@ -1,3 +1,10 @@
+## [2026-06-20 09:30:00] Uspešno Puštanje Ojačanog Sistema u Produkciju (Go-Live)
+- **Opis:**
+  Nakon verifikacije i odobrenja finalnog izveštaja o ojačavanju, celokupna rešenja iz Faze 0, Faze 1 i Faze 2 (P0, P1, P2, P3, P4) su puštena u produkciju:
+  1. **Spajanje u main**: Grana `development` je uspešno spojena u produkcionu granu `main` na GitHub-u.
+  2. **Automatski produkcioni deploy**: Push na `main` granu je uspešno aktivirao GitHub CD pipeline, koji je povukao nove Docker slike i podigao stabilno produkciono okruženje na Hetzner VPS serveru (`178.104.214.78`).
+  3. **Migracije i baze**: Automatski su primenjene sve tri nagomilane Alembic migracije (`9c09b48931b7`, `9d45a91db31f`, `d3b1029c8e9f`) na produkcionoj PostgreSQL bazi podataka.
+
 ## [2026-06-20 07:45:00] Sveobuhvatno Ažuriranje Projektne Dokumentacije za Faze 0, 1 i 2
 - **Opis:**
   Uskladili smo kompletnu tehničku dokumentaciju sa trenutnim stanjem koda nakon ojačavanja sistema:
