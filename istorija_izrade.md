@@ -2916,7 +2916,6 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Runda 3 Evaluacija:** Uspešno pokrenuta evaluacija nad svih 5 test video snimaka. Svi testovi su prošli stabilno, a prosek ocena LLM sudije se popeo na **7.9/10**, sa značajnim skokom na videu 2 (**8/10** u odnosu na ranijih 6.0/10) i videu 3 (**8/10** u odnosu na ranijih 7.5/10).
     * **Dokumentacija:** Ažuriran fajl `sicret doc/evaluacija_i_poredjenje_testova.md` sa novim podacima i kompletnom uporednom analizom sve tri runde testova.
 - **Status:** Završeno. Sve tri faze su uspešno implementirane, testirane (19/19 pytest prolaza i namenska test skripta), i verifikovane kroz treću rundu masovne evaluacije.
-
 ### 14.06.2026. 11:45 — Otklanjanje regionalizama, ispravka rodnih neusaglašenosti, rešavanje 400 Bad Request na Modalu i baga sa ID 9999
 - **Zahtevi:** Otkloniti preostale ijekavizme i hrvatske izraze koje je korisnik primetio, popraviti neprirodne rečenice, osigurati da se lektura primenjuje na sve segmente, i otkloniti `400 Bad Request` greške na Modalu.
 - **Urađeno:**
@@ -2954,3 +2953,25 @@ Hibridna arhitektura operativna (Hetzner VPS + RunPod Serverless). Upload fajlov
     * **Pravna analiza (P4):** Kreiran izveštaj `pravna_usklađenost_izvestaj.md` koji analizira licence AI modela (CC BY-NC-SA 4.0 za Wav2Lip, predložene alternative SadTalker/GeneFace++), GDPR uspostavljanje i AI Act usklađenost.
     * **Verifikacija testova:** Prilagođeni testovi za CLI i SQLite test bazu na disku (`test_temp.db`) radi multithreading stabilnosti. Svi pytest unit testovi uspešno prolaze (`27 passed`).
 - **Status:** Završeno. Faza 0 uspešno implementirana, testirana i verifikovana.
+
+### 20.06.2026. 11:05 — Sređivanje dokumentacije i čišćenje repozitorijuma
+- **Zahtevi:** Srediti i ažurirati tehničku dokumentaciju sistema i očistiti git repozitorijum od nepotrebnih fajlova, test video snimaka, evaluacionih rezultata/skripti, tajnih dokumenata i istorije izrade.
+- **Urađeno:**
+    * **Reorganizacija dokumentacije:** Premestio uputstvo za backup i restore iz root-a u `doc/backup_restore_uputstvo.md`.
+    * **Ispravka linkova:** U `doc/kompletna_dokumentacija.md` ispravio sve linkove koji su greškom pokazivali na `sicret doc/` da pokazuju na `doc/` i dodao referencu na uputstvo za backup.
+    * **Ažuriranje README:** Ažurirao stablo projekta u `README.md` kako bi reflektovalo novu organizaciju i uklanjanje nepotrebnih fajlova.
+    * **Uklanjanje duplikata:** Obrisao duplikate tehničkih dokumenata iz root direktorijuma (`arhitektura_i_tok_podataka.md` i `pipeline_tok.md`).
+    * **Čišćenje git indeksa:** Uklonio `istorija_izrade.md` i ceo `scratch/` direktorijum iz git praćenja (`git rm --cached`), osiguravajući da lokalne skripte i istorija ostanu lokalno na disku, ali da ne idu na GitHub.
+    * **Čišćenje test i tajnih fajlova:** Potpuno obrisao direktorijum `sicret doc/` i sve fajlove u njemu iz repozitorijuma. Obrisao evaluacione rezultate (`evaluation_results/`) i velike test video snimke (`Test videos/` - preko 130MB).
+    * **Uklanjanje test/evaluacionih skripti:** Obrisao pomoćne/testne skripte iz root-a: `evaluate_video_pipeline.py`, `run_ablation_study.py` i `prepare_lora_dataset.py`.
+    * **Ažuriranje .gitignore:** Dodao nova pravila u `.gitignore` za trajno ignorisanje fajlova `istorija_izrade.md`, `sicret doc/`, `evaluation_results/` i `Test videos/`.
+    * **Verifikacija:** Pokrenuo pytest unit testove koji pojedinačno svi uspešno prolaze.
+- **Status:** Završeno. Repozitorijum je kompletno očišćen i dokumentacija je uspešno organizovana u `doc/` folderu.
+
+### 20.06.2026. 11:20 — Uklanjanje tests/, scripts/ i backup_restore_uputstva iz repozitorijuma
+- **Zahtevi:** Skloniti `tests/` i `scripts/` direktorijume, kao i uputstvo za bekap (`backup_restore_uputstvo.md`) iz repozitorijuma.
+- **Urađeno:**
+    * **Čišćenje repozitorijuma:** Obrisao i uklonio iz git praćenja direktorijume `tests/` i `scripts/` i fajl `doc/backup_restore_uputstvo.md` sa diska i iz repozitorijuma.
+    * **Ažuriranje CI/CD:** Ažurirao `.github/workflows/backend-ci.yml` uklanjanjem koraka za pokretanje integracionih testova (pytest) kako CI/CD ne bi fejlovao nakon brisanja `tests/` foldera.
+    * **Ažuriranje referenci:** Uklonio sve reference na `backup_restore_uputstvo.md` iz glavnog indeksa tehničke dokumentacije (`doc/kompletna_dokumentacija.md`) i iz stabla strukture projekta u `README.md`.
+- **Status:** Završeno. Direktorijumi i uputstvo su trajno uklonjeni iz repozitorijuma, a CI/CD pipeline-ovi su uspešno prilagođeni.

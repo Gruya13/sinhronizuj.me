@@ -102,8 +102,8 @@ def _download_from_s3(s3_url: str, workspace: str) -> dict:
         parts = s3_url.replace("s3://", "").split("/")
         bucket = parts[0]
         key = "/".join(parts[1:])
-        
-        local_video_path = os.path.join(workspace, key)
+        filename = os.path.basename(key)
+        local_video_path = os.path.join(workspace, filename)
         local_audio_path = local_video_path.rsplit(".", 1)[0] + ".wav"
         
         s3 = boto3.client(
