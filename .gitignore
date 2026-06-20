@@ -15,7 +15,6 @@ __pycache__/
 temp_workspace/
 *.mp4
 *.wav
-!backend/assets/serbian_female.wav
 *.mp3
 !frontend/public/demo/*.mp3
 cookies.txt
