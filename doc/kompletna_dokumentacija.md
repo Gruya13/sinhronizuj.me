@@ -8,12 +8,13 @@ Ovaj dokument objedinjuje sve aspekte sistema, uključujući arhitekturu, bazu p
 
 ## Sadržaj i Brzi Linkovi
 
-1.  [Arhitektura Sistema i Baza Podataka](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/arhitektura_i_baza.md)
-2.  [Dokumentacija Frontend Aplikacije](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/frontend_dokumentacija.md)
-3.  [Dokumentacija Backend Sloja](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/backend_dokumentacija.md)
-4.  [Audio i Video Procesiranje](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/audio_i_video_procesiranje.md)
-5.  [Veštačka Inteligencija i Modal Radnici](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/modal_workers_i_ai.md)
-6.  [Infrastruktura i DevOps](file:///home/gruya/Projektri/sinhronizuj.me/sicret%20doc/infrastruktura_i_devops.md)
+1.  [Arhitektura Sistema i Baza Podataka](file:///home/gruya/Projektri/sinhronizuj.me/doc/arhitektura_i_baza.md)
+2.  [Dokumentacija Frontend Aplikacije](file:///home/gruya/Projektri/sinhronizuj.me/doc/frontend_dokumentacija.md)
+3.  [Dokumentacija Backend Sloja](file:///home/gruya/Projektri/sinhronizuj.me/doc/backend_dokumentacija.md)
+4.  [Audio i Video Procesiranje](file:///home/gruya/Projektri/sinhronizuj.me/doc/audio_i_video_procesiranje.md)
+5.  [Veštačka Inteligencija i Modal Radnici](file:///home/gruya/Projektri/sinhronizuj.me/doc/modal_workers_i_ai.md)
+6.  [Infrastruktura i DevOps](file:///home/gruya/Projektri/sinhronizuj.me/doc/infrastruktura_i_devops.md)
+7.  [Uputstvo za Backup i Restore](file:///home/gruya/Projektri/sinhronizuj.me/doc/backup_restore_uputstvo.md)
 
 ---
 
@@ -121,3 +122,9 @@ Zajedničko pokretanje servisa vrši se kroz kontejnere:
 *   [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml): Automatski gradi Docker slike nakon prolaska testova, vrši push na GHCR, te na Hetzner VPS-u povlači slike i radi deploy preko SSH.
 *   [release.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/release.yml): Automatski kreira GitHub Release sa generisanim beleškama o izmenama na push-u na `main` granu.
 *   **Backup**: Cron posao svake noći u 02:00h vrši backup PostgreSQL baze i šalje ga na MinIO S3 bucket sa rotacijom i automatskim brisanjem arhiva starijih od 7 dana.
+
+---
+
+## 7. Uputstvo za Backup i Restore
+
+Za detaljna uputstva o procedurama ručnog backup-ovanja, vraćanja podataka (restore) i rotacije arhiva, pogledajte [Uputstvo za Backup i Restore](file:///home/gruya/Projektri/sinhronizuj.me/doc/backup_restore_uputstvo.md).

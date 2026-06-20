@@ -171,8 +171,9 @@ sinhronizuj.me/
 │   ├── tts_openvoice.py     # OpenVoice + Piper kloniranje (L4 GPU)
 │   ├── lektor_worker.py     # Lektorisanje i skraćivanje teksta
 │   └── wav2lip_worker.py    # Wav2Lip vizuelna sinhronizacija (T4 GPU)
-├── finalni_izvestaj_ojacavanja.md # Završni tehnički izveštaj o ojačavanju sistema
-├── istorija_izrade.md       # Istorija implementacije i razvoja
+├── doc/                      # Tehnička dokumentacija sistema (arhitektura, backend, frontend, devops...)
+│   ├── kompletna_dokumentacija.md  # Sveobuhvatni indeks i glavni vodič kroz dokumentaciju
+│   └── backup_restore_uputstvo.md # Detaljno uputstvo za bekap i oporavak baze/S3 skladišta
 ├── docker-compose.yml       # Docker compose za lokalne servise (Postgres, Redis, API)
 └── Dockerfile               # API/Worker Docker slika za server
 ```

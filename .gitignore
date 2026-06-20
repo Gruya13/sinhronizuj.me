@@ -36,3 +36,9 @@ brainstorming/
 
 # Lokalne skripte i temp podaci
 scratch/
+
+# Nepotrebni i lokalni test podaci
+sicret doc/
+evaluation_results/
+Test videos/
+istorija_izrade.md
