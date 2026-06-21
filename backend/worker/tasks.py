@@ -641,10 +641,16 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         # --- KORAK 5: Lokalna detekcija roda i govornika (diarizacija i ASD) ---
         create_or_update_job(project_id=effective_project_id, job_type="analysis", status="running", current_phase="diarizing", job_id=task_id)
-        update_progress("Diarizacija i vizuelna analiza...", 90, detail="Analiziram govornike i pokrete usana na ekranu...")
+        update_progress("Diarizacija i vizuelna analiza...", 90, detail="Analiziram pokrete usana na celom ekranu (skeniranje)...")
         
         from backend.worker.audio_gender import detect_gender_from_audio
-        from backend.worker.active_speaker import is_speaker_active_on_screen
+        from backend.worker.active_speaker import precompute_active_speakers, check_speaker_activity_from_timeline
+        
+        # Precompute aktivnih govornika sekvencijalno za ceo video (veoma brzo)
+        t_asd_start = time.time()
+        asd_timeline = precompute_active_speakers(stable_video_path)
+        duration_asd = time.time() - t_asd_start
+        print(f"[ACTIVE SPEAKER] Skeniranje usana završeno za {duration_asd:.2f}s. Ukupno frejmova: {len(asd_timeline)}", flush=True)
         
         processed_segments = []
         for i, s in enumerate(translation_result["translated_segments"]):
@@ -654,8 +660,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             gender = detect_gender_from_audio(stable_vocals_path, s["start"], s["end"])
             voice_type = "male" if gender == "male" else "clone"
             
-            # Detektujemo da li se usne pomeraju na ekranu (aktivan govornik)
-            is_active = bool(is_speaker_active_on_screen(stable_video_path, s["start"], s["end"]))
+            # Proveravamo aktivnost govornika iz precomputovanog timeline-a
+            is_active = check_speaker_activity_from_timeline(asd_timeline, s["start"], s["end"])
             
             processed_segments.append({
                 "id": i,
