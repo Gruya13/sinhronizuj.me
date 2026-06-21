@@ -25,6 +25,8 @@ brave.txt
 
 # Markdown fajlovi (osim kljucne dokumentacije)
 *.md
+!proces_prevodjenja.md
+!istorija_izrade.md
 !README.md
 !doc/**/*.md
 !doc/*.md
@@ -40,6 +42,6 @@ scratch/
 sicret doc/
 evaluation_results/
 Test videos/
-istorija_izrade.md
+# istorija_izrade.md
 tests/
 scripts/
