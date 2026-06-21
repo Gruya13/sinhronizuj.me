@@ -24,4 +24,5 @@ from backend.worker.translation import (
     retranslate_with_self_critique,
     lektor_segments,
     calculate_jaccard_similarity,
+    get_llm_judge_score,
 )

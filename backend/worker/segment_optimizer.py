@@ -62,8 +62,13 @@ def optimize_segments_for_translation(segments: list, min_duration: float = 1.0,
         # Zbirno trajanje ako se spoje
         combined_duration = next_seg["end"] - curr_seg["start"]
         
-        # Spajamo ako se trenutni ne završava interpunkcijom, pauza je mala (< 0.45s) i zbirno trajanje ne prelazi max_duration
-        if not ends_with_punctuation and pause_duration < 0.45 and combined_duration <= max_duration:
+        # Provera da li se radi o rascepkanom broju (npr. "100," i "000")
+        is_split_number = False
+        if re.search(r'\d+[.,]?$', curr_text) and re.match(r'^\d+', next_seg.get("text", "").strip()):
+            is_split_number = True
+        
+        # Spajamo ako je rascepkan broj ILI ako nema interpunkcije, pauza je mala i ukupno trajanje je u limitu
+        if is_split_number or (not ends_with_punctuation and pause_duration < 0.45 and combined_duration <= max_duration):
             curr_seg = {
                 "start": curr_seg["start"],
                 "end": next_seg["end"],

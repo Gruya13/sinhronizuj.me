@@ -1,4 +1,7 @@
 import re
+import json
+from backend.core.config import settings
+from backend.worker.utils import call_modal_endpoint
 
 NEGATION_PATTERNS_ENG = [
     r'\bnot\b', r'\bnever\b', r'\bno\b', r'\bnobody\b', r'\bnothing\b', r'\bnowhere\b',
@@ -71,7 +74,8 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
     LEAK_PATTERN = re.compile(
         r'\b(dio|dijel\w*|dvjesto|spriječi\w*|tijekom|sustav\w*|tjedan|tjedn\w*|'
         r'tisuć\w*|uvjet\w*|utjecaj\w*|sučelj\w*|zaslon\w*|tipkovnic\w*|poveznic\w*|'
-        r'vidjeti|djeluj\w*|riješi\w*|uvijek|gdje)\b', re.IGNORECASE)
+        r'vidjeti|djeluj\w*|riješi\w*|uvijek|gdje|provjer\w*|vjer\w*|mjer\w*|svijet\w*|'
+        r'vijest\w*|tijel\w*|obavijest\w*)\b', re.IGNORECASE)
     
     leaks = LEAK_PATTERN.findall(serbian_text)
     if leaks:
@@ -106,3 +110,87 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
     # Izračunavanje finalnog QE skora
     qe_score = base_similarity - penalties
     return max(0.0, min(1.0, qe_score))
+
+def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = None) -> dict:
+    """
+    Poziva Modal Lektor (Qwen) kao sudiju (LLM-as-a-Judge) da oceni kvalitet prevoda.
+    Vraća rečnik sa ključevima: 'score' (float od 1.0 do 5.0), 'explanation' (str), 'errors' (list).
+    """
+    if not settings.MODAL_LEKTOR_URL:
+        return {"score": 5.0, "explanation": "Lektor URL nije konfigurisan, automatski prolaz.", "errors": []}
+
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    
+    limit_instruction = ""
+    if limit_char:
+        limit_instruction = f"Prevod (srpski tekst) ima striktan limit dužine od {limit_char} karaktera. Trenutna dužina je {len(serbian_text)} karaktera."
+        
+    prompt = (
+        "Ti si stručni sudija za kvalitet prevoda sa engleskog na srpski jezik (ekavica, latinica).\n"
+        "Ocenjuješ kvalitet prevoda na skali od 1.0 do 5.0 (gde je 5.0 savršen prevod).\n\n"
+        f"Originalni engleski tekst: \"{english_text}\"\n"
+        f"Prevedeni srpski tekst: \"{serbian_text}\"\n"
+        f"{limit_instruction}\n\n"
+        "PRAVILA OCENJIVANJA:\n"
+        "- 5.0: Prevod je tačan, prirodan, na ekavici i latinici, brojevi su rečima, nema stranih reči u originalu (osim GPS, Wi-Fi, Bluetooth), i ne prelazi limit karaktera ako je zadat.\n"
+        "- Oduzmi 1.0 do 2.0 poena ako prevod sadrži ijekavicu ili hrvatske regionalizme (npr. 'dio', 'sustav', 'tijekom', 'tisuća', 'uvjet').\n"
+        "- Oduzmi 1.5 poen ako je izgubljen osnovni smisao ili negacija (npr. original ima negaciju, a prevod nema, ili obrnuto).\n"
+        "- Oduzmi 1.0 poen ako prevod sadrži brojeve napisane ciframa (npr. '5', '2024') umesto slovima.\n"
+        "- Oduzmi 1.0 poen ako sadrži netranskribovana strana imena (npr. 'Claude' umesto 'Klod').\n"
+        "- Oduzmi 1.0 poen ako je prevod predugačak u odnosu na limit karaktera.\n\n"
+        "VAŽNO: STROGO ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah vrati JSON odgovor.\n\n"
+        "FORMAT ODGOVORA:\n"
+        "Odgovori isključivo u sledećem JSON formatu, bez ikakvog dodatnog teksta, komentara ili think tagova:\n"
+        "{\n"
+        "  \"score\": 5.0,\n"
+        "  \"explanation\": \"kratko objašnjenje na srpskom\",\n"
+        "  \"errors\": [\"lista_uočenih_grešaka\"]\n"
+        "}\n"
+    )
+
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Ti si brzi i precizni sudija za kvalitet prevoda. Vrati isključivo validan JSON prema šemi. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah vrati JSON."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1500,
+        "guided_json": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "number"},
+                "explanation": {"type": "string"},
+                "errors": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            },
+            "required": ["score", "explanation", "errors"]
+        }
+    }
+
+    try:
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=45)
+        content = res["choices"][0]["message"]["content"].strip()
+        
+        from backend.worker.translation.lektor import extract_and_parse_json
+        data = extract_and_parse_json(content)
+        if not data:
+            raise ValueError("Nije uspelo parsiranje niti popravljanje JSON-a sudije.")
+            
+        print(f"[LLM JUDGE] Rezultat evaluacije: score={data.get('score')}, errors={data.get('errors')}, objašnjenje={data.get('explanation')}", flush=True)
+        return {
+            "score": float(data.get("score", 5.0)),
+            "explanation": data.get("explanation", ""),
+            "errors": data.get("errors", [])
+        }
+    except Exception as e:
+        print(f"[LLM JUDGE ERROR] Greška pri pozivanju LLM sudije: {e}. Vraćam default prolaz.", flush=True)
+        return {"score": 5.0, "explanation": f"Greška sudije: {e}", "errors": []}

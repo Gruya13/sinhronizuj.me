@@ -42,6 +42,65 @@ def fix_json_newlines(json_str: str) -> str:
         return match.group(0).replace('\n', '\\n')
     return re.sub(r'"(?:[^"\\]|\\.)*"', repl, json_str)
 
+def repair_truncated_json(text: str) -> str:
+    text = text.strip()
+    if not text:
+        return ""
+        
+    if text.endswith(','):
+        text = text[:-1].strip()
+        
+    unescaped_quotes = 0
+    in_escape = False
+    for char in text:
+        if char == '\\':
+            in_escape = not in_escape
+        elif char == '"':
+            if not in_escape:
+                unescaped_quotes += 1
+            in_escape = False
+        else:
+            in_escape = False
+            
+    if unescaped_quotes % 2 != 0:
+        text += '"'
+        
+    if text.endswith(','):
+        text = text[:-1].strip()
+        
+    stack = []
+    in_string = False
+    in_escape = False
+    
+    for char in text:
+        if char == '\\':
+            if in_string:
+                in_escape = not in_escape
+            else:
+                in_escape = False
+        elif char == '"':
+            if not in_escape:
+                in_string = not in_string
+            in_escape = False
+        elif not in_string:
+            if char in ('{', '['):
+                stack.append(char)
+            elif char in ('}', ']'):
+                if stack:
+                    last = stack[-1]
+                    if (char == '}' and last == '{') or (char == ']' and last == '['):
+                        stack.pop()
+        else:
+            in_escape = False
+            
+    for open_char in reversed(stack):
+        if open_char == '{':
+            text += '}'
+        elif open_char == '[':
+            text += ']'
+            
+    return text
+
 def extract_and_parse_json(text: str):
     if not text:
         return None
@@ -60,7 +119,7 @@ def extract_and_parse_json(text: str):
     except json.JSONDecodeError:
         pass
     
-    # Traženje JSON bloka unutar ```json i ```
+    # Pokušaj 3: Traženje JSON bloka unutar ```json i ```
     match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
     if match:
         json_content = match.group(1)
@@ -71,31 +130,55 @@ def extract_and_parse_json(text: str):
                 return json.loads(fix_json_newlines(json_content))
             except json.JSONDecodeError:
                 pass
+
+    # Pokušaj 4: popravka celog teksta ako je odsečen i onda ponovni pokušaj loads
+    try:
+        repaired = repair_truncated_json(text)
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    try:
+        repaired = repair_truncated_json(fix_json_newlines(text))
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
             
-    # Traženje prvog '[' i poslednjeg ']' ili '{' i '}'
+    # Pokušaj 5: Traženje prvog '[' i poslednjeg ']' ili '{' i '}' i popravka
     start_arr = text.find('[')
-    end_arr = text.rfind(']')
-    if start_arr != -1 and end_arr != -1 and end_arr > start_arr:
-        json_content = text[start_arr:end_arr+1]
+    if start_arr != -1:
+        json_content = text[start_arr:]
+        # Ako postoji i zatvarajući, uzmi do njega, inače uzmi do kraja i popravi
+        end_arr = text.rfind(']')
+        if end_arr != -1 and end_arr > start_arr:
+            json_content = text[start_arr:end_arr+1]
         try:
             return json.loads(json_content)
         except json.JSONDecodeError:
             try:
-                return json.loads(fix_json_newlines(json_content))
+                return json.loads(repair_truncated_json(json_content))
             except json.JSONDecodeError:
-                pass
+                try:
+                    return json.loads(repair_truncated_json(fix_json_newlines(json_content)))
+                except json.JSONDecodeError:
+                    pass
             
     start_obj = text.find('{')
-    end_obj = text.rfind('}')
-    if start_obj != -1 and end_obj != -1 and end_obj > start_obj:
-        json_content = text[start_obj:end_obj+1]
+    if start_obj != -1:
+        json_content = text[start_obj:]
+        end_obj = text.rfind('}')
+        if end_obj != -1 and end_obj > start_obj:
+            json_content = text[start_obj:end_obj+1]
         try:
             return json.loads(json_content)
         except json.JSONDecodeError:
             try:
-                return json.loads(fix_json_newlines(json_content))
+                return json.loads(repair_truncated_json(json_content))
             except json.JSONDecodeError:
-                pass
+                try:
+                    return json.loads(repair_truncated_json(fix_json_newlines(json_content)))
+                except json.JSONDecodeError:
+                    pass
             
     return None
 
@@ -285,7 +368,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
 
         lektor_prompt = (
             "Ti si glavni urednik i lektor za srpski jezik. Pregledaj grubi prevod (SRB) u odnosu na original (ENG) i trajanje segmenta, ispravi greške i vrati tečan srpski prevod na ekavici i latinici.\n\n"
-            "VAŽNO ZA REZONOVANJE: U svom procesu razmišljanja (<think>...</think>) budi ekstremno kratak (maksimalno 10 reči ukupno). NIKADA nemoj raditi analizu segment po segment niti brojati slova u razmišljanju. Odmah pređi na JSON odgovor.\n\n"
+            "VAŽNO: STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah vrati JSON odgovor direktno.\n\n"
             f"{history_section}"
             "PRAVILA ZA UREĐIVANJE:\n"
             "1. PIŠI ISKLJUČIVO SRPSKOM LATINICOM. Koristi jedninsko neformalno obraćanje 'ti' (npr. 'poravnaj').\n"
@@ -317,12 +400,20 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         try:
             lektor_payload = {
                 "model": "qwen-lektor",
-                "messages": [{"role": "user", "content": lektor_prompt}],
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Ti si glavni urednik i lektor za srpski jezik. Lekturiši grubi prevod i vrati isključivo validan JSON prema šemi. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Odmah vrati JSON."
+                    },
+                    {
+                        "role": "user",
+                        "content": lektor_prompt
+                    }
+                ],
                 "temperature": 0.1,
                 "max_tokens": 2048,
                 "presence_penalty": 0.5,
-                "enable_thinking": False,
-                "guided_json": lektor_schema
+                "enable_thinking": False
             }
             
             from backend.worker.translator import call_modal_endpoint
@@ -479,7 +570,9 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
     LEAK_PATTERN = re.compile(
         r'\b(dio|dijel\w*|dvjesto|spriječi\w*|tijekom|sustav\w*|tjedan|tjedn\w*|'
         r'tisuć\w*|uvjet\w*|utjecaj\w*|sučelj\w*|zaslon\w*|tipkovnic\w*|poveznic\w*|'
-        r'vidjeti|djeluj\w*|riješi\w*|uvijek|gdje)\b', re.IGNORECASE)
+        r'vidjeti|djeluj\w*|riješi\w*|uvijek|gdje|provjer\w*|vjer\w*|mjer\w*|svijet\w*|'
+        r'vijest\w*|tijel\w*|obavijest\w*|susjed\w*|uput[aeiu]|osjetljiv\w*|'
+        r'kangur\w*|struč(?:ak|ka|ci)|joi)\b', re.IGNORECASE)
     for seg in translated_segments:
         if "text" in seg:
             seg["text"] = unmask_text(seg["text"], seg.get("masks", {}))
@@ -517,10 +610,9 @@ def compress_sentence_via_llm(text: str, limit_char: int) -> str:
         "VAŽNA PRAVILA:\n"
         "1. Zadrži osnovni smisao i informaciju iz rečenice.\n"
         "2. Skraćena rečenica mora biti gramatički ispravna i prirodna na srpskom.\n"
-        "3. Tvoj odgovor mora sadržati isključivo skraćenu rečenicu, bez ikakvog dodatnog teksta, komentara, navodnika ili objašnjenja.\n"
-        "4. STROGO ZABRANJENO: Nemoj brojati slova jedno po jedno niti raditi matematičke proračune u razmišljanju. Samo intuitivno i brzo napiši kraću verziju rečenice.\n"
-        "5. VAŽNO ZA RAZMIŠLJANJE: Budi ekstremno kratak (maksimalno 10 reči ukupno). Odmah pređi na skraćeni tekst.\n"
-        "6. Ukoliko je limit karaktera prekratak da bi se zadržao ceo smisao, izostavi manje bitne detalje ili zadrži samo ključne reči (npr. ako je limit 15 karaktera za dugačku rečenicu, napiši samo najvažniji deo). Nemoj se zaglaviti u petlji brojanja.\n\n"
+        "3. Tvoj odgovor mora sadržati isključivo skraćenu rečenicu, bez ikakvog dodatnog teksta, komentara, navodnika, objašnjenja ili think tagova.\n"
+        "4. STROGO ZABRANJENO: Nemoj generisati nikakvo razmišljanje, obrazloženje ili <think> tag. Samo odmah ispiši skraćeni tekst.\n"
+        "5. Ukoliko je limit karaktera prekratak da bi se zadržao ceo smisao, izostavi manje bitne detalje ili zadrži samo ključne reči.\n\n"
         f"REČENICA ZA SKRAĆIVANJE: {text}"
     )
     
@@ -529,7 +621,7 @@ def compress_sentence_via_llm(text: str, limit_char: int) -> str:
         "messages": [
             {
                 "role": "system", 
-                "content": "Ti si brzi stručni lektor. Tvoj zadatak je da odmah vratiš skraćenu verziju rečenice na srpskom jeziku na osnovu zadatog limita. Razmišljanje (<think>...</think>) drži na maksimum 5-10 reči, ne broji slova, samo odmah ispiši skraćeni tekst. Ukoliko je nemoguće skratiti rečenicu u zadati limit bez gubitka svakog smisla, skrati je što je više moguće, ali nemoj upasti u beskonačnu petlju razmišljanja."
+                "content": "Ti si brzi stručni lektor. Tvoj zadatak je da odmah vratiš skraćenu verziju rečenice na srpskom jeziku na osnovu zadatog limita. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah ispiši skraćenu rečenicu direktno."
             },
             {
                 "role": "user", 
@@ -537,7 +629,7 @@ def compress_sentence_via_llm(text: str, limit_char: int) -> str:
             }
         ],
         "temperature": 0.1,
-        "max_tokens": 200,
+        "max_tokens": 1500,
         "enable_thinking": False
     }
     
