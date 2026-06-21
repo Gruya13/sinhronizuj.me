@@ -108,3 +108,15 @@ Rezultat: Bandit **Medium = 0, High = 0** — svi testovi prolaze.
 
 ### Deploy
 Izmena gurnuta na `development` → merge u `main` → CI/CD pipeline pokrenut ponovo.
+
+## 2026-06-21 (11:23 CET) — Popravka Frontend CI (Playwright)
+
+### Problem
+Frontend CI pipeline je pao na koraku E2E testova (Playwright) jer Vite dev server u CI okruženju nije imao kreiran `.env` fajl sa `VITE_API_URL` promenljivom, što je prouzrokovalo da se aplikacija ne ponaša ispravno tokom E2E testova.
+
+### Rešenje
+- U `.github/workflows/frontend-ci.yml` dodat je korak koji kreira privremeni `.env` fajl sa `VITE_API_URL=http://localhost:8000` pre pokretanja Playwright testova.
+- Dodat je `upload-artifact` korak koji arhivira Playwright izveštaje u slučaju neuspeha radi lakšeg otklanjanja grešaka.
+
+### Deploy
+Izmena je gurnuta na `development` i spojena na `main`. Pokrenut je novi CI/CD pipeline.
