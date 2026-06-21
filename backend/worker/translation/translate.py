@@ -228,7 +228,7 @@ def calculate_dynamic_factor(seg: dict, user_avg_speedup: float = 1.0) -> float:
         
     return factor
 
-def translate_segments(segments: list, video_path: str = None, progress_callback=None, user_avg_speedup: float = 1.0, skip_lektor: bool = False, skip_gating: bool = False, skip_deduplication: bool = False) -> dict:
+def translate_segments(segments: list, video_path: str = None, progress_callback=None, user_avg_speedup: float = 1.0, skip_lektor: bool = False, skip_gating: bool = False, skip_deduplication: bool = False, project_id: str = None) -> dict:
     """
     Poziva Modal Serverless Lektor (Qwen3-32B) za tekstualni prevod visoke tačnosti.
     Optimizovano: bez slika, bez hladnog starta na A10G, batch size = 30.
@@ -258,6 +258,36 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
     grouped_sentences = group_segments_into_sentences(segments, max_group_duration=12.0)
     print(f"[TRANSLATOR] Pokrećem prevođenje {len(segments)} segmenata grupisana u {len(grouped_sentences)} rečenica.", flush=True)
     t_start_trans = time.time()
+
+    # Učitavanje RAG (Translation Memory) i Wiki pravila iz baze
+    user_id = None
+    tm_examples = []
+    wiki_rules_str = ""
+    if project_id:
+        try:
+            from backend.core.database import SessionLocal
+            from backend.core.models import Project, TranslationMemory, WikiRule
+            db = SessionLocal()
+            proj = db.query(Project).filter(Project.id == project_id).first()
+            if proj:
+                user_id = str(proj.user_id)
+                # Učitavamo Translation Memory
+                tm_examples = db.query(TranslationMemory).filter(TranslationMemory.user_id == user_id).all()
+                print(f"[TRANSLATOR RAG] Učitano {len(tm_examples)} Translation Memory zapisa za korisnika {user_id}", flush=True)
+                
+                # Učitavamo Wiki pravila
+                rules = db.query(WikiRule).filter(
+                    (WikiRule.user_id == user_id) | (WikiRule.is_global == True)
+                ).all()
+                if rules:
+                    wiki_lines = []
+                    for r in rules:
+                        wiki_lines.append(f"### {r.title}\n{r.content}")
+                    wiki_rules_str = "DODATNA STILSKA I BREND PRAVILA (WIKI):\n" + "\n\n".join(wiki_lines)
+                    print(f"[TRANSLATOR WIKI] Učitano {len(rules)} Wiki pravila za korisnika {user_id}", flush=True)
+            db.close()
+        except Exception as e:
+            print(f"[TRANSLATOR RAG/WIKI ERROR] Greška pri učitavanju baze: {e}", flush=True)
     
     # 1. Generisanje globalnog sažetka i glosara za ceo video
     try:
@@ -347,6 +377,35 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 current_glossary_lines.append(f'- "{eng}" -> "{srb}"')
         current_glossary_str = "\n".join(current_glossary_lines) if current_glossary_lines else "Nema termina."
 
+        # RAG pretraga za ceo batch
+        rag_context_lines = []
+        seen_tm_ids = set()
+        if user_id and tm_examples:
+            try:
+                from backend.services.embedding import embedding_service
+                for group in batch:
+                    sentence_text = " ".join([s["text"].strip() for s in group if s.get("text")])
+                    sentence_emb = embedding_service.get_embedding(sentence_text)
+                    if sentence_emb:
+                        batch_similar = []
+                        for tm in tm_examples:
+                            if tm.id in seen_tm_ids:
+                                continue
+                            sim = embedding_service.calculate_cosine_similarity(sentence_emb, tm.embedding)
+                            if sim >= 0.80:
+                                batch_similar.append((sim, tm))
+                        # Uzimamo do 2 najsličnija za svaku rečenicu da ne opteretimo prompt
+                        batch_similar = sorted(batch_similar, key=lambda x: x[0], reverse=True)[:2]
+                        for sim, tm in batch_similar:
+                            seen_tm_ids.add(tm.id)
+                            rag_context_lines.append(f'- ENG: "{tm.source_text}" -> SRB: "{tm.target_text}" (sličnost: {sim:.2f})')
+            except Exception as e:
+                print(f"[TRANSLATOR RAG ERROR] Greška u RAG pretrazi: {e}", flush=True)
+
+        rag_context_str = ""
+        if rag_context_lines:
+            rag_context_str = "PRETHODNI PREVODI IZ KORISNIČKE MEMORIJE (RAG):\n" + "\n".join(rag_context_lines)
+
         # Formiranje prompta za prevođenje
         system_prompt = (
             "You are an expert video translation system. Translate the English transcript sentences to Serbian.\n"
@@ -361,10 +420,16 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             "8. STROGO ZABRANJENO: Nemoj generisati nikakvo razmišljanje, obrazloženje ili <think>/<thought> tagove. Samo odmah vrati JSON odgovor direktno.\n\n"
             "Respond strictly in JSON format matching the schema."
         )
+        if wiki_rules_str:
+            system_prompt += f"\n\n{wiki_rules_str}"
 
         user_prompt = (
             f"GLOBAL VIDEO SUMMARY FOR CONTEXT:\n{video_summary}\n\n"
             f"STRIKTNI PREDLOŽENI GLOSAR ZA OVAJ BATCH:\n{current_glossary_str}\n\n"
+        )
+        if rag_context_str:
+            user_prompt += f"{rag_context_str}\n\n"
+        user_prompt += (
             "SENTENCES TO TRANSLATE:\n"
             f"{batch_input_str}\n\n"
             "Translate each sentence, strictly respect the character limits, do NOT think or write <think>, and output the JSON object directly."

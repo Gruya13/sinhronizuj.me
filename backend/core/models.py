@@ -50,6 +50,8 @@ class User(Base):
 
     projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
     glossaries = relationship("Glossary", back_populates="user", cascade="all, delete-orphan")
+    translation_memories = relationship("TranslationMemory", back_populates="user", cascade="all, delete-orphan")
+    wiki_rules = relationship("WikiRule", back_populates="user", cascade="all, delete-orphan")
 
 class Project(Base):
     __tablename__ = "projects"
@@ -136,3 +138,30 @@ class Job(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project = relationship("Project", back_populates="jobs")
+
+class TranslationMemory(Base):
+    __tablename__ = "translation_memory"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    source_text = Column(String, nullable=False)
+    target_text = Column(String, nullable=False)
+    embedding = Column(JSON, nullable=True) # Lista float-ova za kosinusnu sličnost
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="translation_memories")
+    project = relationship("Project")
+
+class WikiRule(Base):
+    __tablename__ = "wiki_rules"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    category = Column(String, default="general")
+    is_global = Column(Boolean, default=False, server_default="false")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="wiki_rules")

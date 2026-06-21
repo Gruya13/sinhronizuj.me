@@ -43,6 +43,7 @@ from backend.routes.projects import router as projects_router
 from backend.routes.segments import router as segments_router
 from backend.routes.admin import router as admin_router
 from backend.routes.system import router as system_router
+from backend.routes.wiki import router as wiki_router
 
 # Registrujemo rute
 app.include_router(auth_router)
@@ -50,6 +51,7 @@ app.include_router(projects_router)
 app.include_router(segments_router)
 app.include_router(admin_router)
 app.include_router(system_router)
+app.include_router(wiki_router)
 
 @app.get("/")
 def read_root():

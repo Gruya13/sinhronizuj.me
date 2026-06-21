@@ -454,7 +454,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             translation_result = translate_segments(
                 optimized_segments,
                 video_path=stable_video_path,
-                progress_callback=lambda detail: update_progress(detail=detail)
+                progress_callback=lambda detail: update_progress(detail=detail),
+                project_id=project_id
             )
             if translation_result["status"] == "error": 
                 return translation_result
@@ -1021,7 +1022,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                         segments_to_retranslate,
                         video_path=local_video_path,
                         progress_callback=None,
-                        user_avg_speedup=user_avg_speedup
+                        user_avg_speedup=user_avg_speedup,
+                        project_id=project_id
                     )
                     
                     if retrans_res["status"] != "error":
@@ -1375,7 +1377,8 @@ def learn_user_glossary_task(user_id: str, original: str, old_translated: str, n
     try:
         from backend.worker.utils import call_modal_endpoint
         from backend.core.database import SessionLocal
-        from backend.core.models import Glossary
+        from backend.core.models import Glossary, TranslationMemory
+        from backend.services.embedding import embedding_service
         import json
         
         res = call_modal_endpoint(url=url, payload=payload)
@@ -1389,13 +1392,13 @@ def learn_user_glossary_task(user_id: str, original: str, old_translated: str, n
         if isinstance(data, dict) and data:
             db = SessionLocal()
             try:
+                # 1. Učenje pojedinačnih reči za glosar
                 for eng, srb in data.items():
                     if not eng or not srb:
                         continue
                     eng_clean = eng.strip().lower()
                     srb_clean = srb.strip().lower()
                     
-                    # Provera da li već postoji taj par za korisnika
                     existing = db.query(Glossary).filter(
                         Glossary.user_id == user_id,
                         Glossary.source_word == eng_clean
@@ -1410,6 +1413,28 @@ def learn_user_glossary_task(user_id: str, original: str, old_translated: str, n
                             target_word=srb_clean
                         )
                         db.add(new_g)
+                
+                # 2. Učenje cele rečenice u Translation Memory (RAG)
+                emb = embedding_service.get_embedding(original)
+                if emb:
+                    existing_tm = db.query(TranslationMemory).filter(
+                        TranslationMemory.user_id == user_id,
+                        TranslationMemory.source_text == original
+                    ).first()
+                    
+                    if existing_tm:
+                        existing_tm.target_text = new_translated
+                        existing_tm.embedding = emb
+                    else:
+                        new_tm = TranslationMemory(
+                            user_id=user_id,
+                            source_text=original,
+                            target_text=new_translated,
+                            embedding=emb
+                        )
+                        db.add(new_tm)
+                    print(f"[RAG LEARNING] Uspešno naučena rečenica u TM za korisnika {user_id}", flush=True)
+
                 db.commit()
                 print(f"[CROSS-PROJECT LEARNING] Uspešno naučeni termini za korisnika {user_id}: {data}", flush=True)
             except Exception as e:
