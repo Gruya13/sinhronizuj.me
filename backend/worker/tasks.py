@@ -630,8 +630,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "tts_path": None,
                 "tts_duration": None,
                 "status": "draft",
-                "qe_score": s.get("qe_score"),
-                "confidence_score": s.get("confidence_score", 5)
+                "qe_score": float(s.get("qe_score")) if s.get("qe_score") is not None else None,
+                "confidence_score": int(s.get("confidence_score", 5))
             })
             
         update_progress(completed_step="Diarizacija i vizuelna analiza završene", percentage=100)
@@ -700,8 +700,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                         tts_s3_key=None,
                         tts_duration=None,
                         status="draft",
-                        confidence_score=s.get("confidence_score", 5),
-                        qe_score=s.get("qe_score")
+                        confidence_score=int(s.get("confidence_score", 5)),
+                        qe_score=float(s.get("qe_score")) if s.get("qe_score") is not None else None
                     )
                     db.add(db_seg)
                 db.commit()
@@ -731,8 +731,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "tts_path": None,
                 "tts_duration": None,
                 "status": "draft",
-                "confidence_score": s.get("confidence_score", 5),
-                "qe_score": s.get("qe_score")
+                "confidence_score": int(s.get("confidence_score", 5)),
+                "qe_score": float(s.get("qe_score")) if s.get("qe_score") is not None else None
             })
             
         draft_data = {

@@ -145,3 +145,21 @@ Nakon završetka analize videa u Fazi 1, na frontendu se pojavljivao crveni bane
 
 ### Status
 Uspešno ispravljeno i verifikovano sintaksno.
+
+## 2026-06-21 (14:53 CET) — Kompletna ispravka numpy tipova (JSON serijalizacija) — Faza prevođenja
+
+### Problem
+Prvobitni fix (active_speaker.py) nije bio dovoljan. Greška `Object of type bool is not JSON serializable` se ponavljala tokom faze prevođenja videa (nakon ~10 minuta). Pravi uzrok je bio u više mesta:
+
+1. **`qe.py` → `get_comet_kiwi_score()`**: Funkcija `semantic_similarity()` koristi `np.dot()` koji vraća `numpy.float64`. Operacija `base_similarity - penalties` na liniji 150 čuva `numpy.float64` tip, a `max(0.0, min(1.0, numpy.float64))` i dalje vraća `numpy.float64`.
+2. **`qe.py` → `check_semantic_contradiction()`**: Poređenje `label_name == "contradiction"` moglo je da vrati implicitni tip koji nije čist Python `bool`.
+3. **`translate.py`**: `qe_score` se prosleđivao u segment dict bez konverzije.
+4. **`tasks.py`**: `qe_score` i `confidence_score` su se čuvali u Redis draft i DB bez eksplicitne konverzije.
+
+### Rešenje
+- **`qe.py`**: Dodat `float()` na povratnu vrednost `get_comet_kiwi_score()` i `bool()` na obe putanje u `check_semantic_contradiction()`.
+- **`translate.py`**: Dodat `float(qe_score)` u finalni segment dict (linija 780).
+- **`tasks.py`**: Dodate `float()` i `int()` konverzije za `qe_score` i `confidence_score` na sva 3 mesta gde se grade diktovi za processed_segments, DB upis i Redis keš.
+
+### Status
+Svi fajlovi kompajlirani uspešno. Čeka se testiranje na produkciji.

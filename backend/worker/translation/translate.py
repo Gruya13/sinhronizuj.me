@@ -777,7 +777,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     "text": t_text,
                     "original_text": s["text"],
                     "masks": single_masks,
-                    "qe_score": qe_score
+                    "qe_score": float(qe_score) if qe_score is not None else None
                 })
         
         # Inkrementiraj batch_start za obrađeni batch

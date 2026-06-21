@@ -81,9 +81,9 @@ def check_semantic_contradiction(original: str, translated: str) -> bool:
         id2label = getattr(config, "id2label", None) if config else None
         if id2label:
             label_name = id2label[max_idx].lower()
-            return label_name == "contradiction"
+            return bool(label_name == "contradiction")
         else:
-            return max_idx == 2
+            return bool(max_idx == 2)
     except Exception as e:
         print(f"[CROSS-ENCODER ERROR] Greška pri proveri kontradikcije: {e}", flush=True)
         return False
@@ -148,7 +148,7 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
         
     # Izračunavanje finalnog QE skora
     qe_score = base_similarity - penalties
-    return max(0.0, min(1.0, qe_score))
+    return float(max(0.0, min(1.0, qe_score)))
 
 def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = None) -> dict:
     """
