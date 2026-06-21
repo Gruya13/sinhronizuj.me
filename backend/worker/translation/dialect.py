@@ -27,9 +27,13 @@ def clean_thought_tags(text: str) -> str:
     return text.strip()
 
 
-def clean_translation_text(text: str) -> str:
+def clean_translation_text(text: str, qe_score: float = None) -> str:
     if not text:
         return text
+        
+    if qe_score is not None and qe_score >= 0.88:
+        from .transliter import to_latin
+        return to_latin(text)
     
     # 1. Padeži za Ej Aj
     text = re.sub(r'\bsa Ej Aj\b', 'sa Ej Ajem', text, flags=re.IGNORECASE)

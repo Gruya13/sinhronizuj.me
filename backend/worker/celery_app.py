@@ -38,11 +38,23 @@ celery_app.conf.update(
     },
 )
 
-# Zadatak 3: Celery Beat konfiguracija za čišćenje SSD-a (svake noći u 03:00)
+# Zadatak 3: Celery Beat konfiguracija
 celery_app.conf.beat_schedule = {
     "cleanup-old-files-nightly": {
         "task": "backend.worker.tasks.cleanup_old_files",
         "schedule": crontab(hour=3, minute=0),
+    },
+    "promote-pending-tm-every-4-hours": {
+        "task": "promote_pending_tm_task",
+        "schedule": crontab(minute=0, hour="*/4"),
+    },
+    "nightly-pattern-analysis": {
+        "task": "run_nightly_pattern_analysis_task",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    "deploy-lora-weekly": {
+        "task": "deploy_lora_task",
+        "schedule": crontab(day_of_week=0, hour=0, minute=0),
     },
 }
 

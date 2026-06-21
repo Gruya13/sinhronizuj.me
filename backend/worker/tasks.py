@@ -190,6 +190,24 @@ def get_redis_client():
     return redis.Redis.from_url(settings.REDIS_URL)
 
 @celery_app.task(
+    name="translate_segments_chunk_task",
+    acks_late=True,
+    time_limit=600
+)
+def translate_segments_chunk_task(segments: list, video_path: str, user_avg_speedup: float, skip_lektor: bool, skip_gating: bool, skip_deduplication: bool, project_id: str):
+    from backend.worker.translator import translate_segments
+    return translate_segments(
+        segments=segments,
+        video_path=video_path,
+        progress_callback=None,
+        user_avg_speedup=user_avg_speedup,
+        skip_lektor=skip_lektor,
+        skip_gating=skip_gating,
+        skip_deduplication=skip_deduplication,
+        project_id=project_id
+    )
+
+@celery_app.task(
     bind=True,
     name="analyze_video_task",
     acks_late=True,
@@ -450,13 +468,110 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 
         if not translation_result:
             update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Prevođenje i lektura teksta preko Qwen modela...")
-            from backend.worker.translator import translate_segments
-            translation_result = translate_segments(
-                optimized_segments,
-                video_path=stable_video_path,
-                progress_callback=lambda detail: update_progress(detail=detail),
-                project_id=project_id
-            )
+            
+            # Celery Paralelizacija (Chunking) na osnovu tišine
+            split_indices = None
+            if len(optimized_segments) >= 6:
+                try:
+                    start_time = optimized_segments[0]["start"]
+                    end_time = optimized_segments[-1]["end"]
+                    total_duration = end_time - start_time
+                    
+                    t1 = start_time + total_duration / 3.0
+                    t2 = start_time + 2.0 * total_duration / 3.0
+                    
+                    # Prozor pretrage oko 1/3 i 2/3 (npr. 1/6 trajanja sa svake strane)
+                    w = total_duration / 6.0
+                    
+                    best_i = -1
+                    max_gap1 = -1.0
+                    
+                    best_j = -1
+                    max_gap2 = -1.0
+                    
+                    for idx_s in range(len(optimized_segments) - 1):
+                        seg_end = optimized_segments[idx_s]["end"]
+                        next_start = optimized_segments[idx_s+1]["start"]
+                        gap = next_start - seg_end
+                        
+                        if t1 - w <= seg_end <= t1 + w:
+                            if gap > max_gap1:
+                                max_gap1 = gap
+                                best_i = idx_s
+                                
+                        if t2 - w <= seg_end <= t2 + w:
+                            if gap > max_gap2:
+                                max_gap2 = gap
+                                best_j = idx_s
+                                
+                    if best_i != -1 and best_j != -1 and best_i < best_j:
+                        split_indices = (best_i, best_j)
+                        print(f"[CHUNKING] Pronađeni split markeri: segmenti {best_i} i {best_j} (pauze: {max_gap1:.2f}s i {max_gap2:.2f}s)", flush=True)
+                except Exception as e:
+                    print(f"[CHUNKING WARNING] Greška pri računanju split markera: {e}", flush=True)
+
+            # Izvršavanje prevoda
+            if split_indices:
+                try:
+                    idx1, idx2 = split_indices
+                    chunk1 = optimized_segments[:idx1+1]
+                    chunk2 = optimized_segments[idx1+1:idx2+1]
+                    chunk3 = optimized_segments[idx2+1:]
+                    
+                    print(f"[CHUNKING] Pokrećem 3 paralelna Celery zadatka za chunks veličina: {len(chunk1)}, {len(chunk2)}, {len(chunk3)}", flush=True)
+                    
+                    from celery import group
+                    job = group(
+                        translate_segments_chunk_task.s(
+                            chunk1, stable_video_path, 1.0, False, False, False, project_id
+                        ),
+                        translate_segments_chunk_task.s(
+                            chunk2, stable_video_path, 1.0, False, False, False, project_id
+                        ),
+                        translate_segments_chunk_task.s(
+                            chunk3, stable_video_path, 1.0, False, False, False, project_id
+                        )
+                    )
+                    
+                    res_group = job.apply_async()
+                    group_outputs = res_group.get(timeout=600)
+                    
+                    merged_segments = []
+                    total_trans_dur = 0.0
+                    total_lek_dur = 0.0
+                    
+                    for out in group_outputs:
+                        if out.get("status") == "error":
+                            raise Exception(f"Pod-zadatak prevođenja vratio grešku: {out.get('message')}")
+                        merged_segments.extend(out.get("translated_segments", []))
+                        metrics = out.get("metrics", {})
+                        total_trans_dur += metrics.get("translator_duration", 0.0)
+                        total_lek_dur += metrics.get("lektor_duration", 0.0)
+                    
+                    merged_segments = sorted(merged_segments, key=lambda x: x["id"])
+                    
+                    translation_result = {
+                        "status": "success",
+                        "translated_segments": merged_segments,
+                        "metrics": {
+                            "translator_duration": total_trans_dur,
+                            "lektor_duration": total_lek_dur
+                        }
+                    }
+                    print(f"[CHUNKING SUCCESS] Uspešno spojen prevod. Ukupno segmenata: {len(merged_segments)}", flush=True)
+                except Exception as e:
+                    print(f"[CHUNKING ERROR] Greška u paralelnoj obradi, radim fallback na sekvencijalnu obradu: {e}", flush=True)
+                    translation_result = None
+
+            if not translation_result:
+                from backend.worker.translator import translate_segments
+                translation_result = translate_segments(
+                    optimized_segments,
+                    video_path=stable_video_path,
+                    progress_callback=lambda detail: update_progress(detail=detail),
+                    project_id=project_id
+                )
+                
             if translation_result["status"] == "error": 
                 return translation_result
             
@@ -514,7 +629,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "active_speaker": is_active,
                 "tts_path": None,
                 "tts_duration": None,
-                "status": "draft"
+                "status": "draft",
+                "qe_score": s.get("qe_score"),
+                "confidence_score": s.get("confidence_score", 5)
             })
             
         update_progress(completed_step="Diarizacija i vizuelna analiza završene", percentage=100)
@@ -582,7 +699,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                         active_speaker=s["active_speaker"],
                         tts_s3_key=None,
                         tts_duration=None,
-                        status="draft"
+                        status="draft",
+                        confidence_score=s.get("confidence_score", 5),
+                        qe_score=s.get("qe_score")
                     )
                     db.add(db_seg)
                 db.commit()
@@ -611,7 +730,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "active_speaker": s["active_speaker"],
                 "tts_path": None,
                 "tts_duration": None,
-                "status": "draft"
+                "status": "draft",
+                "confidence_score": s.get("confidence_score", 5),
+                "qe_score": s.get("qe_score")
             })
             
         draft_data = {
@@ -1444,3 +1565,118 @@ def learn_user_glossary_task(user_id: str, original: str, old_translated: str, n
                 db.close()
     except Exception as e:
         print(f"[CROSS-PROJECT LEARNING ERROR] Greška pri pozivu LLM-a: {e}", flush=True)
+
+@celery_app.task(
+    name="promote_pending_tm_task",
+    acks_late=True,
+    time_limit=1800
+)
+def promote_pending_tm_task():
+    from backend.core.database import SessionLocal
+    from backend.core.models import TranslationMemory, PendingTranslationMemory
+    from backend.services.embedding import embedding_service
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        pending_groups = db.query(
+            PendingTranslationMemory.user_id,
+            PendingTranslationMemory.source_text,
+            func.max(PendingTranslationMemory.target_text).label("target_text"),
+            func.max(PendingTranslationMemory.project_id).label("project_id"),
+            func.sum(PendingTranslationMemory.occurrence_count).label("total_occurrence")
+        ).group_by(
+            PendingTranslationMemory.user_id,
+            PendingTranslationMemory.source_text
+        ).having(
+            func.sum(PendingTranslationMemory.occurrence_count) >= 2
+        ).all()
+
+        promoted_count = 0
+        for group in pending_groups:
+            user_id = group.user_id
+            source_text = group.source_text
+            target_text = group.target_text
+            project_id = group.project_id
+
+            exists = db.query(TranslationMemory).filter(
+                TranslationMemory.user_id == user_id,
+                TranslationMemory.source_text == source_text
+            ).first()
+
+            if not exists:
+                emb = embedding_service.get_embedding(source_text)
+                tm_entry = TranslationMemory(
+                    user_id=user_id,
+                    project_id=project_id,
+                    source_text=source_text,
+                    target_text=target_text,
+                    embedding=emb,
+                    auto_approved=True
+                )
+                db.add(tm_entry)
+                promoted_count += 1
+                print(f"[ALPHA] Promovišem '{source_text}' -> '{target_text}' u glavnu TM tabelu za korisnika {user_id}", flush=True)
+            
+            db.query(PendingTranslationMemory).filter(
+                PendingTranslationMemory.user_id == user_id,
+                PendingTranslationMemory.source_text == source_text
+            ).delete()
+
+        db.commit()
+        print(f"[ALPHA SUCCESS] promote_pending_tm_task završen. Promovisano: {promoted_count}", flush=True)
+        return {"status": "success", "promoted_count": promoted_count}
+    except Exception as e:
+        db.rollback()
+        print(f"[ALPHA ERROR] Greška u promote_pending_tm_task: {e}", flush=True)
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
+@celery_app.task(
+    name="run_nightly_pattern_analysis_task",
+    acks_late=True,
+    time_limit=3600
+)
+def run_nightly_pattern_analysis_task():
+    from backend.worker.translation.pattern_miner import run_nightly_pattern_analysis
+    return run_nightly_pattern_analysis()
+
+@celery_app.task(
+    name="deploy_lora_task",
+    acks_late=True,
+    time_limit=14400
+)
+def deploy_lora_task(dry_run: bool = False):
+    from backend.worker.training.data_generator import run_data_generation
+    from backend.worker.training.train_lora import run_lora_training
+    import redis
+
+    print(f"[BLUE-GREEN DEPLOY] Započinjem proces generisanja podataka i LoRA finetuning-a (dry_run={dry_run})...", flush=True)
+    
+    data_res = run_data_generation()
+    if data_res.get("status") != "success":
+        print(f"[BLUE-GREEN DEPLOY ERROR] Generisanje podataka nije uspelo: {data_res.get('message')}", flush=True)
+        return data_res
+
+    if data_res.get("examples_generated", 0) == 0:
+        print("[BLUE-GREEN DEPLOY] Nema dovoljno primera za trening. Preskačem finetuning.", flush=True)
+        return {"status": "success", "message": "Nema primera za trening."}
+
+    train_res = run_lora_training(dry_run=dry_run)
+    if train_res.get("status") != "success":
+        print(f"[BLUE-GREEN DEPLOY ERROR] Trening nije uspeo: {train_res.get('message')}", flush=True)
+        return train_res
+
+    adapter_dir = train_res.get("adapter_dir", "/models/qwen3-32b-lora")
+    try:
+        r_client = redis.Redis.from_url(settings.REDIS_URL)
+        r_client.set("active_lora_path", adapter_dir)
+        print(f"[BLUE-GREEN DEPLOY SUCCESS] Novi adapter uspešno postavljen u Redis active_lora_path: {adapter_dir}", flush=True)
+        return {"status": "success", "active_lora_path": adapter_dir}
+    except Exception as redis_err:
+        print(f"[BLUE-GREEN DEPLOY ERROR] Greška pri upisu u Redis: {redis_err}", flush=True)
+        return {"status": "error", "message": f"Greška pri upisu u Redis: {redis_err}"}
+
+
+

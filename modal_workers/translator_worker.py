@@ -79,6 +79,7 @@ def serve():
         "--max-model-len", "16384",
         "--limit-mm-per-prompt", "image=10",
         "--enforce-eager",
+        "--enable-prefix-caching",
         "--disable-frontend-multiprocessing",
         "--disable-log-stats",
         "--host", "0.0.0.0",

@@ -100,6 +100,7 @@ class Segment(Base):
     needs_retranslation = Column(Boolean, default=False, server_default="false")
     actual_speed_factor = Column(Float, default=1.0, server_default="1.0")
     confidence_score = Column(Integer, default=5, server_default="5")
+    qe_score = Column(Float, nullable=True)
 
     project = relationship("Project", back_populates="segments")
 
@@ -148,6 +149,7 @@ class TranslationMemory(Base):
     source_text = Column(String, nullable=False)
     target_text = Column(String, nullable=False)
     embedding = Column(JSON, nullable=True) # Lista float-ova za kosinusnu sličnost
+    auto_approved = Column(Boolean, default=False, server_default="false")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="translation_memories")
@@ -157,7 +159,7 @@ class WikiRule(Base):
     __tablename__ = "wiki_rules"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     category = Column(String, default="general")
@@ -165,3 +167,17 @@ class WikiRule(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="wiki_rules")
+
+class PendingTranslationMemory(Base):
+    __tablename__ = "pending_translation_memory"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    source_text = Column(String, nullable=False)
+    target_text = Column(String, nullable=False)
+    occurrence_count = Column(Integer, default=1, server_default="1")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+    project = relationship("Project")

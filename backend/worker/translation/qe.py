@@ -55,15 +55,54 @@ def semantic_similarity(english_text: str, serbian_text: str) -> float:
         print(f"[EMBEDDING ERROR] Greška pri računanju semantičke sličnosti: {e}", flush=True)
         return 0.8  # Fallback
 
+_cross_encoder_model = None
+
+def get_cross_encoder_model():
+    global _cross_encoder_model
+    if _cross_encoder_model is None:
+        print("[EMBEDDING] Inicijalizujem symanto/xlm-roberta-base-snli-mnli CrossEncoder...", flush=True)
+        from sentence_transformers import CrossEncoder
+        _cross_encoder_model = CrossEncoder("symanto/xlm-roberta-base-snli-mnli")
+    return _cross_encoder_model
+
+def check_semantic_contradiction(original: str, translated: str) -> bool:
+    """
+    Koristi Cross-Encoder model za detekciju kontradikcija (suprotno značenje).
+    Vraća True ako postoji kontradikcija, inače False.
+    """
+    if not original or not translated:
+        return False
+    try:
+        model = get_cross_encoder_model()
+        scores = model.predict([(original, translated)])[0]
+        max_idx = int(scores.argmax())
+        
+        config = getattr(model.model, "config", None)
+        id2label = getattr(config, "id2label", None) if config else None
+        if id2label:
+            label_name = id2label[max_idx].lower()
+            return label_name == "contradiction"
+        else:
+            return max_idx == 2
+    except Exception as e:
+        print(f"[CROSS-ENCODER ERROR] Greška pri proveri kontradikcije: {e}", flush=True)
+        return False
+
 def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
     """
     Quality Estimation (QE) skor koji zamenjuje stari kosinusni gejting.
     Kombinuje semantičku sličnost (Sentence-Transformers) sa morfološkim,
     sintaksičkim i pravopisnim kaznenim poenima prilagođenim srpskim pravilima projekta.
+    Dodatno koristi Cross-Encoder za detekciju semantičkih kontradikcija.
     """
     if not english_text or not serbian_text:
         return 1.0
         
+    # 0. NLI Cross-Encoder provera kontradikcije
+    if check_semantic_contradiction(english_text, serbian_text):
+        print(f"[NLI CONTRADICTION] Detektovan semantički nesklad između: ENG: '{english_text}' -> SRB: '{serbian_text}'. QE score postavljen na 0.0", flush=True)
+        return 0.0
+
     # 1. Bazična semantička sličnost
     base_similarity = semantic_similarity(english_text, serbian_text)
     
@@ -113,7 +152,7 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
 
 def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = None) -> dict:
     """
-    Poziva Modal Lektor (Qwen) kao sudiju (LLM-as-a-Judge) da oceni kvalitet prevoda.
+    Poziva Modal Lektor (brzi Llama 3.1 8B) kao sudiju (LLM-as-a-Judge) da oceni kvalitet prevoda.
     Vraća rečnik sa ključevima: 'score' (float od 1.0 do 5.0), 'explanation' (str), 'errors' (list).
     """
     if not settings.MODAL_LEKTOR_URL:
@@ -149,7 +188,7 @@ def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = 
     )
 
     payload = {
-        "model": "qwen-lektor",
+        "model": "llama-8b",
         "messages": [
             {
                 "role": "system",
@@ -185,7 +224,7 @@ def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = 
         if not data:
             raise ValueError("Nije uspelo parsiranje niti popravljanje JSON-a sudije.")
             
-        print(f"[LLM JUDGE] Rezultat evaluacije: score={data.get('score')}, errors={data.get('errors')}, objašnjenje={data.get('explanation')}", flush=True)
+        print(f"[LLM JUDGE] Rezultat evaluacije (Llama 8B): score={data.get('score')}, errors={data.get('errors')}, objašnjenje={data.get('explanation')}", flush=True)
         return {
             "score": float(data.get("score", 5.0)),
             "explanation": data.get("explanation", ""),

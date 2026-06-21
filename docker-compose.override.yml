@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sinhronizuj_user -d sinhronizuj_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-1GjlbjEfc1Z8Dus1lWEQsOegDK9iGYNP}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

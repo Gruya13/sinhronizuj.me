@@ -1,3 +1,21 @@
+## [2026-06-21 10:45:00] Implementacija Perpetual Learning System-a i Optimizacija Performansi Prevođenja
+- **Opis:**
+  Refaktorisana je arhitektura prevođenja i implementiran je trostepeni sistem kontinuiranog učenja (Perpetual Learning System), uz značajne performansne i lingvističke optimizacije pipeline-a:
+  1. **Subagent Alpha (Real-time TM)**: Implementiran automatski upis visokokvalitetnih prevoda u bazu (Translation Memory za QE > 0.92 i Conf > 4.5, i Pending TM za QE > 0.85 i Conf > 3.5). Kreiran Celery task `promote_pending_tm_task` koji se izvršava svaka 4 sata i promoviše ponovljene prevode u glavnu TM tabelu.
+  2. **Subagent Beta (Dnevni Pattern Miner)**: Kreiran `pattern_miner.py` i Celery task koji noću pokreće DBSCAN klasterovanje loših prevoda (QE < 0.85) i generiše globalna Wiki pravila preko Qwen modela, upisujući ih u `wiki_rules` bazu.
+  3. **Subagent Gama (Nedeljni LoRA Fine-Tuner)**: Kreiran cevovod za generisanje sintetičkih podataka (`data_generator.py`) parafraziranjem "zlatnih" prevoda, skript za automatski trening (`train_lora.py`) na Modalu, i Blue-Green Redis mehanizam zamene adaptera u realnom vremenu preko ključa `active_lora_path` bez potrebe za restartom workera.
+  4. **Performansne i lingvističke optimizacije**:
+     - Povećan batch size sa 12 na 25 rečenica sa dinamičkom zaštitom od prekoračenja 4096 tokena.
+     - Implementiran mehanizam prevremenog izlaza (Early Exit) za Lektor fazu ako je QE >= 0.92 i prevod staje u TTS limit.
+     - Smanjena samokritička petlja sa 3 na maksimalno 2 pokušaja.
+     - Integrisan Llama 3.1 8B model kao sudija umesto Qwen3-32B za procenu kvaliteta (QE gating) i selekciju najboljeg rešenja kod Best-of-2 uzorkovanja.
+     - Ugrađen Cross-Encoder model za detekciju semantičkih kontradikcija na nivou rečenice (QE automatski pada na 0 u slučaju kontradikcije).
+     - Implementiran klizni prozor konteksta ("context_history") za očuvanje stilskog kontinuiteta na granicama batch-eva.
+     - Omogućen Automatic Prefix Caching (APC) u vLLM konfiguraciji na Modalu.
+     - Celery paralelizacija (chunking) transkripta na 3 dela na bazi detektovane tišine i paralelno izvršavanje.
+  5. **Verifikacija**: Kreiran je test fajl `tests/test_perpetual_learning.py` i uspešno su verifikovane sve komponente. Svi testovi uspešno prolaze.
+- **Status:** Uspešno implementirano, testirano i spremno za deploy.
+
 ## [2026-06-21 07:29:00] Ispravka naziva Docker slika za worker i beat servise (GHCR usklađivanje)
 - **Opis:**
   Ažurirani su preostali servisi (`worker-analyzer`, `worker-renderer`, `worker-default` i `beat`) u `infra/hetzner/docker-compose.prod.yml` da koriste ispravan naziv slike sa GHCR-a (`sinhronizuj.me-api` umesto `sinhronizuj-api`). Ovo je bilo neophodno jer je `docker compose pull` javljao grešku `not found` za staru sliku na preostalim servisima, čime je blokirao celokupno ažuriranje na produkciji.

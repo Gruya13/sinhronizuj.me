@@ -258,7 +258,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "translated_text": seg["text"],
                 "start": seg["start"],
                 "end": seg["end"],
-                "duration": duration
+                "duration": duration,
+                "qe_score": seg.get("qe_score", 0.0)
             })
             orig_to_unique_map[i] = unique_idx
         else:
@@ -335,6 +336,20 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             factor = calculate_dynamic_factor(seg, user_avg_speedup)
             limit_char = max(15, int(duration * factor), int(len(seg['orig_text']) * 0.75))
             
+            # Early exit za visoko kvalitetan prevod koji zadovoljava TTS limit
+            qe_score = seg.get("qe_score", 0.0)
+            translated_text = seg.get("translated_text", "")
+            if qe_score >= 0.92:
+                if len(translated_text) <= limit_char * 1.15:
+                    print(f"[LEKTOR EARLY EXIT] Preskačem Lektor za segment {global_idx} (qe_score: {qe_score:.3f}, len: {len(translated_text)} <= limit: {limit_char * 1.15:.1f})", flush=True)
+                    parsed_lektor_dict[global_idx] = translated_text
+                    continue
+                else:
+                    print(f"[LEKTOR EARLY EXIT COMPRESS] qe_score: {qe_score:.3f} ali len: {len(translated_text)} > limit: {limit_char * 1.15:.1f}. Komprimujem...", flush=True)
+                    compressed = compress_sentence_via_llm(translated_text, limit_char)
+                    parsed_lektor_dict[global_idx] = compressed
+                    continue
+            
             # Maskiramo pre slanja lektoru radi zaštite entiteta
             masked_orig, _ = mask_untranslatable(seg['orig_text'])
             masked_trans, masks = mask_untranslatable(to_latin(seg['translated_text']))
@@ -343,7 +358,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             lektor_input += f"[seg-{global_idx}] (trajanje: {duration:.1f}s, LIMIT: {limit_char} karaktera) ENG: {masked_orig} | SRB: {masked_trans}\n"
             
         if not lektor_input.strip():
-            print(f"[LEKTOR] Svi segmenti u batch-u {batch_idx + 1} su mikro-segmenti. Preskačem API poziv.", flush=True)
+            print(f"[LEKTOR] Svi segmenti u batch-u {batch_idx + 1} su obrađeni (early exit ili mikro-segmenti). Preskačem API poziv.", flush=True)
             continue
             
         # Klizni prozor konteksta za lektora
@@ -367,7 +382,8 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
             )
 
         lektor_prompt = (
-            "Ti si glavni urednik i lektor za srpski jezik. Pregledaj grubi prevod (SRB) u odnosu na original (ENG) i trajanje segmenta, ispravi greške i vrati tečan srpski prevod na ekavici i latinici.\n\n"
+            "Ti si glavni urednik i lektor za srpski jezik. Pregledaj grubi prevod (SRB) u odnosu na original (ENG) i trajanje segmenta, ispravi greške i vrati tečan srpski prevod na ekavici i latinici.\n"
+            "Prevodi kao da si iskusni sinhronizator. Rečenice neka zvuče kao da ih izgovara profesionalni voditelj emisije ili narator, a ne profesor lingvistike. Koristi kolokvijalne i prirodne fraze gde god je to adekvatno (npr. 'naravno' umesto 'prirodno', 'evo' umesto 'ovde'), prilagođavajući red reči duhu srpskog govornog jezika.\n\n"
             "VAŽNO: STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah vrati JSON odgovor direktno.\n\n"
             f"{history_section}"
             "PRAVILA ZA UREĐIVANJE:\n"
@@ -403,7 +419,7 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Ti si glavni urednik i lektor za srpski jezik. Lekturiši grubi prevod i vrati isključivo validan JSON prema šemi. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Odmah vrati JSON."
+                        "content": "Ti si glavni urednik i lektor za srpski jezik. Lekturiši grubi prevod i vrati isključivo validan JSON prema šemi. Prevodi kao da si iskusni sinhronizator. Rečenice neka zvuče kao da ih izgovara profesionalni voditelj emisije ili narator, a ne profesor lingvistike. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Odmah vrati JSON."
                     },
                     {
                         "role": "user",
@@ -577,14 +593,14 @@ def lektor_segments(original_segments, translated_segments, progress_callback=No
         if "text" in seg:
             seg["text"] = unmask_text(seg["text"], seg.get("masks", {}))
             seg["text"] = to_latin(seg["text"])
-            seg["text"] = clean_translation_text(seg["text"])
+            seg["text"] = clean_translation_text(seg["text"], qe_score=seg.get("qe_score"))
             
             # Leak guard check
             leak = LEAK_PATTERN.search(seg["text"])
             if leak:
                 import logging
                 logging.error(f"[LEAK] Dijalekat procurio u finalni izlaz seg {seg.get('id')}: '{leak.group(0)}' u '{seg['text']}'")
-                seg["text"] = clean_translation_text(to_latin(seg["text"]))
+                seg["text"] = clean_translation_text(to_latin(seg["text"]), qe_score=seg.get("qe_score"))
             
     return {
         "status": "success", 

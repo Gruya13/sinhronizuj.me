@@ -124,6 +124,59 @@ def split_translated_text(translated_text: str, original_segments: list) -> list
         
     return parts
 
+def select_best_translation_via_llama(english_text: str, candidates: List[str]) -> str:
+    """
+    Poziva Llama 3.1 8B da izabere prirodniji i tačniji prevod od ponuđenih kandidata.
+    """
+    if not settings.MODAL_LEKTOR_URL or not candidates:
+        return candidates[0] if candidates else ""
+    if len(candidates) == 1:
+        return candidates[0]
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    
+    prompt = (
+        "Ti si stručni žiri i sudija za srpski jezik (ekavica, latinica).\n"
+        "Tvoj zadatak je da odabereš bolji, prirodniji i tačniji prevod sa engleskog na srpski.\n\n"
+        f"Originalni engleski tekst: \"{english_text}\"\n"
+        f"Kandidat A: \"{candidates[0]}\"\n"
+        f"Kandidat B: \"{candidates[1]}\"\n\n"
+        "Uputstvo za odabir:\n"
+        "- Izaberi onaj prevod koji zvuči prirodnije, tečnije i naratorski na srpskom jeziku.\n"
+        "- Odabrani prevod mora poštovati sva stilska pravila (brojevi slovima, bez ijekavice, latinica).\n"
+        "- Vrati ISKLJUČIVO odabrani srpski tekst prevoda direktno, bez ikakvih uvodnih reči, navodnika, obrazloženja ili objašnjenja.\n"
+        "- STROGO ZABRANJENO: Nemoj pisati <think> ili <thought> tagove i bilo kakvo razmišljanje. Odmah ispiši odabrani prevod."
+    )
+    
+    payload = {
+        "model": "llama-8b",
+        "messages": [
+            {
+                "role": "system",
+                "content": "Ti si sudija za odabir najboljeg srpskog prevoda. Vrati isključivo odabrani prevod direktno."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1000
+    }
+    
+    try:
+        from backend.worker.translator import call_modal_endpoint
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=45)
+        selected = res["choices"][0]["message"]["content"].strip().strip('"\'')
+        cleaned = clean_thought_tags(selected).strip()
+        print(f"[LLAMA SELECT BEST] Između '{candidates[0]}' i '{candidates[1]}', Llama 8B je izabrao: '{cleaned}'", flush=True)
+        if cleaned:
+            return cleaned
+    except Exception as e:
+        print(f"[LLAMA SELECT ERROR] Greška pri odabiru prevoda: {e}", flush=True)
+        
+    return candidates[0]
+
 def retranslate_with_self_critique(english_text: str, bad_translation: str, feedback_hint: str) -> str:
     if not settings.MODAL_LEKTOR_URL:
         return bad_translation
@@ -156,18 +209,26 @@ def retranslate_with_self_critique(english_text: str, bad_translation: str, feed
                 "content": prompt
             }
         ],
-        "temperature": 0.2,
+        "temperature": 0.3,
+        "n": 2,
         "max_tokens": 1500
     }
     
     try:
         from backend.worker.translator import call_modal_endpoint
         res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
-        content = res["choices"][0]["message"]["content"].strip()
-        cleaned = clean_thought_tags(content).strip().strip('"\'')
-        if cleaned:
-            print(f"[SELF-CRITIQUE SUCCESS] Prethodni: {bad_translation} -> Novi: {cleaned}", flush=True)
-            return cleaned
+        choices = res.get("choices", [])
+        candidates = []
+        for choice in choices:
+            c_text = choice["message"]["content"].strip()
+            cleaned = clean_thought_tags(c_text).strip().strip('"\'')
+            if cleaned:
+                candidates.append(cleaned)
+                
+        if candidates:
+            best_translation = select_best_translation_via_llama(english_text, candidates)
+            print(f"[SELF-CRITIQUE SUCCESS] Prethodni: {bad_translation} -> Izabrani: {best_translation}", flush=True)
+            return best_translation
     except Exception as e:
         print(f"[SELF-CRITIQUE ERROR] Greška prilikom re-prevoda sa samokritikom: {e}", flush=True)
         
@@ -331,18 +392,58 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         "required": ["segments"]
     }
 
-    # 2. Prevođenje u batch-ovima (batch size = 12 rečenica)
-    batch_size = 12
+    # 2. Prevođenje u batch-ovima (batch size = 25 rečenica, sa dinamičkim smanjenjem ako premaši tokene)
+    batch_size = 25
     final_segments = []
     
     # Mapiramo maske za rečenice kako bismo znali kako da ih odmaskiramo
     batch_masks_map = {}
 
-    for batch_start in range(0, len(grouped_sentences), batch_size):
-        batch_end = min(batch_start + batch_size, len(grouped_sentences))
+    batch_start = 0
+    while batch_start < len(grouped_sentences):
+        # Očuvanje konteksta preko sliding window-a (poslednje 2 rečenice iz prethodnog batch-a)
+        context_history_str = ""
+        if batch_start > 0:
+            history_sentences = []
+            for prev_group in grouped_sentences[max(0, batch_start - 2):batch_start]:
+                prev_sent = " ".join([s["text"].strip() for s in prev_group if s.get("text")])
+                history_sentences.append(prev_sent)
+            context_history_str = "CONTEXT_HISTORY (READ-ONLY, DO NOT TRANSLATE):\n" + "\n".join([f"- {s}" for s in history_sentences])
+
+        # Dinamičko prilagođavanje veličine batch-a da se ne prekorači 4096 tokena (~15000 karaktera)
+        current_batch_size = batch_size
+        while current_batch_size > 1:
+            batch_end = min(batch_start + current_batch_size, len(grouped_sentences))
+            batch = grouped_sentences[batch_start:batch_end]
+            
+            # Formiranje testnog unosa za batch rečenica
+            formatted_batch_list = []
+            for i, group in enumerate(batch):
+                global_idx = batch_start + i
+                sentence_text = " ".join([s["text"].strip() for s in group if s.get("text")])
+                masked_text, _ = mask_untranslatable(sentence_text)
+                char_limit = 0
+                for s in group:
+                    duration = s["end"] - s["start"]
+                    char_limit += int(duration * calculate_dynamic_factor(s, user_avg_speedup))
+                char_limit = max(15, char_limit)
+                formatted_batch_list.append(f"[Sentence {global_idx}] (Limit: {char_limit} karaktera) ENG: {masked_text}")
+            batch_input_str = "\n".join(formatted_batch_list)
+            
+            # Procena dužine celog prompta
+            test_prompt_len = len(context_history_str) + len(batch_input_str) + len(video_summary) + len(dynamic_glossary_str)
+            if test_prompt_len < 14000:
+                break
+            else:
+                # Smanjujemo batch size za pola ako je prompt predugačak
+                new_size = max(1, current_batch_size // 2)
+                print(f"[TRANSLATOR WARNING] Prompt je predugačak ({test_prompt_len} karaktera). Smanjujem sub-batch sa {current_batch_size} na {new_size}", flush=True)
+                current_batch_size = new_size
+
+        batch_end = min(batch_start + current_batch_size, len(grouped_sentences))
         batch = grouped_sentences[batch_start:batch_end]
         
-        print(f"[TRANSLATOR] Pokrećem batch rečenica od {batch_start} do {batch_end - 1}...", flush=True)
+        print(f"[TRANSLATOR] Pokrećem batch rečenica od {batch_start} do {batch_end - 1} (veličina batch-a: {len(batch)})...", flush=True)
         if progress_callback:
             progress_callback(detail=f"Prevodim rečenice {batch_start}-{batch_end - 1}... ⏳")
 
@@ -409,6 +510,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         # Formiranje prompta za prevođenje
         system_prompt = (
             "You are an expert video translation system. Translate the English transcript sentences to Serbian.\n"
+            "Prevodi kao da si iskusni sinhronizator. Rečenice neka zvuče kao da ih izgovara profesionalni voditelj emisije ili narator, a ne profesor lingvistike. Koristi kolokvijalne i prirodne fraze gde god je to adekvatno (npr. 'naravno' umesto 'prirodno', 'evo' umesto 'ovde'), prilagođavajući red reči duhu srpskog govornog jezika.\n"
             "STRICT RULES FOR SERBIAN TRANSLATION:\n"
             "1. Language & Script: Use standard Serbian language in Latin script.\n"
             "2. Dialect: Use strictly Serbian ekavica (e.g. 'deo', 'rešenje', 'promena', 'gde', 'uvek', 'sprečiti'). Do NOT use ijekavica or Croatian regionalisms.\n"
@@ -423,7 +525,10 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         if wiki_rules_str:
             system_prompt += f"\n\n{wiki_rules_str}"
 
-        user_prompt = (
+        user_prompt = ""
+        if context_history_str:
+            user_prompt += f"{context_history_str}\n\n"
+        user_prompt += (
             f"GLOBAL VIDEO SUMMARY FOR CONTEXT:\n{video_summary}\n\n"
             f"STRIKTNI PREDLOŽENI GLOSAR ZA OVAJ BATCH:\n{current_glossary_str}\n\n"
         )
@@ -442,10 +547,22 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.0,
+            "temperature": 0.2,
             "max_tokens": 2048,
             "guided_json": translator_schema
         }
+
+        # Provera active_lora_path iz Redisa za Blue-Green deployment
+        try:
+            import redis
+            r_client = redis.Redis.from_url(settings.REDIS_URL)
+            lora_bytes = r_client.get("active_lora_path")
+            if lora_bytes:
+                active_lora_path = lora_bytes.decode("utf-8")
+                payload["lora_path"] = active_lora_path
+                print(f"[BLUE-GREEN] Dodat active_lora_path u payload: {active_lora_path}", flush=True)
+        except Exception as e:
+            print(f"[BLUE-GREEN WARNING] Greška pri dobavljanju active_lora_path: {e}", flush=True)
 
         try:
             from backend.worker.translator import call_modal_endpoint
@@ -579,9 +696,9 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             
             print(f"[VALIDATION] Rečenica {global_idx}: Negation OK = {negation_ok}, CometKiwi QE Score = {qe_score:.3f}, LLM Judge Score = {judge_score:.1f}", flush=True)
             
-            # 3. Automatska re-prevod i samokritika petlja (Multi-turn Critique do 3 pokušaja)
+            # 3. Automatska re-prevod i samokritika petlja (Multi-turn Critique do 2 pokušaja)
             turn = 0
-            max_turns = 3
+            max_turns = 2
             while not skip_gating and (not negation_ok or (qe_score < 0.85 and judge_score < 4.0)) and turn < max_turns:
                 turn += 1
                 hints = []
@@ -659,8 +776,12 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                     "end": s["end"],
                     "text": t_text,
                     "original_text": s["text"],
-                    "masks": single_masks
+                    "masks": single_masks,
+                    "qe_score": qe_score
                 })
+        
+        # Inkrementiraj batch_start za obrađeni batch
+        batch_start += len(batch)
 
     # Sortiranje finalnih segmenata po ID-u kako bi ostali u pravom redosledu
     final_segments = sorted(final_segments, key=lambda x: x["id"])
@@ -673,7 +794,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             for fs in final_segments:
                 unmasked = unmask_text(fs["text"], fs["masks"])
                 lat = to_latin(unmasked)
-                cleaned = clean_translation_text(lat)
+                cleaned = clean_translation_text(lat, qe_score=fs.get("qe_score"))
                 fs["text"] = cleaned
             return {
                 "status": "success",
@@ -685,7 +806,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             }
         
         from backend.worker.translator import lektor_segments
-        return lektor_segments(
+        res = lektor_segments(
             segments, 
             final_segments, 
             progress_callback=progress_callback, 
@@ -695,6 +816,71 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             user_avg_speedup=user_avg_speedup,
             skip_deduplication=skip_deduplication
         )
+        
+        # Subagent Alpha: Real-time "Tihi Konsenzus"
+        if res.get("status") == "success" and project_id:
+            try:
+                from backend.core.database import SessionLocal
+                from backend.core.models import TranslationMemory, PendingTranslationMemory, Project
+                from backend.services.embedding import embedding_service
+                
+                db = SessionLocal()
+                project_entry = db.query(Project).filter(Project.id == project_id).first()
+                if project_entry:
+                    user_id = project_entry.user_id
+                    for fs in res["translated_segments"]:
+                        final_text = fs.get("text", "")
+                        orig_text = fs.get("original_text", "")
+                        if not final_text or not orig_text:
+                            continue
+                        
+                        # Izračunavanje QE skora nad finalnim lekturisanim tekstom
+                        final_qe = get_comet_kiwi_score(orig_text, final_text)
+                        lektor_confidence = fs.get("confidence_score", 5)
+                        
+                        if final_qe > 0.92 and lektor_confidence > 4.5:
+                            # Provera da li već postoji u TranslationMemory
+                            exists = db.query(TranslationMemory).filter(
+                                TranslationMemory.user_id == user_id,
+                                TranslationMemory.source_text == orig_text
+                            ).first()
+                            if not exists:
+                                emb = embedding_service.get_embedding(orig_text)
+                                tm_entry = TranslationMemory(
+                                    user_id=user_id,
+                                    project_id=project_id,
+                                    source_text=orig_text,
+                                    target_text=final_text,
+                                    embedding=emb,
+                                    auto_approved=True
+                                )
+                                db.add(tm_entry)
+                                print(f"[ALPHA] Visok kvalitet (QE={final_qe:.3f}, Conf={lektor_confidence}). Direktan upis u TM: '{orig_text}' -> '{final_text}'", flush=True)
+                        elif final_qe > 0.85 and lektor_confidence > 3.5:
+                            # Upis u pending tabelu
+                            existing_pending = db.query(PendingTranslationMemory).filter(
+                                PendingTranslationMemory.user_id == user_id,
+                                PendingTranslationMemory.source_text == orig_text
+                            ).first()
+                            if existing_pending:
+                                existing_pending.occurrence_count += 1
+                                print(f"[ALPHA] Inkrementiram Pending TM occurrence_count za '{orig_text}': {existing_pending.occurrence_count}", flush=True)
+                            else:
+                                pending_entry = PendingTranslationMemory(
+                                    user_id=user_id,
+                                    project_id=project_id,
+                                    source_text=orig_text,
+                                    target_text=final_text,
+                                    occurrence_count=1
+                                )
+                                db.add(pending_entry)
+                                print(f"[ALPHA] Dodat u pending_translation_memory (QE={final_qe:.3f}, Conf={lektor_confidence}): '{orig_text}' -> '{final_text}'", flush=True)
+                db.commit()
+                db.close()
+            except Exception as e:
+                print(f"[ALPHA ERROR] Greška u Perpetual Learning Real-time upisu: {e}", flush=True)
+
+        return res
     except Exception as e:
         import traceback
         traceback.print_exc()
