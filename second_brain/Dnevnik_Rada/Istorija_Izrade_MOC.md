@@ -1,0 +1,35 @@
+# Istorija Izrade MOC (Dnevnik Rada)
+
+Ovaj dokument služi kao indeks svih izmena, implementacija i sesija razvoja na projektu **sinhronizuj.me**. Povezuje dnevne beleške i glavnu datoteku istorije razvoja.
+
+## Povezane Beleške
+*   [[00_MOC_Index]]
+*   [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md) – Glavna datoteka istorije projekta.
+
+---
+
+## 📅 Hronološki Pregled Implementacija
+
+### Jun 2026.
+
+#### [[2026-06-21 - Implementacija Perpetual Learning System-a i Optimizacija Performansi Prevođenja]]
+*   **Opis**: Refaktorisana je arhitektura prevođenja i implementiran je trostepeni sistem kontinuiranog učenja (Perpetual Learning System): Real-time TM (Subagent Alpha), Dnevni Pattern Miner (Subagent Beta) i Nedeljni LoRA Fine-Tuner (Subagent Gamma).
+*   **Performanse**: Uvećan `batch_size` na 25 rečenica, Lektor early exit, paralelizacija (chunking) i vLLM APC.
+*   **Optimizacije**: Definitivno rešenje za NumPy JSON serijalizaciju (monkey-patch na nivou importovanja).
+
+#### [[2026-06-21 - CI-CD Popravke i GHCR Usklađivanje]]
+*   **Opis**: Rešavanje Bandit SAST grešaka, dodavanje `.env` interpolacije za docker-compose na staging/production VPS-u i ispravke naziva Docker slika za worker i beat servise na GHCR.
+*   **Frontend**: Deblokiranje deploy pipeline-a i rešavanje Playwright E2E testova dodavanjem privremenog Vite `.env` fajla.
+
+#### [[2026-06-21 - Hibridni Model Prevođenja]]
+*   **Opis**: Implementacija i verifikacija RAG Translation Memory i LLM Wiki pravila. Integracija sentence-level re-segmentacije, multi-turn critique i LLM Judge gating-a.
+
+#### [[2026-06-20 - Poliranje Prevoda i Rešavanje Timeout-a]]
+*   **Opis**: Otklanjanje dijalektizama i čišćenje meta-odgovora modela (ti/vi obraćanje). Rešavanje Nginx 504 Gateway Timeout-a povećanjem timeout-a na 600s za dugotrajne TTS zahteve.
+
+---
+
+## ✍️ Pravila Ažuriranja Istorije
+Prilikom završetka svake programerske sesije, AI agent mora:
+1.  Upisati sažetak u glavnu datoteku [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md).
+2.  Kreirati novu detaljnu zabelešku u folderu `second_brain/Dnevnik_Rada/` i povezati je ovde pod hronološkim pregledom.

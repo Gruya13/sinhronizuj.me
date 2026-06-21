@@ -1,3 +1,14 @@
+## [2026-06-21 22:31:00] Kreiranje Obsidian Second Brain (Wiki) i smernica za AI agente
+- **Opis:**
+  Uspostavljen je Obsidian Second Brain (Wiki) sistem znanja u folderu `second_brain/` radi boljeg dokumentovanja arhitekture i funkcionalnosti projekta:
+  1. **Indeks i Smernice**: Kreiran je centralni `second_brain/00_MOC_Index.md` (Map of Content) i detaljno uputstvo za AI agente `second_brain/AI_Agent_Guidelines.md` sa pravilima za pretraživanje, linkovanje i ažuriranje Wiki-ja.
+  2. **Migracija dokumentacije**: Postojeća dokumentacija iz foldera `doc/` je migrirana, reorganizovana i obogaćena dvosmernim linkovima:
+     - `Arhitektura/Arhitektura_Sistema.md` i `Arhitektura/Baza_Podataka.md` (SQLAlchemy modeli i Alembic migracioni tok).
+     - `Funkcionalnosti/Audio_i_Video_Procesiranje.md`, `Funkcionalnosti/Backend.md`, `Funkcionalnosti/Frontend.md` i `Funkcionalnosti/Modal_Workers_i_AI.md`.
+     - `Rešavanje_Problema/Docker_i_Infrastruktura.md` i `Rešavanje_Problema/Česta_Pitanja_i_Bagovi.md` (baza rešenih grešaka uključujući NumPy 2.4.4 JSON issue).
+  3. **Hronologija rada**: Kreirana je stranica `second_brain/Dnevnik_Rada/Istorija_Izrade_MOC.md` za pregled dosadašnjih sesija razvoja.
+- **Status:** Uspešno kreirano, struktura povezana i spremno za dalji rad.
+
 ## [2026-06-21 10:45:00] Implementacija Perpetual Learning System-a i Optimizacija Performansi Prevođenja
 - **Opis:**
   Refaktorisana je arhitektura prevođenja i implementiran je trostepeni sistem kontinuiranog učenja (Perpetual Learning System), uz značajne performansne i lingvističke optimizacije pipeline-a:

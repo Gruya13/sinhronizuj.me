@@ -30,6 +30,8 @@ brave.txt
 !README.md
 !doc/**/*.md
 !doc/*.md
+!second_brain/**/*.md
+!second_brain/*.md
 doc/objasnjenje_glosara.md
 
 # Brainstorming i lokalni planovi
