@@ -46,10 +46,24 @@ jobs:
         cd frontend
         npx playwright install --with-deps chromium
 
+    - name: Kreiranje .env fajla za CI okruženje
+      run: |
+        echo "VITE_API_URL=http://localhost:8000" > frontend/.env
+
     - name: Pokretanje E2E testova (Playwright)
       run: |
         cd frontend
         npx playwright test
+      env:
+        CI: true
+
+    - name: Upload Playwright izveštaj pri neuspehu
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: frontend/playwright-report/
+        retention-days: 7
 
     - name: Build aplikacije
       run: |
