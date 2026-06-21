@@ -24,10 +24,46 @@ celery_app = Celery(
     include=["backend.worker.tasks"]
 )
 
+# Registracija custom JSON encoder-a koji konvertuje numpy tipove u Python native tipove.
+# Ovo sprečava "Object of type X is not JSON serializable" greške iz numpy/ML biblioteka.
+import json as _json
+
+class NumpySafeEncoder(_json.JSONEncoder):
+    def default(self, obj):
+        try:
+            import numpy as np
+            if isinstance(obj, np.integer):
+                return int(obj)
+            if isinstance(obj, np.floating):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        except ImportError:
+            pass
+        return super().default(obj)
+
+def _numpy_safe_dumps(obj):
+    return _json.dumps(obj, cls=NumpySafeEncoder)
+
+def _numpy_safe_loads(s):
+    return _json.loads(s)
+
+from kombu.serialization import register
+register(
+    'numpy-safe-json',
+    _numpy_safe_dumps,
+    _numpy_safe_loads,
+    content_type='application/json',
+    content_encoding='utf-8',
+)
+
 celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
+    task_serializer="numpy-safe-json",
+    accept_content=["json", "numpy-safe-json"],
+    result_serializer="numpy-safe-json",
+    event_serializer="numpy-safe-json",
     timezone="Europe/Belgrade",
     enable_utc=True,
     task_routes={

@@ -9,6 +9,26 @@ import re
 import time
 import threading
 import hashlib
+
+import numpy as np
+
+class NumpySafeEncoder(json.JSONEncoder):
+    """JSON encoder koji automatski konvertuje numpy tipove u Python native tipove."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+def safe_json_dumps(obj, **kwargs):
+    """json.dumps wrapper koji bezbedno serijalizuje numpy tipove."""
+    return json.dumps(obj, cls=NumpySafeEncoder, **kwargs)
+
 from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.config import Config
@@ -453,7 +473,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         # Provera keša za prevod
         video_hash = get_file_sha256(stable_video_path)
-        translation_hash = get_sha256_of_data(json.dumps(optimized_segments) + video_hash)
+        translation_hash = get_sha256_of_data(safe_json_dumps(optimized_segments) + video_hash)
         translation_cache_key = f"cache/translation/{translation_hash}.json"
         
         translation_result = None
@@ -587,7 +607,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             # Otpremamo u keš na S3
             local_trans_path = os.path.join(task_workspace, "translation_cache.json")
             with open(local_trans_path, "w", encoding="utf-8") as f:
-                json.dump(translation_result, f, ensure_ascii=False)
+                f.write(safe_json_dumps(translation_result, ensure_ascii=False))
             upload_file_to_s3(local_trans_path, settings.MINIO_BUCKET, translation_cache_key)
             if os.path.exists(local_trans_path):
                 os.remove(local_trans_path)
@@ -752,7 +772,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         }
         
         # Keširamo u Redisu
-        r_client.set(f"project:{effective_project_id}:draft", json.dumps(draft_data), ex=604800)
+        r_client.set(f"project:{effective_project_id}:draft", safe_json_dumps(draft_data), ex=604800)
         print(f"[CELERY TASK] Keširan draft u Redis: project:{effective_project_id}:draft", flush=True)
         
         # Ažuriramo metapodatke u projects:metadata HASH-u
@@ -764,7 +784,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "status": "ready",
                 "created_at": created_at_val
             }
-            r_client.hset("projects:metadata", project_id, json.dumps(meta_data))
+            r_client.hset("projects:metadata", project_id, safe_json_dumps(meta_data))
             
         return {
             "status": "success",
@@ -1332,14 +1352,14 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             "final_video_url": final_presigned_url,
             "created_at": created_at_val
         }
-        r_client.set(f"project:{project_id}:draft", json.dumps(project_data), ex=604800)
+        r_client.set(f"project:{project_id}:draft", safe_json_dumps(project_data), ex=604800)
         
         # Ažuriramo status projekta u metapodacima u Redisu
         meta_bytes = r_client.hget("projects:metadata", project_id)
         if meta_bytes:
             meta = json.loads(meta_bytes)
             meta["status"] = "completed"
-            r_client.hset("projects:metadata", project_id, json.dumps(meta))
+            r_client.hset("projects:metadata", project_id, safe_json_dumps(meta))
             
         # Ažuriranje završne faze u Job tabeli
         create_or_update_job(
@@ -1367,7 +1387,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             if meta_bytes:
                 meta = json.loads(meta_bytes)
                 meta["status"] = "ready"
-                r_client.hset("projects:metadata", project_id, json.dumps(meta))
+                r_client.hset("projects:metadata", project_id, safe_json_dumps(meta))
         except:
             pass
         return {"status": "error", "message": str(e)}

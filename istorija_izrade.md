@@ -161,5 +161,19 @@ Prvobitni fix (active_speaker.py) nije bio dovoljan. Greška `Object of type boo
 - **`translate.py`**: Dodat `float(qe_score)` u finalni segment dict (linija 780).
 - **`tasks.py`**: Dodate `float()` i `int()` konverzije za `qe_score` i `confidence_score` na sva 3 mesta gde se grade diktovi za processed_segments, DB upis i Redis keš.
 
+
 ### Status
-Svi fajlovi kompajlirani uspešno. Čeka se testiranje na produkciji.
+Delimično rešeno — problem se ponavljao jer numpy tipovi cure iz više izvora.
+
+## 2026-06-21 (22:07 CET) — Definitivno rešenje: NumpySafeEncoder za Celery i json.dumps
+
+### Problem
+Prethodna dva fixa (kastovanje u `active_speaker.py`, `qe.py`, `translate.py`, `tasks.py`) nisu bili dovoljni jer numpy tipovi (`numpy.float64`, `numpy.bool_`, `numpy.int64`) mogu da procure iz bilo kog ML modula (sentence-transformers, CrossEncoder, numpy operacije). Greška se javljala na segmentu 12/19 tokom prevođenja jer je Celery `self.update_state()` koristio standardni `json` serializer koji ne poznaje numpy tipove.
+
+### Rešenje — Univerzalno
+1. **`celery_app.py`**: Registrovan custom Kombu serializer `numpy-safe-json` koji koristi `NumpySafeEncoder` klasu. Celery sada koristi ovaj serializer za `task_serializer`, `result_serializer` i `event_serializer`. Automatski konvertuje `np.integer→int`, `np.floating→float`, `np.bool_→bool`, `np.ndarray→list`.
+2. **`tasks.py`**: Dodata `NumpySafeEncoder` klasa i `safe_json_dumps()` helper. Svi `json.dumps()` pozivi koji serijalizuju podatke sa numpy tipovima (Redis draft, translation cache, metadata) zamenjeni sa `safe_json_dumps()`.
+
+### Izmenjeni fajlovi
+- `backend/worker/celery_app.py` — Kombu custom serializer registracija
+- `backend/worker/tasks.py` — NumpySafeEncoder klasa + 7 zamenjenih json.dumps poziva
