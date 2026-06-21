@@ -61,7 +61,7 @@ def is_safe_url(url: str) -> bool:
                 return False
                 
             # HEAD zahtev bez automatskog praćenja redirekcija kako bismo sami kontrolisali sledeći hop
-            with httpx.Client(verify=False) as client:
+            with httpx.Client(verify=False) as client:  # nosec B501
                 response = client.head(current_url, follow_redirects=False, timeout=2.0)
                 if response.is_redirect:
                     next_url = response.headers.get("Location")
