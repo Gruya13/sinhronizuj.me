@@ -15,19 +15,37 @@ import numpy as np
 class NumpySafeEncoder(json.JSONEncoder):
     """JSON encoder koji automatski konvertuje numpy tipove u Python native tipove."""
     def default(self, obj):
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.floating):
             return float(obj)
-        if isinstance(obj, np.bool_):
-            return bool(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super().default(obj)
 
+def sanitize_for_json(obj):
+    """Rekurzivno konvertuje SVE numpy tipove u Python native tipove.
+    Koristi se pre upisa u SQLAlchemy JSON kolone i Redis jer
+    SQLAlchemy i Celery koriste sopstveni json.dumps koji ne zna za numpy."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
 def safe_json_dumps(obj, **kwargs):
     """json.dumps wrapper koji bezbedno serijalizuje numpy tipove."""
-    return json.dumps(obj, cls=NumpySafeEncoder, **kwargs)
+    return json.dumps(sanitize_for_json(obj), **kwargs)
 
 from datetime import datetime, timedelta, timezone
 import boto3
@@ -280,15 +298,15 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
     }
 
     def add_phase_cost(phase_id, name, gpu, duration, rate):
-        cost = duration * rate
+        cost = float(duration) * float(rate)
         progress_metadata['costs']['phases'][phase_id] = {
             "name": name,
             "gpu": gpu,
-            "duration_sec": round(duration, 2),
-            "cost_usd": round(cost, 5)
+            "duration_sec": round(float(duration), 2),
+            "cost_usd": round(float(cost), 5)
         }
         total = sum(p["cost_usd"] for p in progress_metadata['costs']['phases'].values())
-        progress_metadata['costs']['total_usd'] = round(total, 5)
+        progress_metadata['costs']['total_usd'] = round(float(total), 5)
 
     def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None):
         if step_name: progress_metadata['current_step'] = step_name
@@ -303,7 +321,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
-        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
+        self.update_state(task_id=task_id, state='PROGRESS', meta=sanitize_for_json(progress_metadata))
 
     vc_result = {}
     def run_vc_extraction(video_path):
@@ -697,7 +715,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 p_db.no_vocals_s3_key = no_vocals_key
                 p_db.visual_context_s3_key = visual_context_key
                 p_db.video_title = video_title
-                p_db.costs = progress_metadata["costs"]
+                p_db.costs = sanitize_for_json(progress_metadata["costs"])
                 p_db.status = "ready"
                 
                 # Brišemo stare segmente pre kreiranja novih
@@ -786,13 +804,13 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             }
             r_client.hset("projects:metadata", project_id, safe_json_dumps(meta_data))
             
-        return {
+        return sanitize_for_json({
             "status": "success",
             "project_id": effective_project_id,
             "visual_context_url": visual_context_url,
             "segments": redis_segments,
             "costs": progress_metadata["costs"]
-        }
+        })
         
     except Exception as e:
         import traceback
@@ -903,7 +921,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             progress_metadata['logs'].append(f"[{ts}] {detail}")
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
-        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
+        self.update_state(task_id=task_id, state='PROGRESS', meta=sanitize_for_json(progress_metadata))
 
     try:
         # --- PREUZIMANJE OSNOVNIH FAJLOVA SA S3 ---

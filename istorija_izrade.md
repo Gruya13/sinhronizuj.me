@@ -177,3 +177,19 @@ Prethodna dva fixa (kastovanje u `active_speaker.py`, `qe.py`, `translate.py`, `
 ### Izmenjeni fajlovi
 - `backend/worker/celery_app.py` — Kombu custom serializer registracija
 - `backend/worker/tasks.py` — NumpySafeEncoder klasa + 7 zamenjenih json.dumps poziva
+
+## 2026-06-21 (22:27 CET) — Root Cause: numpy 2.4.4 + sanitize_for_json + monkey-patch
+
+### Root Cause Analiza
+U **numpy 2.4.4**, `np.bool_.__name__` je `'bool'` (BEZ underscore), ali `issubclass(np.bool_, bool)` je `False`. Zato greška kaže "Object of type **bool** is not JSON serializable". Prethodna dva fixa (custom Kombu serializer) nisu radili jer Kombu registruje serializer sa istim `content_type='application/json'` što konflikira sa ugrađenim JSON serializer-om.
+
+SQLAlchemy JSON kolona (`costs = Column(JSON)`) koristi sopstveni json encoder nezavisan od Celery-ja, pa ni custom Kombu serializer ne pomaže.
+
+### Definitivno rešenje — Tri sloja zaštite
+1. **Globalni monkey-patch** (`celery_app.py`): `json.JSONEncoder.default` je patched na import nivou. SVE `json.dumps` pozive u celom procesu automatski podržavaju numpy tipove.
+2. **Rekurzivna sanitizacija** (`tasks.py`): Nova `sanitize_for_json()` funkcija rekurzivno prolazi kroz dict/list i konvertuje sve numpy tipove. Koristi se na:
+   - `self.update_state()` (Celery progress)
+   - `p_db.costs = ...` (SQLAlchemy JSON kolona)
+   - `return {...}` (Celery task rezultat)
+   - `safe_json_dumps()` (Redis cache)
+3. **Eksplicitne konverzije** u `add_phase_cost()`: `float(duration)`, `float(cost)`, `float(total)`.
