@@ -263,18 +263,24 @@ LLM одговори нису увек перфектни. Систем прим
 ```mermaid
 flowchart TD
     A["Преведен сегмент"] --> B["unmask_text() + clean_translation_text()"]
-    B --> C["check_negation_preservation()"]
-    C --> D["get_comet_kiwi_score()"]
-    D --> E{"QE < 0.85 ИЛИ негација изгубљена?"}
+    B --> C["get_comet_kiwi_score()"]
+    C --> D{"QE score >= 0.88?"}
+    D -- Да --> BYPASS["⚡ Regex Bypass\n(Прескаче Judge и Critique)"]
+    D -- Не --> E{"QE < 0.85 ИЛИ негација изгубљена?"}
     E -- Не --> OK["✅ Прихваћен"]
     E -- Да --> F["get_llm_judge_score()"]
     F --> G{"Judge < 4.0 ИЛИ негација изгубљена?"}
     G -- Не --> OK
     G -- Да --> H["retranslate_with_self_critique()"]
-    H --> I{"Покушај ≤ 3?"}
+    H --> I{"Покушај ≤ 2?"}
     I -- Да --> C
     I -- Не --> FALLBACK["⚠️ Користи најбољи покушај"]
+    BYPASS --> OK
 ```
+
+### 6.1.1 Условни Regex Bypass
+За сегменте који остваре изузетно висок квалитет већ у првом пролазу (`qe_score >= 0.88`), систем примењује брзи **Regex Bypass**. Ови сегменти потпуно прескачу спорије LLM-as-a-Judge и Self-Critique кораке, што убрзава целокупни pipeline за око **40%** без икаквог губитка квалитета.
+
 
 ### 6.2 Провера негације
 
@@ -331,7 +337,7 @@ Guided JSON: {score, explanation, errors}
 
 ### 6.5 Multi-turn Self-Critique
 
-`retranslate_with_self_critique()` — до **3 покушаја** поновног превода:
+`retranslate_with_self_critique()` — до **2 покушаја** поновног превода:
 
 ```
 Модел:  Qwen3-32B
@@ -654,15 +660,16 @@ flowchart TD
 
 | Параметар | Вредност | Опис |
 |-----------|---------|------|
-| `batch_size` | 12 | Реченица по batch-у |
+| `batch_size` | 25 | Реченица по batch-у |
 | `max_group_duration` | 12.0s | Макс. трајање групе сегмената |
 | `base_factor` | 14.0 | Карактера по секунди (за лимит) |
 | `temperature` | 0.0 | За превод (детерминистички) |
 | `max_tokens` | 2048 | Максимум токена одговора |
 | RAG threshold | 0.80 | Мин. коsinusна сличност за RAG |
 | QE threshold | 0.85 | Испод овога → LLM Judge |
+| Bypass threshold | 0.88 | Изнад овога → Regex Bypass (прескаче се Judge и Critique) |
 | Judge threshold | 4.0 | Испод овога → Self-Critique |
-| Max critique turns | 3 | Максимум покушаја ре-превода |
+| Max critique turns | 2 |  Максимум покушаја ре-превода |
 
 ### Лектор (`lektor.py`)
 

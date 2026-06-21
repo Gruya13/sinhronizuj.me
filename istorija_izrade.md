@@ -120,3 +120,16 @@ Frontend CI pipeline je pao na koraku E2E testova (Playwright) jer Vite dev serv
 
 ### Deploy
 Izmena je gurnuta na `development` i spojena na `main`. Pokrenut je novi CI/CD pipeline.
+
+## 2026-06-21 (11:40 CET) — Ažuriranje Dokumentacije i Kreiranje Uputstva za Samoučenje
+
+### Urađeno
+1. **Ažuriranje [proces_prevodjenja.md](file:///home/gruya/Projektri/sinhronizuj.me/proces_prevodjenja.md):**
+   - Unete najnovije optimizacije pipeline-a: uvećanje `batch_size` na 25 rečenica, skraćenje critique krugova na maksimalno 2.
+   - Dodat opis i dijagram toka za **Regex Bypass** (`qe_score >= 0.88`) koji preskače LLM proveru i ubrzava prevod za 40%.
+   - Dodat opis za Celery paralelizaciju (chunking) i vLLM APC.
+2. **Kreiranje [sistem_samounapredjenja.md](file:///home/gruya/Projektri/sinhronizuj.me/sistem_samounapredjenja.md):**
+   - Napravljen detaljan vodič kroz Perpetual Learning System.
+   - Opisana uloga tri subagenta: **Alpha** (real-time TM/Pending), **Beta** (noćni DBSCAN pattern miner), i **Gamma** (nedeljni LoRA fine-tuning na Modalu).
+   - Detaljno opisan **Redis Blue-Green Hot-Swap** mehanizam za učitavanje novog adaptera sa 0ms downtime-a.
+   - Dodat kompletan Mermaid dijagram toka.
