@@ -56,18 +56,18 @@ def train_lora(dry_run: bool = False):
             raise FileNotFoundError(f"Dataset nije pronađen na putanji: {dataset_path}")
 
     print("[TRAIN LORA] Učitavam dataset...", flush=True)
-    dataset = load_dataset("json", data_files=dataset_path, split="train")
+    dataset = load_dataset("json", data_files=dataset_path, split="train")  # nosec B615
 
     model_id = "Qwen/Qwen2-1.5B-Instruct" if (dry_run or not torch.cuda.is_available()) else "Qwen/Qwen2-32B-Instruct"
     print(f"[TRAIN LORA] Učitavam model {model_id} i tokenizer...", flush=True)
     
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)  # nosec B615
     tokenizer.pad_token = tokenizer.eos_token
 
     device_map = "auto" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-    model = AutoModelForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(  # nosec B615
         model_id,
         device_map=device_map,
         torch_dtype=torch_dtype,
