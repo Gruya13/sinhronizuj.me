@@ -96,7 +96,7 @@ services:
 
   # 5. Celery Radnik - Analizator
   worker-analyzer:
-    image: ghcr.io/gruya13/sinhronizuj-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/gruya13/sinhronizuj.me-api:${IMAGE_TAG:-latest}
     container_name: sinhronizuj-worker-analyzer
     command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q analyze_queue
     env_file:
@@ -126,7 +126,7 @@ services:
 
   # 6. Celery Radnik - Renderer
   worker-renderer:
-    image: ghcr.io/gruya13/sinhronizuj-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/gruya13/sinhronizuj.me-api:${IMAGE_TAG:-latest}
     container_name: sinhronizuj-worker-renderer
     command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q render_queue
     env_file:
@@ -156,7 +156,7 @@ services:
 
   # 7. Celery Radnik - Default
   worker-default:
-    image: ghcr.io/gruya13/sinhronizuj-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/gruya13/sinhronizuj.me-api:${IMAGE_TAG:-latest}
     container_name: sinhronizuj-worker-default
     command: celery -A backend.worker.tasks worker --loglevel=info --concurrency=1 -Q default_queue
     env_file:
@@ -186,7 +186,7 @@ services:
 
   # 8. Celery Beat (Periodični Poslovi)
   beat:
-    image: ghcr.io/gruya13/sinhronizuj-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/gruya13/sinhronizuj.me-api:${IMAGE_TAG:-latest}
     container_name: sinhronizuj-beat
     command: celery -A backend.worker.tasks beat --loglevel=info
     env_file:
