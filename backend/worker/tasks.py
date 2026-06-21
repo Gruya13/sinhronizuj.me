@@ -617,7 +617,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             voice_type = "male" if gender == "male" else "clone"
             
             # Detektujemo da li se usne pomeraju na ekranu (aktivan govornik)
-            is_active = is_speaker_active_on_screen(stable_video_path, s["start"], s["end"])
+            is_active = bool(is_speaker_active_on_screen(stable_video_path, s["start"], s["end"]))
             
             processed_segments.append({
                 "id": i,

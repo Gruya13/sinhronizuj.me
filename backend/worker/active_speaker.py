@@ -106,6 +106,6 @@ def is_speaker_active_on_screen(video_path: str, start_time: float, end_time: fl
         # Ako je manje, usne su statične (mirne ili zatvorene).
         is_active = variance > 0.0015
         print(f"[ACTIVE SPEAKER] Varijansa usana: {variance:.5f} (lice na {face_presence_ratio:.1%} slika) -> Aktivan govornik: {is_active}")
-        return is_active
+        return bool(is_active)
 
     return False

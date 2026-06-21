@@ -133,3 +133,15 @@ Izmena je gurnuta na `development` i spojena na `main`. Pokrenut je novi CI/CD p
    - Opisana uloga tri subagenta: **Alpha** (real-time TM/Pending), **Beta** (noćni DBSCAN pattern miner), i **Gamma** (nedeljni LoRA fine-tuning na Modalu).
    - Detaljno opisan **Redis Blue-Green Hot-Swap** mehanizam za učitavanje novog adaptera sa 0ms downtime-a.
    - Dodat kompletan Mermaid dijagram toka.
+
+## 2026-06-21 (12:05 CET) — Ispravka JSON serijalizacije pri završetku analize videa (Active Speaker)
+
+### Problem
+Nakon završetka analize videa u Fazi 1, na frontendu se pojavljivao crveni baner sa greškom `Object of type bool is not JSON serializable`. Uzrok je bio u funkciji `is_speaker_active_on_screen` u [active_speaker.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/active_speaker.py) koja je kao rezultat detekcije govornika na ekranu vraćala NumPy boolean tip (`numpy.bool_`), nastao poređenjem varijanse otvorenosti usana (`variance > 0.0015`). Celery i standardni Python `json.dumps()` ne mogu da serijalizuju ovaj tip prilikom keširanja nacrta projekta u Redis i slanja rezultata Celery zadatka klijentu.
+
+### Rešenje
+- Izmenjena je povratna vrednost u [active_speaker.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/active_speaker.py) tako što je povratna promenljiva eksplicitno kastovana u standardni Python `bool`: `return bool(is_active)`.
+- Dodata je još jedna sigurnosna konverzija prilikom preuzimanja rezultata u Celery zadatku `analyze_video_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py): `is_active = bool(is_speaker_active_on_screen(...))`.
+
+### Status
+Uspešno ispravljeno i verifikovano sintaksno.
