@@ -188,8 +188,17 @@ SQLAlchemy JSON kolona (`costs = Column(JSON)`) koristi sopstveni json encoder n
 ### Definitivno rešenje — Tri sloja zaštite
 1. **Globalni monkey-patch** (`celery_app.py`): `json.JSONEncoder.default` je patched na import nivou. SVE `json.dumps` pozive u celom procesu automatski podržavaju numpy tipove.
 2. **Rekurzivna sanitizacija** (`tasks.py`): Nova `sanitize_for_json()` funkcija rekurzivno prolazi kroz dict/list i konvertuje sve numpy tipove. Koristi se na:
-   - `self.update_state()` (Celery progress)
    - `p_db.costs = ...` (SQLAlchemy JSON kolona)
    - `return {...}` (Celery task rezultat)
    - `safe_json_dumps()` (Redis cache)
 3. **Eksplicitne konverzije** u `add_phase_cost()`: `float(duration)`, `float(cost)`, `float(total)`.
+
+## 2026-06-21 (22:53 CET) — Fix TimeLimitExceeded + performance optimizacija
+
+### Problem
+Nakon što je JSON serijalizacija ispravljena, task konačno prolazi dalje ali udara u `TimeLimitExceeded(1200)` — task prekoračuje 20-minutni time limit. Uzrok: `sanitize_for_json(progress_metadata)` se pozivao na SVAKOM `update_progress()` pozivu (deseci puta po segmentu) što je drastično usporavalo izvršavanje.
+
+### Rešenje
+1. Povećan `time_limit` za `analyze_video_task` sa 1200s (20 min) na **2400s (40 min)**, `soft_time_limit` na 2300s.
+2. Uklonjen `sanitize_for_json` iz `update_progress()` — monkey-patch u `celery_app.py` već globalno hvata numpy tipove u `json.JSONEncoder.default`, pa je dupla sanitizacija nepotrebna.
+3. `sanitize_for_json` ostaje samo na kritičnim upis tačkama: SQLAlchemy `p_db.costs`, Redis `safe_json_dumps`, i Celery `return` dict.

@@ -254,8 +254,8 @@ def translate_segments_chunk_task(segments: list, video_path: str, user_avg_spee
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=300,
-    time_limit=1200,
-    soft_time_limit=1100,
+    time_limit=2400,
+    soft_time_limit=2300,
     on_failure=handle_task_failure,
     on_success=handle_task_success
 )
@@ -321,7 +321,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
-        self.update_state(task_id=task_id, state='PROGRESS', meta=sanitize_for_json(progress_metadata))
+        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
 
     vc_result = {}
     def run_vc_extraction(video_path):
@@ -921,7 +921,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             progress_metadata['logs'].append(f"[{ts}] {detail}")
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
-        self.update_state(task_id=task_id, state='PROGRESS', meta=sanitize_for_json(progress_metadata))
+        self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
 
     try:
         # --- PREUZIMANJE OSNOVNIH FAJLOVA SA S3 ---
