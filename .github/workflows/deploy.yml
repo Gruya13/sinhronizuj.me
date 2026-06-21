@@ -92,6 +92,7 @@ jobs:
           # Osiguravanje da smo na pravoj grani i povlačenje koda
           git checkout development
           git pull origin development
+          cp .env infra/hetzner/.env
           
           # Login na GHCR na serveru
           if [ ! -z "$GHCR_READ_TOKEN" ]; then
@@ -131,6 +132,7 @@ jobs:
           # Osiguravanje da smo na pravoj grani i povlačenje koda
           git checkout main
           git pull origin main
+          cp .env infra/hetzner/.env
           
           # Login na GHCR na serveru
           if [ ! -z "$GHCR_READ_TOKEN" ]; then
