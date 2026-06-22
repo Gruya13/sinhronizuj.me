@@ -155,16 +155,29 @@ class Wav2LipWorker:
                     save_job(job_id, {"status": "failed", "error": "Izlazni video nije generisan."})
                     return
                     
-                with open(output_path, "rb") as f:
-                    output_b64 = base64.b64encode(f.read()).decode('utf-8')
-                    
-                save_job(job_id, {
-                    "status": "completed",
-                    "result": {
-                        "status": "success",
-                        "video_base64": output_b64
-                    }
-                })
+                result_upload_url = data.get("result_upload_url")
+                if result_upload_url:
+                    with open(output_path, "rb") as f:
+                        resp = requests.put(result_upload_url, data=f, headers={"Content-Type": "video/mp4"}, timeout=300)
+                        resp.raise_for_status()
+                    save_job(job_id, {
+                        "status": "completed",
+                        "result": {
+                            "status": "success",
+                            "uploaded": True
+                        }
+                    })
+                else:
+                    with open(output_path, "rb") as f:
+                        output_b64 = base64.b64encode(f.read()).decode('utf-8')
+                        
+                    save_job(job_id, {
+                        "status": "completed",
+                        "result": {
+                            "status": "success",
+                            "video_base64": output_b64
+                        }
+                    })
             except Exception as e:
                 save_job(job_id, {"status": "failed", "error": str(e)})
             finally:
@@ -250,13 +263,23 @@ class Wav2LipWorker:
                 if not os.path.exists(output_path):
                     return {"error": "Izlazni video nije generisan."}
                     
-                with open(output_path, "rb") as f:
-                    output_b64 = base64.b64encode(f.read()).decode('utf-8')
-                    
-                return {
-                    "status": "success",
-                    "video_base64": output_b64
-                }
+                result_upload_url = data.get("result_upload_url")
+                if result_upload_url:
+                    with open(output_path, "rb") as f:
+                        resp = requests.put(result_upload_url, data=f, headers={"Content-Type": "video/mp4"}, timeout=300)
+                        resp.raise_for_status()
+                    return {
+                        "status": "success",
+                        "uploaded": True
+                    }
+                else:
+                    with open(output_path, "rb") as f:
+                        output_b64 = base64.b64encode(f.read()).decode('utf-8')
+                        
+                    return {
+                        "status": "success",
+                        "video_base64": output_b64
+                    }
             except Exception as e:
                 return {"error": str(e)}
             finally:

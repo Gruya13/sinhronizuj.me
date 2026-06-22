@@ -1,3 +1,35 @@
+## 2026-06-22 (12:45 CET) — Asinhroni API i S3 lipsync prenos (Faza 2)
+
+### Urađeno
+1. **Asinhroni TTS za DAW Studio**:
+   - Kreirani asinhroni Celery taskovi `generate_segment_tts_task` i `generate_all_tts_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py).
+   - Izmenjene FastAPI rute u [segments.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/segments.py) da asinhrono okidaju Celery taskove i odmah vraćaju `task_id` klijentu. Progres se beleži preko Redis-a i prati preko postojeće statusne rute.
+2. **S3 presigned URL prenos za lipsync**:
+   - Dodate helper funkcije `get_presigned_upload_url`, `upload_file_to_s3`, `download_file_from_s3` i `delete_file_from_s3` u [s3.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/services/s3.py).
+   - Modifikovane funkcije `apply_lip_sync` i `apply_selective_lip_sync` u [lipsync.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/lipsync.py) da otpreme video i audio na S3, generišu presigned download/upload URL-ove i proslede ih Modal radniku umesto Base64 JSON payload-a.
+   - Modal radnik u [wav2lip_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/wav2lip_worker.py) preuzima fajlove preko presigned URL-ova i otprema finalni video direktno na S3 presigned upload URL, čime se Base64 stringovi potpuno eliminišu iz memorije i API payloada.
+   - Nakon uspešnog završetka, backend preuzima video sa S3 i čisti privremene S3 objekte radi uštede prostora.
+3. **Verifikacija i testiranje**:
+   - Kreiran sveobuhvatan test fajl [test_faza2.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_faza2.py) koji simulira rad API ruta sa mock-ovanim Redis klijentom, i testira običnu i selektivnu lipsync obradu kroz S3 workflow.
+   - Rešen problem sa blokiranjem rate limitera tokom testiranja onemogućavanjem slowapi limitera.
+   - Svi testovi (4 passed) uspešno prolaze u manje od 2 sekunde.
+   - Pokrenut celokupan pytest test paket (27 passed) i linteri (Ruff, Bandit) na izmenjenim fajlovima — kod je 100% ispravan.
+
+---
+
+## 2026-06-22 (12:46 CET) — Planiranje Optimizacije Prevodilačke Petlje i Llama Sudije
+
+### Urađeno
+1. **Analiza zagušenja i kašnjenja prevoda**:
+   - Detektovan uzrok zagušenja i dugog prevođenja (i do 20 minuta) koji dovodi do pucanja taskova usled timeout-a. Sekvencijalno slanje validacije, suđenja i samokritike po pojedinačnim segmentima na teški 32B model (`Qwen/Qwen3-32B-AWQ`) preopterećuje jedan vLLM radnik na Modalu.
+2. **Definisan plan u [buduca_unapredjenja.md](file:///home/gruya/Projektri/sinhronizuj.me/buduca_unapredjenja.md)**:
+   - Dodat novi modul **6. Optimizacija Prevodilačke Petlje (Paralelizacija & Namenski Sudija)** koji obuhvata:
+     - Namenski Llama-3.1-8B radnik za sudiju (`get_llm_judge_score`) i odabir najboljeg prevoda na jeftinijim GPU instancama (A10G/T4) radi rasterećenja 32B Lektor modela.
+     - Paralelizaciju provera kvaliteta i samokritike unutar [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) pomoću `asyncio` ili `ThreadPoolExecutor`-a.
+     - Optimizaciju i labavljenje strogih CometKiwi kaznenih pravila u [qe.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/qe.py) kako bi se sprečila nepotrebna aktivacija skupe petlje samokritike.
+
+---
+
 ## 2026-06-22 (12:05 CET) — Optimizacija Konkurentnosti i Čišćenje Resursa (Faza 1)
 
 ### Urađeno

@@ -4,6 +4,13 @@ import subprocess
 import uuid
 import base64
 from backend.core.config import settings
+from backend.services.s3 import (
+    get_presigned_download_url,
+    get_presigned_upload_url,
+    upload_file_to_s3,
+    download_file_from_s3,
+    delete_file_from_s3
+)
 
 def has_sufficient_faces(video_path: str, sample_rate: int = 30, threshold_percentage: float = 10.0) -> bool:
     """
@@ -60,29 +67,40 @@ def apply_lip_sync(video_path: str, audio_path: str, workspace_path: str = None)
     modal_url = os.getenv("MODAL_WAV2LIP_URL", "")
     if modal_url:
         print(f"[FAZA 7] Koristim serverless Modal GPU worker za Wav2Lip na: {modal_url}")
+        s3_keys_to_clean = []
         try:
             from backend.worker.utils import call_modal_endpoint
             
-            with open(video_path, "rb") as f_vid:
-                video_b64 = base64.b64encode(f_vid.read()).decode('utf-8')
-            with open(audio_path, "rb") as f_aud:
-                audio_b64 = base64.b64encode(f_aud.read()).decode('utf-8')
-                
+            temp_id = uuid.uuid4().hex
+            video_key = f"temp/lipsync/{temp_id}_input_vid.mp4"
+            audio_key = f"temp/lipsync/{temp_id}_input_aud.wav"
+            output_key = f"temp/lipsync/{temp_id}_output_vid.mp4"
+            
+            if not upload_file_to_s3(video_path, settings.MINIO_BUCKET, video_key):
+                raise Exception("Neuspešno otpremanje video zapisa na S3")
+            s3_keys_to_clean.append(video_key)
+            
+            if not upload_file_to_s3(audio_path, settings.MINIO_BUCKET, audio_key):
+                raise Exception("Neuspešno otpremanje audio zapisa na S3")
+            s3_keys_to_clean.append(audio_key)
+            
+            video_url = get_presigned_download_url(settings.MINIO_BUCKET, video_key, expires_in=900)
+            audio_url = get_presigned_download_url(settings.MINIO_BUCKET, audio_key, expires_in=900)
+            result_upload_url = get_presigned_upload_url(settings.MINIO_BUCKET, output_key, expires_in=900)
+            
             payload = {
-                "video_base64": video_b64,
-                "audio_base64": audio_b64
+                "video_url": video_url,
+                "audio_url": audio_url,
+                "result_upload_url": result_upload_url
             }
             
             res = call_modal_endpoint(modal_url, payload, timeout_seconds=900)
             if "error" in res:
                 raise Exception(res["error"])
                 
-            out_vid_b64 = res.get("video_base64")
-            if not out_vid_b64:
-                raise Exception("Modal radnik nije vratio video_base64.")
-                
-            with open(output_path, "wb") as f_out:
-                f_out.write(base64.b64decode(out_vid_b64))
+            s3_keys_to_clean.append(output_key)
+            if not download_file_from_s3(settings.MINIO_BUCKET, output_key, output_path):
+                raise Exception("Neuspešno preuzimanje obrađenog videa sa S3")
                 
             return {
                 "status": "success",
@@ -92,6 +110,9 @@ def apply_lip_sync(video_path: str, audio_path: str, workspace_path: str = None)
             }
         except Exception as modal_err:
             print(f"[FAZA 7 WARNING] Greška pri pozivanju serverless Wav2Lip-a: {modal_err}. Pokušavam lokalni fallback...")
+        finally:
+            for k in s3_keys_to_clean:
+                delete_file_from_s3(settings.MINIO_BUCKET, k)
             
     # 2. Lokalni fallback
     wav2lip_dir = os.getenv("WAV2LIP_PATH", "/opt/Wav2Lip")
@@ -246,30 +267,51 @@ def apply_selective_lip_sync(video_path: str, audio_path: str, segments: list, w
                 # Prvi pokušaj: Serverless Modal
                 if modal_url:
                     print(f"[SELECTIVE LIP SYNC] Segment {idx}: Koristim serverless Modal za Wav2Lip...", flush=True)
+                    s3_keys_to_clean_sub = []
                     try:
                         from backend.worker.utils import call_modal_endpoint
                         
-                        with open(sub_video_path, "rb") as f_vid:
-                            video_b64 = base64.b64encode(f_vid.read()).decode('utf-8')
-                        with open(sub_audio_path, "rb") as f_aud:
-                            audio_b64 = base64.b64encode(f_aud.read()).decode('utf-8')
+                        temp_id = uuid.uuid4().hex
+                        video_key = f"temp/lipsync/{temp_id}_sub_vid_{idx}.mp4"
+                        audio_key = f"temp/lipsync/{temp_id}_sub_aud_{idx}.wav"
+                        output_key = f"temp/lipsync/{temp_id}_sub_out_{idx}.mp4"
+                        
+                        if upload_file_to_s3(sub_video_path, settings.MINIO_BUCKET, video_key):
+                            s3_keys_to_clean_sub.append(video_key)
+                        else:
+                            raise Exception("Neuspešno otpremanje pod-videa na S3")
                             
+                        if upload_file_to_s3(sub_audio_path, settings.MINIO_BUCKET, audio_key):
+                            s3_keys_to_clean_sub.append(audio_key)
+                        else:
+                            raise Exception("Neuspešno otpremanje pod-audia na S3")
+                            
+                        video_url = get_presigned_download_url(settings.MINIO_BUCKET, video_key, expires_in=600)
+                        audio_url = get_presigned_download_url(settings.MINIO_BUCKET, audio_key, expires_in=600)
+                        result_upload_url = get_presigned_upload_url(settings.MINIO_BUCKET, output_key, expires_in=600)
+                        
                         payload = {
-                            "video_base64": video_b64,
-                            "audio_base64": audio_b64
+                            "video_url": video_url,
+                            "audio_url": audio_url,
+                            "result_upload_url": result_upload_url
                         }
                         
                         res = call_modal_endpoint(modal_url, payload, timeout_seconds=600)
-                        if "error" not in res and "video_base64" in res:
-                            with open(sub_lipsync_path, "wb") as f_out:
-                                f_out.write(base64.b64decode(res["video_base64"]))
-                            success_lipsync = True
-                            used_providers.append("modal")
+                        if "error" not in res:
+                            s3_keys_to_clean_sub.append(output_key)
+                            if download_file_from_s3(settings.MINIO_BUCKET, output_key, sub_lipsync_path):
+                                success_lipsync = True
+                                used_providers.append("modal")
+                            else:
+                                print(f"[SELECTIVE LIP SYNC WARNING] Greška pri preuzimanju pod-videa sa S3 za segment {idx}", flush=True)
                         else:
                             err_msg = res.get("error", "Nepoznata greška")
                             print(f"[SELECTIVE LIP SYNC WARNING] Modal greška za segment {idx}: {err_msg}", flush=True)
                     except Exception as modal_err:
                         print(f"[SELECTIVE LIP SYNC WARNING] Greška pri pozivanju serverless Wav2Lip za segment {idx}: {modal_err}", flush=True)
+                    finally:
+                        for k in s3_keys_to_clean_sub:
+                            delete_file_from_s3(settings.MINIO_BUCKET, k)
                 
                 # Drugi pokušaj (fallback): Lokalni podproces
                 if not success_lipsync and os.path.exists(wav2lip_dir):

@@ -1725,5 +1725,432 @@ def deploy_lora_task(dry_run: bool = False, user_id: str = None):
         print(f"[BLUE-GREEN DEPLOY ERROR] Greška pri upisu u Redis: {redis_err}", flush=True)
         return {"status": "error", "message": f"Greška pri upisu u Redis: {redis_err}"}
 
+def refresh_project_draft(project_id: str, db: SessionLocal):
+    import uuid
+    from backend.main import get_presigned_download_url
+    
+    project_uuid = uuid.UUID(project_id) if isinstance(project_id, str) else project_id
+    p = db.query(Project).filter(Project.id == project_uuid).first()
+    if not p:
+        return
+        
+    db_segments = db.query(Segment).filter(Segment.project_id == project_uuid).order_by(Segment.segment_id).all()
+    
+    segments_list = []
+    for s in db_segments:
+        segments_list.append({
+            "id": s.segment_id,
+            "start": s.start,
+            "end": s.end,
+            "original": s.original,
+            "translated": s.translated,
+            "voice_type": s.voice_type,
+            "volume": s.volume,
+            "speed": s.speed,
+            "pitch": s.pitch,
+            "bg_volume": s.bg_volume,
+            "active_speaker": s.active_speaker,
+            "tts_path": get_presigned_download_url(settings.MINIO_BUCKET, s.tts_s3_key) if s.tts_s3_key else None,
+            "tts_duration": s.tts_duration,
+            "status": s.status,
+            "confidence_score": s.confidence_score if s.confidence_score is not None else 5,
+            "needs_retranslation": s.needs_retranslation if s.needs_retranslation is not None else False,
+            "actual_speed_factor": s.actual_speed_factor if s.actual_speed_factor is not None else 1.0
+        })
+        
+    project_data = {
+        "project_id": str(p.id),
+        "name": p.name,
+        "video_url": get_presigned_download_url(settings.MINIO_BUCKET, p.video_s3_key) if p.video_s3_key else "",
+        "video_path": p.video_s3_key,
+        "vocals_path": p.vocals_s3_key,
+        "no_vocals_path": p.no_vocals_s3_key,
+        "no_vocals_url": get_presigned_download_url(settings.MINIO_BUCKET, p.no_vocals_s3_key) if p.no_vocals_s3_key else "",
+        "dubbed_audio_path": p.dubbed_audio_s3_key,
+        "dubbed_audio_url": get_presigned_download_url(settings.MINIO_BUCKET, p.dubbed_audio_s3_key) if p.dubbed_audio_s3_key else "",
+        "visual_context_url": get_presigned_download_url("previews", p.visual_context_s3_key) if p.visual_context_s3_key else "",
+        "title": p.video_title,
+        "segments": segments_list,
+        "costs": p.costs or {"phases": {}, "total_usd": 0.0},
+        "status": p.status,
+        "created_at": p.created_at.isoformat() if p.created_at else ""
+    }
+    
+    r_client = get_redis_client()
+    r_client.set(f"project:{project_id}:draft", safe_json_dumps(project_data), ex=604800)
+
+@celery_app.task(
+    bind=True,
+    name="generate_segment_tts_task",
+    acks_late=True,
+    time_limit=300
+)
+def generate_segment_tts_task(self, project_id: str, segment_id: int, text: str, voice_type: str, volume: float, speed: float, pitch: float, bg_volume: float):
+    print(f"--- [CELERY TASK] Započeta asinhrona sinteza segmenta {segment_id} za projekat {project_id} ---", flush=True)
+    task_id = self.request.id
+    db = SessionLocal()
+    
+    task_workspace = os.path.join(settings.TEMP_WORKSPACE, task_id)
+    os.makedirs(task_workspace, exist_ok=True)
+    
+    s3 = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name=settings.S3_REGION
+    )
+    
+    try:
+        import uuid
+        project_uuid = uuid.UUID(project_id)
+        p = db.query(Project).filter(Project.id == project_uuid).first()
+        if not p:
+            return {"status": "error", "message": "Projekat nije pronađen."}
+            
+        db_seg = db.query(Segment).filter(Segment.project_id == project_uuid, Segment.segment_id == segment_id).first()
+        if not db_seg:
+            return {"status": "error", "message": "Segment nije pronađen."}
+            
+        old_tts_duration = db_seg.tts_duration or (db_seg.end - db_seg.start)
+            
+        probni_filename = f"tts_probni_{project_id}_{segment_id}.wav"
+        stable_probni_path = os.path.join(task_workspace, probni_filename)
+        
+        raw_filename = f"tts_raw_{project_id}_{segment_id}.wav"
+        stable_raw_path = os.path.join(task_workspace, raw_filename)
+        
+        from backend.worker.utils import apply_audio_modifiers
+        from pydub import AudioSegment
+        
+        is_fast_adjust = (
+            db_seg.translated == text and 
+            db_seg.voice_type == voice_type
+        )
+        
+        if is_fast_adjust:
+            raw_s3_key = f"projects/{project_id}/tts_raw_{segment_id}.wav"
+            if not os.path.exists(stable_raw_path):
+                try:
+                    s3.download_file(settings.MINIO_BUCKET, raw_s3_key, stable_raw_path)
+                except Exception:
+                    is_fast_adjust = False
+                    
+        if is_fast_adjust and os.path.exists(stable_raw_path):
+            apply_audio_modifiers(
+                stable_raw_path,
+                stable_probni_path,
+                volume=volume,
+                speed=speed,
+                pitch=pitch
+            )
+            try:
+                updated_audio = AudioSegment.from_wav(stable_probni_path)
+                actual_duration = len(updated_audio) / 1000.0
+            except Exception:
+                actual_duration = db_seg.tts_duration or (db_seg.end - db_seg.start)
+        else:
+            local_vocals_path = os.path.join(task_workspace, f"vocals_temp_{project_id}.wav")
+            if not os.path.exists(local_vocals_path) and p.vocals_s3_key:
+                try:
+                    s3.download_file(settings.MINIO_BUCKET, p.vocals_s3_key, local_vocals_path)
+                except Exception as e:
+                    return {"status": "error", "message": f"Greška pri preuzimanju vokala sa S3: {e}"}
+                    
+            db_segs = db.query(Segment).filter(Segment.project_id == project_uuid).order_by(Segment.segment_id).all()
+            segments_list_dicts = [{"id": s.segment_id, "start": s.start, "end": s.end, "original": s.original, "translated": s.translated} for s in db_segs]
+            
+            from backend.worker.tts_engine import synthesize_audio
+            
+            single_tts_segment = [{
+                "id": db_seg.segment_id,
+                "start": db_seg.start,
+                "end": db_seg.end,
+                "text": text,
+                "original_text": db_seg.original
+            }]
+            
+            tts_result = synthesize_audio(
+                local_vocals_path,
+                single_tts_segment,
+                voice_type=voice_type,
+                disable_openvoice=settings.DISABLE_OPENVOICE,
+                disable_enhance=settings.DISABLE_ENHANCE,
+                all_segments=segments_list_dicts,
+                workspace_path=task_workspace
+            )
+            
+            if tts_result["status"] == "error":
+                return tts_result
+                
+            res_segments = tts_result.get("tts_segments", [])
+            if not res_segments:
+                return {"status": "error", "message": "TTS nije vratio metapodatke o segmentu."}
+                
+            generated_seg = res_segments[0]
+            
+            shutil.copy2(generated_seg["path"], stable_raw_path)
+            
+            apply_audio_modifiers(
+                generated_seg["path"],
+                stable_probni_path,
+                volume=volume,
+                speed=speed,
+                pitch=pitch
+            )
+            
+            try:
+                updated_audio = AudioSegment.from_wav(stable_probni_path)
+                actual_duration = len(updated_audio) / 1000.0
+            except Exception:
+                actual_duration = generated_seg["duration"]
+                
+            if os.path.exists(generated_seg["path"]):
+                os.remove(generated_seg["path"])
+            if os.path.exists(tts_result["dubbed_audio_path"]):
+                os.remove(tts_result["dubbed_audio_path"])
+                
+        probni_s3_key = f"projects/{project_id}/tts_seg_{segment_id}.wav"
+        raw_s3_key = f"projects/{project_id}/tts_raw_{segment_id}.wav"
+        
+        try:
+            s3.upload_file(stable_probni_path, settings.MINIO_BUCKET, probni_s3_key)
+            s3.upload_file(stable_raw_path, settings.MINIO_BUCKET, raw_s3_key)
+        except Exception as e:
+            return {"status": "error", "message": f"S3 upload TTS neuspešan: {e}"}
+            
+        db_seg.translated = text
+        db_seg.voice_type = voice_type
+        db_seg.volume = volume
+        db_seg.speed = speed
+        db_seg.pitch = pitch
+        db_seg.bg_volume = bg_volume
+        db_seg.tts_s3_key = probni_s3_key
+        db_seg.tts_duration = actual_duration
+        db_seg.status = "previewed"
+        db.commit()
+        
+        if p.dubbed_audio_s3_key:
+            local_dubbed_path = os.path.join(task_workspace, f"dubbed_temp_{project_id}.wav")
+            try:
+                s3.download_file(settings.MINIO_BUCKET, p.dubbed_audio_s3_key, local_dubbed_path)
+                full_audio = AudioSegment.from_wav(local_dubbed_path)
+                
+                temp_seg_local = os.path.join(task_workspace, f"temp_seg_{segment_id}.wav")
+                s3.download_file(settings.MINIO_BUCKET, probni_s3_key, temp_seg_local)
+                new_seg_audio = AudioSegment.from_wav(temp_seg_local)
+                
+                start_ms = int(db_seg.start * 1000)
+                old_duration_ms = int(old_tts_duration * 1000)
+                
+                part1 = full_audio[:start_ms]
+                part2 = AudioSegment.silent(duration=old_duration_ms)
+                part3 = full_audio[start_ms + old_duration_ms:]
+                
+                temp_audio = part1 + part2 + part3
+                full_audio = temp_audio.overlay(new_seg_audio, position=start_ms)
+                full_audio.export(local_dubbed_path, format="wav")
+                
+                s3.upload_file(local_dubbed_path, settings.MINIO_BUCKET, p.dubbed_audio_s3_key)
+                
+                if os.path.exists(local_dubbed_path): os.remove(local_dubbed_path)
+                if os.path.exists(temp_seg_local): os.remove(temp_seg_local)
+            except Exception as e:
+                print(f"[ERROR] Greška pri osvežavanju celog dubbed audia na S3: {e}", flush=True)
+                
+        refresh_project_draft(project_id, db)
+        
+        from backend.main import get_presigned_download_url
+        presigned_url = get_presigned_download_url(settings.MINIO_BUCKET, probni_s3_key)
+        
+        return {
+            "status": "success",
+            "audio_url": presigned_url,
+            "duration": actual_duration
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+        if os.path.exists(task_workspace):
+            shutil.rmtree(task_workspace, ignore_errors=True)
+
+@celery_app.task(
+    bind=True,
+    name="generate_all_tts_task",
+    acks_late=True,
+    time_limit=1800
+)
+def generate_all_tts_task(self, project_id: str, voice_type: str):
+    print(f"--- [CELERY TASK] Započeta asinhrona sinteza svih segmenata za projekat {project_id} ---", flush=True)
+    task_id = self.request.id
+    db = SessionLocal()
+    
+    task_workspace = os.path.join(settings.TEMP_WORKSPACE, task_id)
+    os.makedirs(task_workspace, exist_ok=True)
+    
+    s3 = boto3.client(
+        's3',
+        endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
+        aws_access_key_id=settings.MINIO_ACCESS_KEY,
+        aws_secret_access_key=settings.MINIO_SECRET_KEY,
+        config=Config(signature_version='s3v4'),
+        region_name=settings.S3_REGION
+    )
+    
+    try:
+        import uuid
+        project_uuid = uuid.UUID(project_id)
+        p = db.query(Project).filter(Project.id == project_uuid).first()
+        if not p:
+            return {"status": "error", "message": "Projekat nije pronađen."}
+            
+        db_segments = db.query(Segment).filter(Segment.project_id == project_uuid).order_by(Segment.segment_id).all()
+        if not db_segments:
+            return {"status": "error", "message": "Projekat nema segmenata za sintezu."}
+            
+        local_vocals_path = os.path.join(task_workspace, f"vocals_temp_{project_id}.wav")
+        if not os.path.exists(local_vocals_path) and p.vocals_s3_key:
+            try:
+                s3.download_file(settings.MINIO_BUCKET, p.vocals_s3_key, local_vocals_path)
+            except Exception as e:
+                return {"status": "error", "message": f"Greška pri preuzimanju vokala sa S3: {e}"}
+                
+        tts_segments = []
+        segments_list_dicts = []
+        for s in db_segments:
+            item = {
+                "id": s.segment_id,
+                "start": s.start,
+                "end": s.end,
+                "text": s.translated,
+                "original_text": s.original,
+                "voice_type": s.voice_type or voice_type
+            }
+            tts_segments.append(item)
+            segments_list_dicts.append(item)
+            
+        from backend.worker.tts_engine import synthesize_audio
+        from pydub import AudioSegment
+        
+        tts_result = synthesize_audio(
+            local_vocals_path,
+            tts_segments,
+            voice_type=voice_type,
+            disable_openvoice=settings.DISABLE_OPENVOICE,
+            disable_enhance=settings.DISABLE_ENHANCE,
+            all_segments=segments_list_dicts,
+            workspace_path=task_workspace
+        )
+        
+        if tts_result["status"] == "error":
+            return tts_result
+            
+        res_segments = tts_result.get("tts_segments", [])
+        res_map = {s["id"]: s for s in res_segments}
+        
+        try:
+            ref_audio = AudioSegment.from_wav(local_vocals_path)
+            video_duration_ms = len(ref_audio)
+        except Exception:
+            video_duration_ms = 30000
+            
+        final_mix = AudioSegment.silent(duration=video_duration_ms)
+        
+        from backend.worker.utils import apply_audio_modifiers
+        
+        for s in db_segments:
+            if s.segment_id in res_map:
+                res_s = res_map[s.segment_id]
+                seg_filename = f"tts_seg_{project_id}_{s.segment_id}.wav"
+                stable_seg_path = os.path.join(task_workspace, seg_filename)
+                
+                apply_audio_modifiers(
+                    res_s["path"],
+                    stable_seg_path,
+                    volume=s.volume,
+                    speed=s.speed,
+                    pitch=s.pitch
+                )
+                
+                try:
+                    seg_audio = AudioSegment.from_wav(stable_seg_path)
+                    duration = len(seg_audio) / 1000.0
+                except Exception:
+                    try:
+                        seg_audio = AudioSegment.from_wav(res_s["path"])
+                    except Exception:
+                        seg_audio = AudioSegment.silent(duration=int((s.end - s.start) * 1000))
+                    duration = res_s.get("duration", s.end - s.start)
+                    
+                probni_s3_key = f"projects/{project_id}/tts_seg_{s.segment_id}.wav"
+                raw_s3_key = f"projects/{project_id}/tts_raw_{s.segment_id}.wav"
+                
+                try:
+                    s3.upload_file(stable_seg_path, settings.MINIO_BUCKET, probni_s3_key)
+                    s3.upload_file(res_s["path"], settings.MINIO_BUCKET, raw_s3_key)
+                except Exception as e:
+                    print(f"[S3 UPLOAD ERROR] Greška pri uploadu TTS seg {s.segment_id}: {e}", flush=True)
+                    
+                s.tts_s3_key = probni_s3_key
+                s.tts_duration = duration
+                s.status = "previewed"
+                
+                try:
+                    start_ms = int(s.start * 1000)
+                    final_mix = final_mix.overlay(seg_audio, position=start_ms)
+                except Exception:
+                    pass
+                    
+                if os.path.exists(stable_seg_path): os.remove(stable_seg_path)
+                if os.path.exists(res_s["path"]): os.remove(res_s["path"])
+                
+            elif s.tts_s3_key:
+                temp_seg_local = os.path.join(task_workspace, f"temp_seg_{s.segment_id}.wav")
+                try:
+                    s3.download_file(settings.MINIO_BUCKET, s.tts_s3_key, temp_seg_local)
+                    seg_audio = AudioSegment.from_wav(temp_seg_local)
+                    start_ms = int(s.start * 1000)
+                    final_mix = final_mix.overlay(seg_audio, position=start_ms)
+                    if os.path.exists(temp_seg_local): os.remove(temp_seg_local)
+                except Exception:
+                    pass
+                    
+        dubbed_filename = f"tts_full_{project_id}.wav"
+        stable_dubbed_path = os.path.join(task_workspace, dubbed_filename)
+        final_mix.export(stable_dubbed_path, format="wav")
+        
+        dubbed_audio_s3_key = f"projects/{project_id}/dubbed_audio.wav"
+        try:
+            s3.upload_file(stable_dubbed_path, settings.MINIO_BUCKET, dubbed_audio_s3_key)
+        except Exception as e:
+            return {"status": "error", "message": f"S3 upload celog tona neuspešan: {e}"}
+            
+        p.dubbed_audio_s3_key = dubbed_audio_s3_key
+        db.commit()
+        
+        refresh_project_draft(project_id, db)
+        
+        from backend.main import get_presigned_download_url
+        presigned_dubbed_url = get_presigned_download_url(settings.MINIO_BUCKET, dubbed_audio_s3_key)
+        
+        return {
+            "status": "success",
+            "audio_url": presigned_dubbed_url,
+            "segments": [{"id": s.segment_id, "tts_path": get_presigned_download_url(settings.MINIO_BUCKET, s.tts_s3_key)} for s in db_segments if s.tts_s3_key]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+        if os.path.exists(task_workspace):
+            shutil.rmtree(task_workspace, ignore_errors=True)
+
+
 
 

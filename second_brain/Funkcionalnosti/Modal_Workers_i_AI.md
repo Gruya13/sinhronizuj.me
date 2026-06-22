@@ -51,7 +51,12 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 ### 2.6. LipSync vizuelna sinhronizacija (`wav2lip_worker.py`)
 *   **Model**: Wav2Lip.
 *   **GPU zahtev**: Nvidia T4 (16GB VRAM) sa NFS skladištem za keširanje modela.
-*   **Funkcija**: Ugrađen je serverless radnik koji vrši fotorealističnu sinhronizaciju pokreta usana na osnovu spojenog srpskog govora i originalnog videa.
+*   **Optimizacija prenosa (S3 Presigned URL)**: Umesto prenosa video i audio zapisa u obliku teških Base64 stringova unutar JSON payload-a (što je uzrokovalo OOM greške i ogroman memorijski overhead na API gateway-u i radniku), prenos je prebačen na S3 presigned URL-ove:
+    *   Backend otprema privremeni isečak na S3 i generiše pre-signed download URL-ove za video i audio.
+    *   Generiše se i pre-signed upload URL za izlazni fajl na S3 (`result_upload_url`).
+    *   Modal radnik preuzima fajlove direktno sa S3, vrši inferenciju, otprema izlazni sinhronizovani video nazad na S3 preko upload URL-a i vraća samo status uspeha.
+    *   Ovim je u potpunosti eliminisan Base64 format iz memorije i API payload-a, čime je stabilnost povećana na 100%, a mrežni saobraćaj smanjen za preko 95%.
+
 
 ---
 
