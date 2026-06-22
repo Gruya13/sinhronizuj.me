@@ -45,7 +45,7 @@ def get_upload_url(
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
@@ -54,7 +54,7 @@ def get_upload_url(
         endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
@@ -103,7 +103,7 @@ def process_video(request: Request, data: VideoRequest, current_user: User = Dep
         endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
@@ -272,7 +272,7 @@ def delete_project(project_id: str, current_user: User = Depends(get_current_use
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name='us-east-1'
     )
     

@@ -151,3 +151,20 @@ Uvođenjem funkcija za Perpetual Learning u bazu su dodate kolone `qe_score` i d
    `alembic -c backend/alembic.ini upgrade head`
 4. **Verifikacija**: Ručno su izvršene preostale migracije u kontejneru na VPS-u, ažurirajući šemu baze na najnoviju verziju (`bce39c06dfe4`). Izbrisan je test projekat čime je potvrđeno da kaskadno brisanje DB segmenata i pripadajućih S3/MinIO fajlova sada prolazi bez ikakvih izuzetaka.
 
+---
+
+## 🐛 8. Greška 500 pri prijavi na sajt (FastAPI i Prometheus Instrumentator nekompatibilnost)
+
+### Simptom
+Nakon spajanja izmena za Fazu 4, prijava (login) na sajt je prestala da radi. Klijent je dobijao crveni baner sa greškom `Failed to fetch`, dok je u konzoli pregledača stajala CORS greška: 
+`Access to fetch at 'https://api.sinhronizuj.me/api/v1/auth/login' from origin 'https://sinhronizuj.me' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.`
+
+### Uzrok (Root Cause)
+1. **Prometheus / FastAPI konflikt**: Poziv na `/api/v1/auth/login` (i sve ostale pod-rute) je na backendu bacao `500 Internal Server Error` sa greškom `AttributeError: '_IncludedRouter' object has no attribute 'path'` unutar `prometheus_fastapi_instrumentator` middleware-a. Uzrok je bio taj što `fastapi` u [requirements.txt](file:///home/gruya/Projektri/sinhronizuj.me/requirements.txt) nije bio pinovan, pa se pri build-u na serveru instalirala najnovija verzija FastAPI (`0.138.0`). U FastAPI verzijama `>=0.137.0` uvedeno je lenjo učitavanje i pod-ruteri se čuvaju kao `_IncludedRouter` objekti koji nemaju `.path` atribut, što je srušilo stari `prometheus-fastapi-instrumentator==7.0.0` koji ga je zahtevao pri analizi ruta. Pošto je middleware pukao pre nego što je poslat odgovor, odgovor je vraćen kao 500 bez CORS zaglavlja, što je klijentski pregledač prepoznao kao CORS problem.
+2. **Prazan `translator.py`**: Tokom refaktorisanja u Fazi 4, greškom su uklonjeni svi uvozi iz fasadnog modula [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py). Ovo je dovelo do pucanja svih testova i funkcionalnosti koje uvoze prevodilačke funkcije preko ove fasade.
+
+### Rešenje
+1. **Pinovanje FastAPI**: U datoteci [requirements.txt](file:///home/gruya/Projektri/sinhronizuj.me/requirements.txt) pinovane su verzije `fastapi==0.136.0` (stabilna verzija iz lokalnog razvojnog okruženja) i `uvicorn==0.45.0` radi sprečavanja nekompatibilnosti u budućnosti.
+2. **Popravka `translator.py`**: Vraćeni su svi uvozi u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) i definisana je `__all__` lista kako bi se uklonila Ruff linter upozorenja o neiskorišćenim uvozima.
+3. **Verifikacija**: Pokrenut je ceo test paket (24 passed) i lokalno je testiran API login čime je potvrđeno da sve radi bez ikakvih izuzetaka. Izmene su gurnute na granu `development` što je uspešno pokrenulo CI/CD deploy pipeline na produkciju.
+

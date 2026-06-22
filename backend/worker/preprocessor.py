@@ -54,7 +54,7 @@ def upload_to_minio(file_path: str, bucket_name: str = "previews") -> str:
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
@@ -64,17 +64,12 @@ def upload_to_minio(file_path: str, bucket_name: str = "previews") -> str:
         endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
     try:
-        # Proveri/kreiraj bucket preko internog klijenta
-        try:
-            s3_internal.head_bucket(Bucket=bucket_name)
-        except:
-            print(f"[MINIO] Kreiram bucket: {bucket_name}")
-            s3_internal.create_bucket(Bucket=bucket_name)
+        # Kofa previews već postoji na S3 serveru, prelazimo direktno na upload.
 
         # Upload preko internog klijenta (brze je)
         print(f"[MINIO] Uploadujem {filename} u {bucket_name}...")

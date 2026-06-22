@@ -13,7 +13,7 @@ def get_presigned_download_url(bucket_name: str, object_key: str, expires_in: in
         endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name='us-east-1'
     )
     try:
@@ -64,7 +64,7 @@ def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str) -> bool
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:
@@ -81,7 +81,7 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str) ->
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:
@@ -98,7 +98,7 @@ def delete_file_from_s3(bucket_name: str, object_key: str) -> bool:
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:

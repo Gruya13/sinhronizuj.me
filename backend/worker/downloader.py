@@ -106,11 +106,13 @@ def _download_from_s3(s3_url: str, workspace: str) -> dict:
         local_video_path = os.path.join(workspace, filename)
         local_audio_path = local_video_path.rsplit(".", 1)[0] + ".wav"
         
+        from botocore.config import Config
         s3 = boto3.client(
             's3',
             endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
             aws_access_key_id=settings.MINIO_ACCESS_KEY,
             aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
             region_name=settings.S3_REGION
         )
         

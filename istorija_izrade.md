@@ -1,3 +1,20 @@
+## 2026-06-22 (16:30 CET) — Rešavanje greške prijave na sajt i popravka praznog translator modula
+
+### Problem
+Nakon merdžovanja Faze 4, korisnici više nisu mogli da se prijave na sajt. Analizom logova na produkcionom VPS serveru uočena su dva problema:
+1. **Nekompatibilnost FastAPI i Prometheus Instrumentator-a**: Poziv na `/api/v1/auth/login` (i sve ostale pod-rute) je bacao `500 Internal Server Error` sa greškom `AttributeError: '_IncludedRouter' object has no attribute 'path'` unutar `prometheus_fastapi_instrumentator`. Uzrok je bio taj što `fastapi` u `requirements.txt` nije bio pinovan, pa se pri build-u na serveru instalirala najnovija verzija FastAPI (`0.138.0`) koja interno koristi `_IncludedRouter` objekte bez `path` atributa, sa kojima stari `prometheus-fastapi-instrumentator==7.0.0` ne ume da radi.
+2. **Prazan `translator.py` modul**: Tokom refaktorisanja u Fazi 4, greškom su uklonjeni svi uvozi iz fasadnog modula [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py). Ovo je dovelo do pucanja svih testova i funkcionalnosti koje se oslanjaju na uvoz prevodilačkih funkcija iz ovog modula.
+
+### Rešenje
+1. **Pinovanje FastAPI**: U datoteci [requirements.txt](file:///home/gruya/Projektri/sinhronizuj.me/requirements.txt) pinovane su verzije `fastapi==0.136.0` (stabilna verzija iz lokalnog razvojnog okruženja) i `uvicorn==0.45.0` radi sprečavanja nekompatibilnosti u budućnosti.
+2. **Restauracija `translator.py`**: Vraćeni su svi uvozi u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) i definisana je `__all__` lista kako bi se uklonila Ruff linter upozorenja o neiskorišćenim uvozima.
+3. **Verifikacija**:
+   - Pokrenut je ceo test paket (24 passed) i svi linteri (Ruff, Bandit) — kod je 100% ispravan.
+   - Lokalno je testiran API login i uspešno vraća očekivanu 401 grešku umesto 500.
+   - Izmene su komitovane i gurnute na granu `development` što je pokrenulo CI/CD deploy pipeline na VPS-u.
+
+---
+
 ## 2026-06-22 (13:58 CET) — Implementacija Sistemskih Unapređenja i Optimizacije Prevodilačke Petlje (Faza 4)
 
 ### Urađeno

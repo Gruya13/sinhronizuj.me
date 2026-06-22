@@ -69,7 +69,7 @@ def check_s3_file_exists(bucket_name: str, object_key: str) -> bool:
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:
@@ -195,7 +195,7 @@ def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str):
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:
@@ -212,7 +212,7 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     try:
@@ -1481,11 +1481,14 @@ def cleanup_old_files():
     print(f"[CLEANUP] Pokrećem čišćenje starih fajlova: {datetime.now()}")
     
     try:
+        from botocore.config import Config
         s3 = boto3.client(
             's3',
             endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
             aws_access_key_id=settings.MINIO_ACCESS_KEY,
-            aws_secret_access_key=settings.MINIO_SECRET_KEY
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+            region_name=settings.S3_REGION
         )
         
         buckets = ['uploads', 'processed', 'input-audio']
@@ -1931,7 +1934,7 @@ def generate_segment_tts_task(self, project_id: str, segment_id: int, text: str,
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
@@ -2130,7 +2133,7 @@ def generate_all_tts_task(self, project_id: str, voice_type: str):
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4'),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
         region_name=settings.S3_REGION
     )
     
