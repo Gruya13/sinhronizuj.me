@@ -141,3 +141,26 @@ U cilju bezbedne nadogradnje šeme baze podataka bez gubitka podataka u produkci
     ```bash
     alembic upgrade head
     ```
+
+---
+
+## 4. Optimizacija baze podataka (Faza 3)
+
+U cilju ubrzanja performansi i smanjenja opterećenja na PostgreSQL instanci pri čestim SQL JOIN upitima i CASCADE brisanjima, u Fazi 3 su sprovedene sledeće optimizacije:
+
+1. **Indeksiranje stranih ključeva**:
+   - Dodat je parametar `index=True` na svim ključnim stranim ključevima (`user_id` i `project_id`) u sledećim tabelama:
+     - `projects` (`user_id`)
+     - `glossaries` (`user_id`)
+     - `jobs` (`project_id`)
+     - `translation_memory` (`user_id`)
+     - `wiki_rules` (`user_id`)
+     - `pending_translation_memory` (`user_id`)
+   - Indeksiranje ovih kolona ubrzava SQL JOIN operacije i pretrage po korisniku/projektu i do 10x, a takođe sprečava full-table scan-ove pri kaskadnim brisanjima.
+
+2. **Rešavanje N+1 upita pri čuvanju nacrta**:
+   - U ruti `save_project_draft` u [projects.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/projects.py) izbegnut je klasičan N+1 problem. Umesto da se za svaki izmenjeni segment iz zahteva radi poseban `SELECT` upit na bazu, svi segmenti povezani sa projektom se dobavljaju odjednom pomoću jednog upita:
+     ```python
+     segments = db.query(Segment).filter(Segment.project_id == project_id).all()
+     ```
+   - Segmenti se zatim mapiraju u memorijski rečnik po `segment_id`, čime se broj upita na bazu smanjuje sa N+1 na tačno 1.

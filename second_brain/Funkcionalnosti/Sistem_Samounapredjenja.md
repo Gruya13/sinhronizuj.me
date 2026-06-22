@@ -24,7 +24,7 @@ Da bi se prevazišla statičnost tradicionalnih prevodilačkih modela, sinhroniz
 
 ## 2. Subagent Alpha: Real-time "Tihi Konsenzus"
 
-Alpha agent je zadužen za instantno učenje. Kada korisnik u editoru ručno ispravi prevedeni segment i klikne na čuvanje, pokreće se Celery task `learn_user_glossary_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py):
+Alpha agent je zadužen za instantno učenje. Kada korisnik u editoru ručno ispravi prevedene segmente i klikne na čuvanje nacrta, pokreće se grupni (batch) Celery task `learn_user_glossary_batch_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) koji procesira sve korekcije odjednom:
 
 1.  **Evaluacija Kvaliteta**: Sistem računa CometKiwi QE score (`qe_score`) ispravljenog segmenta.
 2.  **Tihi Konsenzus (Auto-odobrenje)**:
@@ -75,9 +75,10 @@ Jednom nedeljno pokreće se skripta koja:
 ### 4.2. Modal Serverless Trening (`train_lora.py`)
 Trening se obavlja serverless na Modalu kako se ne bi opterećivao host VPS:
 1.  Rezerviše se kontejner sa **Nvidia A10G (24GB VRAM)** GPU-om.
-2.  Učitava se baza `dataset.jsonl` i pokreće se trening nad modelom `Qwen/Qwen2-32B-Instruct` (uz AWQ/Marlin kvantizaciju).
-3.  LoRA parametri su postavljeni na `r=16` i `lora_alpha=32` i gađaju projekcione matrice (`q_proj`, `v_proj`, `k_proj`, `o_proj`).
-4.  Trening se obično vrši u 3 epohe kako bi se izbegao overfitting. Novodobijeni adapter se čuva na Modal shared storage.
+2.  Montira se deljeni mrežni NFS volumen `/models` i HuggingFace okruženjska promenljiva `HF_HOME` se postavlja na `/models/huggingface_cache` pre pokretanja treninga. Na ovaj način se preuzeti LLM modeli (poput Qwen 32B) trajno keširaju, što dramatično ubrzava pokretanje serverless instanci i eliminiše mrežne troškove ponovnog preuzimanja modela.
+3.  Učitava se baza `dataset.jsonl` i pokreće se trening nad modelom `Qwen/Qwen2-32B-Instruct` (uz AWQ/Marlin kvantizaciju).
+4.  LoRA parametri su postavljeni na `r=16` i `lora_alpha=32` i gađaju projekcione matrice (`q_proj`, `v_proj`, `k_proj`, `o_proj`).
+5.  Trening se obično vrši u 3 epohe kako bi se izbegao overfitting. Novodobijeni adapter se čuva na Modal shared storage.
 
 ---
 
