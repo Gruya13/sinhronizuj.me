@@ -27,3 +27,5 @@ sentry-sdk[fastapi]==2.5.1
 sentence-transformers
 mediapipe==0.10.14
 scikit-learn
+alembic==1.18.4
+
