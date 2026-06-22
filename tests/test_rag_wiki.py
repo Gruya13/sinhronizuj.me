@@ -1,8 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from backend.services.embedding import embedding_service
-from backend.core.models import TranslationMemory, WikiRule, User
-from backend.routes.wiki import WikiRuleCreate, WikiRuleUpdate
+from backend.core.models import TranslationMemory
 
 # Mock-ujemo get_embedding da ne uvozi stvarni model na CI/CD okruženju
 embedding_service.get_embedding = MagicMock(return_value=[0.1] * 384)

@@ -1,5 +1,4 @@
 import re
-import json
 import numpy as np
 from datetime import datetime, timedelta
 from sklearn.cluster import DBSCAN

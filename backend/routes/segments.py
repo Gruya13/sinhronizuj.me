@@ -1,11 +1,6 @@
-import os
 import json
-import shutil
-import boto3
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from botocore.config import Config
-from pydub import AudioSegment
 
 from backend.core.config import settings
 from backend.core.database import get_db
@@ -14,8 +9,6 @@ from backend.core.auth import get_current_user
 from backend.core.schemas import ShortenSegmentRequest, SegmentTTSRequest, GenerateAllTTSRequest, RenderRequest
 from backend.core.limiter import limiter
 from backend.services.redis import get_redis_client
-from backend.services.s3 import get_presigned_download_url
-from backend.routes.projects import get_project_draft
 
 router = APIRouter(tags=["Segments"])
 

@@ -1,10 +1,8 @@
 import os
-import requests
 import uuid
 import base64
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
-from backend.worker.preprocessor import upload_to_minio
 
 def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", 
                      disable_openvoice: bool = False, disable_enhance: bool = False,
@@ -99,7 +97,7 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
             ref_sub_audio.export(buffer, format="wav")
             ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
             ref_text = "Ovo je originalni glas iz videa."
-            print(f"[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
+            print("[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
             
     except Exception as e:
         return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}

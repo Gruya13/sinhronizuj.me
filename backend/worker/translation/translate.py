@@ -7,7 +7,6 @@ import base64
 from typing import List
 
 from backend.core.config import settings
-from backend.worker.utils import call_modal_endpoint
 
 # Uvoženje iz lokalnih modula
 from .masking import mask_untranslatable, unmask_text, mask_segment_pair
@@ -658,6 +657,10 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                             parsed_dict[global_idx] = str(item[key])
                             break
 
+        # Paralelna prva validacija i pozivanje sudije (Faza 4)
+        from concurrent.futures import ThreadPoolExecutor
+        
+        batch_evals = []
         for idx, group in enumerate(batch):
             global_idx = batch_start + idx
             raw_trans = parsed_dict.get(global_idx, "").strip()
@@ -676,23 +679,58 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             negation_ok = check_negation_preservation(orig_text, unmasked_text)
             qe_score = get_comet_kiwi_score(orig_text, unmasked_text)
             
-            # 2. Hibridni LLM-as-a-Judge gating ako je CometKiwi nizak ili ako negacija fali
-            judge_score = 5.0
-            judge_errors = []
-            judge_explanation = ""
-            
             char_limit = 0
             for s in group:
                 duration = s["end"] - s["start"]
                 char_limit += int(duration * calculate_dynamic_factor(s, user_avg_speedup))
             char_limit = max(15, char_limit)
             
-            if not skip_gating and (not negation_ok or qe_score < 0.85):
-                print(f"[LLM JUDGE ACTIVATION] Gating sumnjiv za rečenicu {global_idx} (CometKiwi QE: {qe_score:.3f}, Negation OK: {negation_ok}). Pozivam LLM-as-a-Judge...", flush=True)
-                judge_res = get_llm_judge_score(orig_text, unmasked_text, limit_char=char_limit)
-                judge_score = judge_res["score"]
-                judge_errors = judge_res["errors"]
-                judge_explanation = judge_res["explanation"]
+            batch_evals.append({
+                "global_idx": global_idx,
+                "group": group,
+                "orig_text": orig_text,
+                "unmasked_text": unmasked_text,
+                "negation_ok": negation_ok,
+                "qe_score": qe_score,
+                "char_limit": char_limit,
+                "judge_score": 5.0,
+                "judge_errors": [],
+                "judge_explanation": ""
+            })
+            
+        # Nalazimo sumnjive koji zahtevaju sudiju
+        sumnjivi_evals = [e for e in batch_evals if not skip_gating and (not e["negation_ok"] or e["qe_score"] < 0.85)]
+        
+        if sumnjivi_evals:
+            print(f"[PARALLEL LLM JUDGE] Pokrećem paralelno suđenje za {len(sumnjivi_evals)} rečenica...", flush=True)
+            with ThreadPoolExecutor(max_workers=len(sumnjivi_evals)) as executor:
+                futures = {
+                    executor.submit(get_llm_judge_score, e["orig_text"], e["unmasked_text"], limit_char=e["char_limit"]): e
+                    for e in sumnjivi_evals
+                }
+                for future in futures:
+                    e = futures[future]
+                    try:
+                        judge_res = future.result()
+                        e["judge_score"] = judge_res["score"]
+                        e["judge_errors"] = judge_res["errors"]
+                        e["judge_explanation"] = judge_res["explanation"]
+                    except Exception as err:
+                        print(f"[PARALLEL LLM JUDGE ERROR] Greška pri paralelnom suđenju rečenice {e['global_idx']}: {err}", flush=True)
+                        e["judge_score"] = 5.0
+                        
+        for idx, group in enumerate(batch):
+            global_idx = batch_start + idx
+            e = batch_evals[idx]
+            
+            orig_text = e["orig_text"]
+            unmasked_text = e["unmasked_text"]
+            negation_ok = e["negation_ok"]
+            qe_score = e["qe_score"]
+            char_limit = e["char_limit"]
+            judge_score = e["judge_score"]
+            judge_errors = e["judge_errors"]
+            judge_explanation = e["judge_explanation"]
             
             print(f"[VALIDATION] Rečenica {global_idx}: Negation OK = {negation_ok}, CometKiwi QE Score = {qe_score:.3f}, LLM Judge Score = {judge_score:.1f}", flush=True)
             

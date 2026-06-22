@@ -8,10 +8,9 @@ from slowapi import _rate_limit_exceeded_handler
 from backend.core.config import settings
 from backend.core.limiter import limiter
 # Eksponiranje za kompatibilnost sa testovima
-from backend.services.redis import get_redis_client
-from backend.services.s3 import get_presigned_download_url
 
 import sentry_sdk
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Inicijalizacija Sentry monitoringa
 if getattr(settings, "SENTRY_DSN", None):
@@ -23,6 +22,7 @@ if getattr(settings, "SENTRY_DSN", None):
     print("[SENTRY INIT] Sentry monitoring je uspešno inicijalizovan za FastAPI.", flush=True)
 
 app = FastAPI(title="Sinhronizuj.me API", description="API za inteligentnu sinhronizaciju videa", version="2.0.0")
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["Monitoring"], include_in_schema=False)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -44,6 +44,7 @@ from backend.routes.segments import router as segments_router
 from backend.routes.admin import router as admin_router
 from backend.routes.system import router as system_router
 from backend.routes.wiki import router as wiki_router
+from backend.routes.websocket import router as websocket_router
 
 # Registrujemo rute
 app.include_router(auth_router)
@@ -52,6 +53,7 @@ app.include_router(segments_router)
 app.include_router(admin_router)
 app.include_router(system_router)
 app.include_router(wiki_router)
+app.include_router(websocket_router)
 
 @app.get("/")
 def read_root():

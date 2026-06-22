@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from backend.core.config import settings
 from backend.core.database import Base
 # Uvozimo sve modele kako bi se registrovali na Base.metadata
-from backend.core.models import User, Project, Segment, Glossary, Waitlist, Job
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

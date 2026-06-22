@@ -2,7 +2,6 @@ import os
 import cv2
 import subprocess
 import uuid
-import base64
 from backend.core.config import settings
 from backend.services.s3 import (
     get_presigned_download_url,

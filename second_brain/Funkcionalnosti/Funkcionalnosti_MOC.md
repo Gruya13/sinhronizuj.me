@@ -10,3 +10,4 @@ Ovaj dokument je mapa sadržaja za sve beleške koje se tiču funkcionalnosti i 
 *   [[Modal_Workers_i_AI]] – Modal serverless GPU klaster, optimizacija troškova obrade i cold start warmup.
 *   [[Prevodilacki_Pipeline|Prevodilački Pipeline]] – Segment-level i sentence-level optimizacije, prevođenje sa RAG-om i LLM-as-a-Judge gating.
 *   [[Sistem_Samounapredjenja|Sistem Samounapređenja]] – Zatvorena petlja učenja (Feedback Loop) kroz real-time TM, DBSCAN pattern miner i LoRA fine-tuning.
+*   [[API_Specifikacija]] – Detaljna OpenAPI specifikacija i definicija svih API endpoint-a.

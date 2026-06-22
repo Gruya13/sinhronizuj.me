@@ -1,5 +1,4 @@
 import re
-import json
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
@@ -106,7 +105,7 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
     # 1. Bazična semantička sličnost
     base_similarity = semantic_similarity(english_text, serbian_text)
     
-    # 2. Pravopisni/morfološki kazneni poeni
+    # 2. Pravopis
     penalties = 0.0
     
     # a) Curenje dijalekta (ijekavica / hrvatski regionalizmi)
@@ -118,13 +117,14 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
     
     leaks = LEAK_PATTERN.findall(serbian_text)
     if leaks:
-        # Kazna: 0.1 po uočenoj reči
-        penalties += 0.1 * len(leaks)
+        # Ublaženo: 0.05 po reči, ali maksimalno 0.15 ukupne kazne za dijalekt
+        penalties += min(0.15, 0.05 * len(leaks))
         
     # b) Brojevi napisani ciframa umesto rečima
     if re.search(r'\b\d+\b', serbian_text):
         if re.search(r'\b\d+\b', english_text):
-            penalties += 0.08
+            # Ublaženo sa 0.08 na 0.04 za proste godine/datume ako su u oba teksta
+            penalties += 0.04
             
     # c) Padež meseca
     if "listopada" in serbian_text.lower() or ("oktobru" in serbian_text.lower() and "u oktobru" not in serbian_text.lower()):
@@ -144,7 +144,8 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
         
     # f) Predugačak prevod (veliko odstupanje u dužini)
     if len(serbian_text) > len(english_text) * 1.5:
-        penalties += 0.05
+        # Ublaženo sa 0.05 na 0.03
+        penalties += 0.03
         
     # Izračunavanje finalnog QE skora
     qe_score = base_similarity - penalties
@@ -152,13 +153,15 @@ def get_comet_kiwi_score(english_text: str, serbian_text: str) -> float:
 
 def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = None) -> dict:
     """
-    Poziva Modal Lektor (brzi Llama 3.1 8B) kao sudiju (LLM-as-a-Judge) da oceni kvalitet prevoda.
+    Poziva Llama 3.1 8B na Modalu kao sudiju (LLM-as-a-Judge) da oceni kvalitet prevoda.
+    Koristi MODAL_JUDGE_URL, a kao fallback MODAL_LEKTOR_URL.
     Vraća rečnik sa ključevima: 'score' (float od 1.0 do 5.0), 'explanation' (str), 'errors' (list).
     """
-    if not settings.MODAL_LEKTOR_URL:
-        return {"score": 5.0, "explanation": "Lektor URL nije konfigurisan, automatski prolaz.", "errors": []}
+    judge_url = settings.MODAL_JUDGE_URL or settings.MODAL_LEKTOR_URL
+    if not judge_url:
+        return {"score": 5.0, "explanation": "Judge/Lektor URL nije konfigurisan, automatski prolaz.", "errors": []}
 
-    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    url = f"{judge_url.rstrip('/')}/v1/chat/completions"
     
     limit_instruction = ""
     if limit_char:
@@ -188,7 +191,7 @@ def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = 
     )
 
     payload = {
-        "model": "llama-8b",
+        "model": "llama-judge" if settings.MODAL_JUDGE_URL else "llama-8b",
         "messages": [
             {
                 "role": "system",

@@ -1,9 +1,7 @@
-import pytest
 import os
-import json
 from unittest.mock import patch, MagicMock
 from backend.core.models import TranslationMemory, PendingTranslationMemory, WikiRule, Segment, Project
-from backend.worker.tasks import promote_pending_tm_task, deploy_lora_task
+from backend.worker.tasks import promote_pending_tm_task
 from backend.worker.translation.pattern_miner import run_nightly_pattern_analysis
 from backend.worker.training.data_generator import run_data_generation
 from backend.worker.training.train_lora import run_lora_training

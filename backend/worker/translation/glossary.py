@@ -2,7 +2,6 @@ import os
 import json
 import re
 from backend.core.config import settings
-from backend.worker.utils import call_modal_endpoint
 from .dialect import clean_thought_tags
 
 GLOSSARY_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "glossaries.json")

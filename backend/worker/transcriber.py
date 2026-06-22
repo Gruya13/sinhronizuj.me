@@ -305,7 +305,7 @@ def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callb
             
         # KORAK 4: LLM Arbitraža ako imamo oba transkripta
         if sentence_segments and sensevoice_text:
-            print(f"[ASR] Uspešno pribavljena oba transkripta. Pokrećem arbitražu.", flush=True)
+            print("[ASR] Uspešno pribavljena oba transkripta. Pokrećem arbitražu.", flush=True)
             sentence_segments = arbitrate_transcripts(sentence_segments, sensevoice_text)
         
         return {

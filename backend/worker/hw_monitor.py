@@ -1,6 +1,5 @@
 import subprocess
 import psutil
-import os
 
 def get_gpu_stats():
     """

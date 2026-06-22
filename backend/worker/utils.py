@@ -39,7 +39,7 @@ def _call_modal_endpoint_sync(url: str, payload: dict, timeout_seconds: int = 60
             if "error" in result:
                 raise Exception(f"Modal posao vratio grešku: {result['error']}")
                 
-            print(f"[MODAL] Posao završen uspešno!")
+            print("[MODAL] Posao završen uspešno!")
             if progress_callback:
                 progress_callback(detail="Zadatak na Modal-u je uspešno završen.")
                 
@@ -160,7 +160,7 @@ def normalize_audio(audio_path: str, target_dbfs: float = -20.0):
         change_in_dbfs = target_dbfs - sound.dBFS
         normalized_sound = sound.apply_gain(change_in_dbfs)
         normalized_sound.export(audio_path, format="wav")
-        print(f"[NORMALIZE] Uspešno normalizovan audio.")
+        print("[NORMALIZE] Uspešno normalizovan audio.")
     except Exception as e:
         print(f"[NORMALIZE] Greška pri normalizaciji audia: {e}")
 

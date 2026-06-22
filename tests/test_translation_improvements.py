@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from backend.worker.translation.translate import (
     group_segments_into_sentences,

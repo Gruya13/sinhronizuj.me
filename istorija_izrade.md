@@ -1,3 +1,32 @@
+## 2026-06-22 (13:58 CET) — Implementacija Sistemskih Unapređenja i Optimizacije Prevodilačke Petlje (Faza 4)
+
+### Urađeno
+1. **OpenAPI i API Specifikacija**:
+   - Definisane šeme, odgovori i metapodaci na svim FastAPI rutama.
+   - Napravljena Python skripta [export_openapi.py](file:///home/gruya/Projektri/sinhronizuj.me/scratch/export_openapi.py) koja automatski generiše OpenAPI dokumentaciju i konvertuje je u wiki format [API_Specifikacija.md](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/Funkcionalnosti/API_Specifikacija.md).
+2. **Performance SLA i Tajmauti**:
+   - Sinhronizovani Celery tajmauti sa SLA standardima (npr. dugi video 40 min ima limit od 2400s u Celery-ju).
+   - Kreiran wiki dokument [Performanse_i_SLA.md](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/Arhitektura/Performanse_i_SLA.md) i uvezan u sistemske mape.
+3. **Centralni SECURITY.md**:
+   - Kreiran [SECURITY.md](file:///home/gruya/Projektri/sinhronizuj.me/SECURITY.md) u korenu projekta koji definiše JWT zaštitu, pre-signed URL-ove za S3 prenos, SSRF i Bandit sigurnosne provere.
+4. **Real-time Status preko WebSocketa**:
+   - Implementirano Redis Pub/Sub objavljivanje napretka u `tasks.py` (`update_progress`).
+   - Kreiran ruter [websocket.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/websocket.py) sa `/api/v1/ws/project/{project_id}` WebSocket endpointom, asinhronim Pub/Sub čitačem i verifikacijom tokena iz query parametara.
+   - Ruter je uspešno integrisan u [main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py).
+5. **Prometheus i Grafana Monitoring**:
+   - Integrisan `prometheus-fastapi-instrumentator` u [main.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/main.py) za izlaganje metrika na `/metrics`.
+   - Kreirani konfiguracioni fajlovi za Prometheus [prometheus.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/monitoring/prometheus.yml) i Grafanu [grafana_datasources.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/monitoring/grafana_datasources.yml).
+   - Dodati monitoring servisi (Prometheus, Grafana, Node Exporter, cAdvisor) u produkcioni [docker-compose.prod.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/hetzner/docker-compose.prod.yml).
+6. **Optimizacija Prevodilačke Petlje i Namenski Sudija**:
+   - Kreiran serverless Modal radnik [judge_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/judge_worker.py) koji servira Llama 3.1 8B na A10G GPU.
+   - Povezan `MODAL_JUDGE_URL` na backendu i ublažene CometKiwi kazne u [qe.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/qe.py) da se izbegnu nepotrebne iteracije samokritike.
+   - Implementirana paralelizacija prve validacije i suđenja unutar [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) pomoću `ThreadPoolExecutor` kako bi se drastično ubrzao proces prevođenja.
+7. **Testiranje i Verifikacija**:
+   - Napisan sveobuhvatan test fajl [test_faza4.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_faza4.py) koji verifikuje rad LLM sudije, paralelne evaluacije u prevodilačkom batch-u i WebSocket rute.
+   - Pokrenut ceo test paket (31 passed) i Ruff/Bandit linteri — kod je u potpunosti ispravan i bezbedan.
+
+---
+
 ## 2026-06-22 (12:59 CET) — Optimizacija Treninga i Baze Podataka (Faza 3)
 
 ### Urađeno

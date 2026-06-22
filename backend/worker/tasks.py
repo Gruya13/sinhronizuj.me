@@ -307,11 +307,16 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         progress_metadata['costs']['total_usd'] = round(float(total), 5)
 
     def update_progress(step_name=None, percentage=None, completed_step=None, segments=None, visual_context_url=None, detail=None):
-        if step_name: progress_metadata['current_step'] = step_name
-        if percentage is not None: progress_metadata['percent'] = percentage
-        if completed_step: progress_metadata['completed_steps'].append(completed_step)
-        if segments: progress_metadata['segments'] = segments
-        if visual_context_url: progress_metadata['visual_context_url'] = visual_context_url
+        if step_name:
+            progress_metadata['current_step'] = step_name
+        if percentage is not None:
+            progress_metadata['percent'] = percentage
+        if completed_step:
+            progress_metadata['completed_steps'].append(completed_step)
+        if segments:
+            progress_metadata['segments'] = segments
+        if visual_context_url:
+            progress_metadata['visual_context_url'] = visual_context_url
         if detail:
             progress_metadata['detail'] = detail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -320,6 +325,10 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
+        try:
+            r_client.publish(f"project:{project_id}:progress", safe_json_dumps(progress_metadata))
+        except Exception as pub_err:
+            print(f"[REDIS PUB ERROR] Greška pri slanju na kanal: {pub_err}", flush=True)
 
     vc_result = {}
     def run_vc_extraction(video_path):
@@ -833,8 +842,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=300,
-    time_limit=1800,
-    soft_time_limit=1700,
+    time_limit=2400,
+    soft_time_limit=2300,
     on_failure=handle_task_failure,
     on_success=handle_task_success
 )
@@ -918,9 +927,12 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         progress_metadata['costs']['total_usd'] = round(total, 5)
         
     def update_progress(step_name=None, percentage=None, completed_step=None, detail=None):
-        if step_name: progress_metadata['current_step'] = step_name
-        if percentage is not None: progress_metadata['percent'] = percentage
-        if completed_step: progress_metadata['completed_steps'].append(completed_step)
+        if step_name:
+            progress_metadata['current_step'] = step_name
+        if percentage is not None:
+            progress_metadata['percent'] = percentage
+        if completed_step:
+            progress_metadata['completed_steps'].append(completed_step)
         if detail:
             progress_metadata['detail'] = detail
             ts = datetime.now().strftime("%H:%M:%S")
@@ -928,6 +940,10 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             if len(progress_metadata['logs']) > 20:
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
+        try:
+            r_client.publish(f"project:{project_id}:progress", safe_json_dumps(progress_metadata))
+        except Exception as pub_err:
+            print(f"[REDIS PUB ERROR] Greška pri slanju na kanal: {pub_err}", flush=True)
 
     try:
         # --- PREUZIMANJE OSNOVNIH FAJLOVA SA S3 ---

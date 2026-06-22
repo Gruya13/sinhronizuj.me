@@ -5,7 +5,6 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
 
 from backend.core.database import engine, Base
-from backend.core.models import User, Project, Segment, Glossary
 
 print("Ispuštam sve postojeće tabele...")
 Base.metadata.drop_all(bind=engine)

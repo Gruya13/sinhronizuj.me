@@ -13,6 +13,7 @@ class Settings:
     MODAL_SENSEVOICE_URL: str = os.getenv("MODAL_SENSEVOICE_URL", "")
     MODAL_TRANSLATOR_URL: str = os.getenv("MODAL_TRANSLATOR_URL", "")
     MODAL_LEKTOR_URL: str = os.getenv("MODAL_LEKTOR_URL", "")
+    MODAL_JUDGE_URL: str = os.getenv("MODAL_JUDGE_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
     MODAL_DEMUCS_URL: str = os.getenv("MODAL_DEMUCS_URL", "")
     MODAL_WAV2LIP_URL: str = os.getenv("MODAL_WAV2LIP_URL", "")

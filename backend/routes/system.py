@@ -1,7 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from celery.result import AsyncResult
 
@@ -9,7 +9,6 @@ from backend.core.database import get_db
 from backend.core.models import User, Project
 from backend.core.auth import get_current_user, get_current_admin_user
 from backend.services.redis import get_redis_client
-from backend.services.s3 import get_presigned_download_url
 from backend.core.config import settings
 from backend.worker.celery_app import celery_app
 

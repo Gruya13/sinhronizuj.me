@@ -2,7 +2,6 @@ import re
 import time
 import json
 from backend.core.config import settings
-from backend.worker.utils import call_modal_endpoint
 
 # Uvoženje iz lokalnih modula
 from .masking import mask_untranslatable, unmask_text
