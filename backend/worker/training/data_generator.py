@@ -3,7 +3,7 @@ import re
 import json
 from backend.core.config import settings
 from backend.core.database import SessionLocal
-from backend.core.models import Segment
+from backend.core.models import Segment, Project
 
 def generate_paraphrases(text: str) -> list:
     """
@@ -54,23 +54,61 @@ def generate_paraphrases(text: str) -> list:
         print(f"[DATA GENERATOR WARNING] Greška pri parafraziranju: {e}", flush=True)
     return [text, text, text]
 
-def run_data_generation():
+def run_data_generation(user_id: str = None):
     """
     Ekstrahuje 'Zlatne' prevode i korisničke ispravke, parafrazira ih i kreira dataset.
+    Ako je prosleđen user_id, izoluje podatke samo za tog korisnika.
     """
-    print("[DATA GENERATOR] Započinjem generisanje skupa podataka za finetuning...", flush=True)
+    print(f"[DATA GENERATOR] Započinjem generisanje skupa podataka za finetuning (user_id={user_id})...", flush=True)
     db = SessionLocal()
     try:
-        # Zlatni parovi: qe_score > 0.92 i confidence_score > 4.5
-        # Korisničke ispravke: status == 'edited'
-        segments = db.query(Segment).filter(
-            ((Segment.qe_score > 0.92) & (Segment.confidence_score > 4.5)) |
-            (Segment.status == 'edited')
-        ).all()
+        if user_id:
+            import uuid
+            if isinstance(user_id, str):
+                try:
+                    user_uuid = uuid.UUID(user_id)
+                except ValueError:
+                    user_uuid = user_id
+            else:
+                user_uuid = user_id
+
+            # Filtriramo samo segmente koji pripadaju projektima datog korisnika
+            segments = db.query(Segment).join(Project).filter(
+                Project.user_id == user_uuid,
+                (((Segment.qe_score > 0.92) & (Segment.confidence_score > 4.5)) |
+                 (Segment.status == 'edited'))
+            ).all()
+        else:
+            # Zlatni parovi: qe_score > 0.92 i confidence_score > 4.5
+            # Korisničke ispravke: status == 'edited'
+            segments = db.query(Segment).filter(
+                ((Segment.qe_score > 0.92) & (Segment.confidence_score > 4.5)) |
+                (Segment.status == 'edited')
+            ).all()
 
         print(f"[DATA GENERATOR] Pronađeno {len(segments)} adekvatnih segmenata u bazi.", flush=True)
         if not segments:
             return {"status": "success", "examples_generated": 0, "message": "Nema segmenata koji ispunjavaju kriterijume."}
+
+        # Sakupimo jedinstvene prevode radi optimizacije (deduplikacije) i paralelnog rada
+        unique_translations = list(set(s.translated for s in segments if s.original and s.translated))
+        
+        # Paralelno parafraziranje pomoću ThreadPoolExecutor-a
+        from concurrent.futures import ThreadPoolExecutor
+        paraphrases_map = {}
+        max_workers = min(16, len(unique_translations)) if unique_translations else 1
+        
+        if unique_translations:
+            print(f"[DATA GENERATOR] Parafraziram {len(unique_translations)} jedinstvenih prevoda sa {max_workers} thread-ova...", flush=True)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_text = {executor.submit(generate_paraphrases, text): text for text in unique_translations}
+                for future in future_to_text:
+                    text = future_to_text[future]
+                    try:
+                        paraphrases_map[text] = future.result()
+                    except Exception as e:
+                        print(f"[DATA GENERATOR WARNING] Greška u threadu za parafraze: {e}", flush=True)
+                        paraphrases_map[text] = [text, text, text]
 
         system_prompt = (
             "Prevodi kao da si iskusni sinhronizator. Rečenice neka zvuče kao da ih izgovara "
@@ -91,7 +129,7 @@ def run_data_generation():
 
                 # Uzmi originalni prevod + 3 parafraze
                 targets = [s.translated]
-                paraphrases = generate_paraphrases(s.translated)
+                paraphrases = paraphrases_map.get(s.translated, [s.translated, s.translated, s.translated])
                 targets.extend(paraphrases)
 
                 for t in set(targets):

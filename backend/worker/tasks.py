@@ -277,11 +277,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
     )
 
     # Uspostavljanje izolovanog radnog prostora za ovaj task
-    original_temp_workspace = settings.TEMP_WORKSPACE
-    task_workspace = os.path.join(original_temp_workspace, task_id)
+    task_workspace = os.path.join(settings.TEMP_WORKSPACE, task_id)
     os.makedirs(task_workspace, exist_ok=True)
-    settings.TEMP_WORKSPACE = task_workspace
-    print(f"[CELERY TASK] Izolovani TEMP_WORKSPACE postavljen na: {settings.TEMP_WORKSPACE}", flush=True)
+    print(f"[CELERY TASK] Izolovani task_workspace kreiran na: {task_workspace}", flush=True)
 
     progress_metadata = {
         'id': task_id,
@@ -329,7 +327,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             print("[BACKGROUND VC] Započinjem ekstrakciju frejmova u pozadini...", flush=True)
             from backend.worker.preprocessor import extract_visual_context, upload_to_minio
             t_start = time.time()
-            preview_path = extract_visual_context(video_path)
+            preview_path = extract_visual_context(video_path, workspace_path=task_workspace)
             duration = time.time() - t_start
             url = None
             if preview_path:
@@ -346,7 +344,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
     try:
         # --- KORAK 1: Preuzimanje ---
         update_progress("Preuzimanje videa...", 10, detail="Povezivanje sa izvorom i preuzimanje video zapisa...")
-        result = download_video(video_url)
+        result = download_video(video_url, workspace_path=task_workspace)
         if result["status"] == "error": 
             return result
         update_progress(completed_step="Preuzimanje završeno")
@@ -369,11 +367,11 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         vocals_filename = f"vocals_{effective_project_id}.wav"
         no_vocals_filename = f"no_vocals_{effective_project_id}.wav"
-        stable_vocals_path = os.path.join(original_temp_workspace, vocals_filename)
-        stable_no_vocals_path = os.path.join(original_temp_workspace, no_vocals_filename)
+        stable_vocals_path = os.path.join(task_workspace, vocals_filename)
+        stable_no_vocals_path = os.path.join(task_workspace, no_vocals_filename)
         
         if check_s3_file_exists(settings.MINIO_BUCKET, vocals_cache_key) and check_s3_file_exists(settings.MINIO_BUCKET, no_vocals_cache_key):
-            print(f"[CACHE HIT] Separacija vokala pronađena u kešu na S3. Preuzimam...", flush=True)
+            print("[CACHE HIT] Separacija vokala pronađena u kešu na S3. Preuzimam...", flush=True)
             update_progress("Izolacija vokala...", 25, detail="Preuzimam izolovani vokal iz keša...")
             download_file_from_s3(settings.MINIO_BUCKET, vocals_cache_key, stable_vocals_path)
             download_file_from_s3(settings.MINIO_BUCKET, no_vocals_cache_key, stable_no_vocals_path)
@@ -383,7 +381,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             t_start_sep = time.time()
             sep_result = separate_audio(
                 result['audio_path'],
-                progress_callback=lambda detail: update_progress(detail=detail)
+                progress_callback=lambda detail: update_progress(detail=detail),
+                workspace_path=task_workspace
             )
             duration_sep = time.time() - t_start_sep
             if sep_result["status"] == "error": 
@@ -430,7 +429,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         transcription_result = None
         if check_s3_file_exists(settings.MINIO_BUCKET, trans_cache_key):
-            print(f"[CACHE HIT] Transkripcija pronađena u kešu na S3. Preuzimam...", flush=True)
+            print("[CACHE HIT] Transkripcija pronađena u kešu na S3. Preuzimam...", flush=True)
             update_progress("Prepoznavanje govora (Whisper)...", 50, detail="Preuzimam transkripciju iz keša...")
             local_trans_path = os.path.join(task_workspace, "trans_cache.json")
             if download_file_from_s3(settings.MINIO_BUCKET, trans_cache_key, local_trans_path):
@@ -483,7 +482,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         # Kopiramo originalni video u stabilnu lokaciju
         video_filename = f"video_{effective_project_id}.mp4"
-        stable_video_path = os.path.join(original_temp_workspace, video_filename)
+        stable_video_path = os.path.join(task_workspace, video_filename)
         shutil.copy2(result["video_path"], stable_video_path)
         
         from backend.worker.segment_optimizer import optimize_segments_for_translation
@@ -496,7 +495,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         translation_result = None
         if check_s3_file_exists(settings.MINIO_BUCKET, translation_cache_key):
-            print(f"[CACHE HIT] Prevod pronađen u kešu na S3. Preuzimam...", flush=True)
+            print("[CACHE HIT] Prevod pronađen u kešu na S3. Preuzimam...", flush=True)
             update_progress("Prevođenje (Modal + Multimodal)...", 85, detail="Preuzimam prevod iz keša...")
             local_trans_path = os.path.join(task_workspace, "translation_cache.json")
             if download_file_from_s3(settings.MINIO_BUCKET, translation_cache_key, local_trans_path):
@@ -822,6 +821,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
+    finally:
+        if os.path.exists(task_workspace):
+            shutil.rmtree(task_workspace, ignore_errors=True)
 @celery_app.task(
     bind=True,
     name="render_video_task",
@@ -891,10 +893,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         db.close()
         
     # Inicijalizujemo local workspace
-    original_temp_workspace = settings.TEMP_WORKSPACE
-    task_workspace = os.path.join(original_temp_workspace, task_id)
+    task_workspace = os.path.join(settings.TEMP_WORKSPACE, task_id)
     os.makedirs(task_workspace, exist_ok=True)
-    settings.TEMP_WORKSPACE = task_workspace
     
     progress_metadata = {
         'id': task_id,
@@ -1019,7 +1019,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 disable_openvoice=settings.DISABLE_OPENVOICE,
                 disable_enhance=settings.DISABLE_ENHANCE,
                 progress_callback=lambda detail: update_progress(detail=detail),
-                all_segments=segments
+                all_segments=segments,
+                workspace_path=task_workspace
             )
             duration_tts = time.time() - t_start_tts
             if tts_result["status"] == "error":
@@ -1119,7 +1120,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             local_no_vocals_path,
             merger_segments,
             background_vol=background_vol,
-            dubbed_vol=dubbed_vol
+            dubbed_vol=dubbed_vol,
+            workspace_path=task_workspace
         )
         duration_merge = time.time() - t_start_merge
         if merge_result["status"] == "error":
@@ -1202,7 +1204,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                         db.commit()
                         
                         # 3. Regenerišemo TTS samo za te re-prevedene segmente
-                        print(f"[FEEDBACK LOOP] Ponovo generišem TTS za re-prevedene segmente...", flush=True)
+                        print("[FEEDBACK LOOP] Ponovo generišem TTS za re-prevedene segmente...", flush=True)
                         db_segs_to_tts = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id.in_([s["id"] for s in segments_to_retranslate])).all()
                         
                         from backend.worker.tts_engine import synthesize_audio
@@ -1224,7 +1226,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                             voice_type=voice_type,
                             disable_openvoice=settings.DISABLE_OPENVOICE,
                             disable_enhance=settings.DISABLE_ENHANCE,
-                            all_segments=[{"id": s.segment_id, "start": s.start, "end": s.end, "original": s.original, "translated": s.translated} for s in all_segs_db]
+                            all_segments=[{"id": s.segment_id, "start": s.start, "end": s.end, "original": s.original, "translated": s.translated} for s in all_segs_db],
+                            workspace_path=task_workspace
                         )
                         
                         if tts_result["status"] != "error":
@@ -1263,7 +1266,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                             db.commit()
                             
                             # 4. Ponovo pokrećemo FFmpeg merger sa novim kraćim audio zapisima
-                            print(f"[FEEDBACK LOOP] Ponovo pokrećem dynamic time stretching sa novim audio zapisima...", flush=True)
+                            print("[FEEDBACK LOOP] Ponovo pokrećem dynamic time stretching sa novim audio zapisima...", flush=True)
                             re_merger_segments = [{
                                 "id": s["id"],
                                 "path": s["tts_path"],
@@ -1283,7 +1286,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                                 local_no_vocals_path,
                                 re_merger_segments,
                                 background_vol=background_vol,
-                                dubbed_vol=dubbed_vol
+                                dubbed_vol=dubbed_vol,
+                                workspace_path=task_workspace
                             )
                             if merge_result["status"] == "error":
                                 return merge_result
@@ -1310,7 +1314,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         if needs_lipsync:
             update_progress("Lip Sync sinhronizacija...", 85, detail="Usklađivanje usana govornika (Wav2Lip)...")
             lip_vocals_path = merge_result["dubbed_audio_path"]
-            lip_result = apply_selective_lip_sync(merge_result["final_video_path"], lip_vocals_path, segments)
+            lip_result = apply_selective_lip_sync(merge_result["final_video_path"], lip_vocals_path, segments, workspace_path=task_workspace)
             final_output = lip_result["lipsync_video_path"] if lip_result["status"] != "error" else merge_result["final_video_path"]
         else:
             final_output = merge_result["final_video_path"]
@@ -1416,8 +1420,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
             pass
         return {"status": "error", "message": str(e)}
     finally:
-        # Vraćamo originalni workspace i čistimo render folder
-        settings.TEMP_WORKSPACE = original_temp_workspace
+        # Čistimo render folder
         if os.path.exists(task_workspace):
             shutil.rmtree(task_workspace, ignore_errors=True)
  
@@ -1691,14 +1694,14 @@ def run_nightly_pattern_analysis_task():
     acks_late=True,
     time_limit=14400
 )
-def deploy_lora_task(dry_run: bool = False):
+def deploy_lora_task(dry_run: bool = False, user_id: str = None):
     from backend.worker.training.data_generator import run_data_generation
     from backend.worker.training.train_lora import run_lora_training
     import redis
 
-    print(f"[BLUE-GREEN DEPLOY] Započinjem proces generisanja podataka i LoRA finetuning-a (dry_run={dry_run})...", flush=True)
+    print(f"[BLUE-GREEN DEPLOY] Započinjem proces generisanja podataka i LoRA finetuning-a (dry_run={dry_run}, user_id={user_id})...", flush=True)
     
-    data_res = run_data_generation()
+    data_res = run_data_generation(user_id=user_id)
     if data_res.get("status") != "success":
         print(f"[BLUE-GREEN DEPLOY ERROR] Generisanje podataka nije uspelo: {data_res.get('message')}", flush=True)
         return data_res

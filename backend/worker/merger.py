@@ -117,10 +117,10 @@ def merge_audio_and_video_dynamic(
         return {"status": "error", "message": "Neki od potrebnih fajlova za spajanje ne postoje."}
 
     if not tts_segments:
-        # Ako nema segmenata, radimo fallback na klasično spajanje
         print("[DYNAMIC MERGER WARNING] Nema segmenata za dinamičko spajanje. Radim fallback na statički mix.")
         return {"status": "error", "message": "Nema segmenata za dinamičko spajanje."}
 
+    temp_files_to_clean = []
     try:
         print(f"[DYNAMIC MERGER] Započinjem dinamički video time stretching za {len(tts_segments)} segmenata...")
         
@@ -198,7 +198,6 @@ def merge_audio_and_video_dynamic(
         concat_mix_labels = []
         concat_voc_labels = []
         
-        temp_files_to_clean = []
         speech_speedups = {}
         
         for idx, block in enumerate(blocks):
@@ -313,10 +312,6 @@ def merge_audio_and_video_dynamic(
             print(f"Error log: {res.stderr.decode('utf-8', errors='ignore')}")
             return {"status": "error", "message": f"FFmpeg dynamic stretching nije uspeo: {res.stderr.decode('utf-8')}"}
             
-        for f in temp_files_to_clean:
-            if os.path.exists(f):
-                os.remove(f)
-                
         print(f"[DYNAMIC MERGER] Uspešno kreiran rastegnuti video: {final_video_path}")
         return {
             "status": "success",
@@ -329,3 +324,10 @@ def merge_audio_and_video_dynamic(
         import traceback
         traceback.print_exc()
         return {"status": "error", "message": f"Greška pri dinamičkom spajanju: {str(e)}"}
+    finally:
+        for f in temp_files_to_clean:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except Exception as clean_err:
+                    print(f"[DYNAMIC MERGER CLEANUP ERROR] Greška pri čišćenju {f}: {clean_err}", flush=True)

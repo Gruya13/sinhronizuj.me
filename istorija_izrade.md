@@ -1,3 +1,48 @@
+## 2026-06-22 (12:05 CET) — Optimizacija Konkurentnosti i Čišćenje Resursa (Faza 1)
+
+### Urađeno
+1. **Otklonjen kritičan Race Condition u Celery taskovima**:
+   - Uklonjeno globalno predefinisanje singleton promenljive `settings.TEMP_WORKSPACE = task_workspace` iz funkcija `analyze_video_task` i `render_video_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py).
+   - Kreiran lokalno izolovani direktorijum `task_workspace` (pomoću jedinstvenog `task_id`) i prosleđen kao parametar `workspace_path` u sve funkcije u pipeline-u: `download_video`, `separate_audio`, `extract_visual_context`, `synthesize_audio`, `merge_audio_and_video_dynamic` i `apply_selective_lip_sync`. Ovo osigurava potpunu stabilnost pri paralelnom izvršavanju više analiza i rendera istovremeno.
+2. **Rešeno curenje diska (Disk Leaks)**:
+   - Dodat robustan `finally` blok u `analyze_video_task` i `render_video_task` unutar [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) koji garantuje brisanje celog `task_workspace` direktorijuma nakon uspeha ili neuspeha/izuzetka.
+   - Prepravljene lokacije privremenih fajlova `stable_vocals_path`, `stable_no_vocals_path` i `stable_video_path` da se kreiraju isključivo unutar izolovanog `task_workspace` umesto globalnog temp foldera, čime je obezbeđeno njihovo automatsko brisanje na kraju taska.
+   - U datoteci [merger.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/merger.py) dodat `try...finally` blok u funkciji `merge_audio_and_video_dynamic` koji uvek briše sve generisane ubrzane fajlove iz liste `temp_files_to_clean`, sprečavajući nakupljanje nepotrebnih audio zapisa pri greškama.
+3. **Poboljšan dataset generator i izolacija korisnika**:
+   - Izmenjena funkcija `run_data_generation` u [data_generator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/training/data_generator.py) da opciono prima `user_id` i radi SQL `JOIN` sa tabelom `Project` radi izolacije i filtriranja "Zlatnih" segmenata i korisničkih ispravki po korisniku. Ovo sprečava mešanje stilova i podataka različitih korisnika tokom LoRA učenja.
+   - Paralelizovan parafrazer unutar `data_generator.py` korišćenjem `ThreadPoolExecutor`-a sa deduplikacijom prevoda, čime je vreme generisanja dataseta ubrzano i do 10-20 puta smanjenjem Modal API mrežnih blokada i troškova.
+   - Prilagođen Celery task `deploy_lora_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) da podrži `user_id` i prosledi ga generatoru.
+4. **Verifikacija koda**:
+   - Sve izmene su linto-vane sa `ruff` i proverene sa `bandit` radi sigurnosti.
+   - Pokrenut celokupni pytest test paket lokalno i svi testovi (23 passed) su uspešno prošli.
+
+---
+
+## 2026-06-22 (11:41 CET) — Planiranje i dokumentovanje budućih unapređenja sistema
+
+### Urađeno
+1. **Započet brainstorming novih ideja**:
+   - Analizirani i definisani planovi za rešavanje nedostatka API dokumentacije (OpenAPI/Swagger i Wiki integracija).
+   - Definisane SLA vrednosti za obradu videa (kratki, srednji i dugi formati).
+   - Strukturisan plan za bezbednosni audit i kreiranje `SECURITY.md` datoteke.
+   - Osmišljena asinhrona arhitektura za praćenje realnog progresa Modal radnika preko WebSocketa i Redis Pub/Sub kanala.
+   - Koncipirana integracija Prometheus i Grafana monitoringa (Node Exporter, cAdvisor, Celery Exporter i FastAPI Instrumentator) u Docker Compose okruženje.
+2. **Kreiran centralni plan u root-u**:
+   - Sve ideje i njihovi detaljni koraci implementacije su dokumentovani u [buduca_unapredjenja.md](file:///home/gruya/Projektri/sinhronizuj.me/buduca_unapredjenja.md).
+
+---
+
+## 2026-06-22 (11:30 CET) — Detaljan sistemski i arhitektonski audit platforme
+
+### Urađeno
+1. **Izvršen detaljan audit codebase-a**:
+   - Analizirani FastAPI gateway, SQLAlchemy modeli, Celery taskovi, Redis i Modal serverless GPU integracije.
+   - Identifikovano 9 kritičnih i srednjih slabih tačaka u konkurentnosti (race conditions), curenju resursa (disk leaks), memorijskoj stabilnosti (OOM kod Base64 transfera), performansama baze podataka i dizajnu modela za samoučenje.
+2. **Kreiran sistemski izveštaj**:
+   - Detaljan izveštaj sa konkretnim predlozima za optimizaciju i arhitekturna unapređenja je sačuvan kao artifakt [sistemski_audit_izvestaj.md](file:///home/gruya/.gemini/antigravity/brain/a88ec1a2-a74e-4ecd-9a5a-49d6ce91b5e5/sistemski_audit_izvestaj.md).
+
+---
+
 ## 2026-06-22 (10:15 CET) — Kreiranje interaktivnog grafikona toka podataka Modal radnika
 
 ### Urađeno
