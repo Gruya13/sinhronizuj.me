@@ -24,6 +24,9 @@
 7. **Testiranje i Verifikacija**:
    - Napisan sveobuhvatan test fajl [test_faza4.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_faza4.py) koji verifikuje rad LLM sudije, paralelne evaluacije u prevodilačkom batch-u i WebSocket rute.
    - Pokrenut ceo test paket (31 passed) i Ruff/Bandit linteri — kod je u potpunosti ispravan i bezbedan.
+8. **Ažuriranje Obsidian Wiki-ja**:
+   - Kreirana nova Wiki stranica [Sistemske_Optimizacije.md](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/Arhitektura/Sistemske_Optimizacije.md) koja pruža sveobuhvatan tehnički pregled optimizacija iz Faza 1, 2, 3 i 4 (race conditions, disk leaks, active speaker precomputations, asinhroni TTS, S3 presigned prenos, DB indeksi, N+1 fix, batch glosar, WebSocket statusi, Prometheus monitoring i parallel LLM sudija).
+   - Ažurirani centralni indeksi [00_MOC_Index.md](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/00_MOC_Index.md) i [Arhitektura_MOC.md](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/Arhitektura/Arhitektura_MOC.md) kako bi povezali novu stranicu.
 
 ---
 

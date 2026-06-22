@@ -10,6 +10,8 @@ Dobrodošli u centralni trezor znanja (Second Brain) projekta **sinhronizuj.me**
 Sve o tehničkom dizajnu, infrastrukturi, bazi podataka i komunikaciji između komponenti.
 *   [[Arhitektura_Sistema]] – Troslojna arhitektura i tok podataka.
 *   [[Baza_Podataka]] – SQLAlchemy modeli, UUID ključevi i Alembic migracioni tok.
+*   [[Performanse_i_SLA]] – SLA standardi i benchmarks po fazama obrade.
+*   [[Sistemske_Optimizacije]] – Detaljan pregled sprovedenih optimizacija i otklonjenih slabosti.
 
 ### ⚙️ [[Funkcionalnosti_MOC|2. Funkcionalnosti & Moduli]]
 Detaljni tehnički opisi pojedinačnih delova sistema i AI modela.
