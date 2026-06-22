@@ -25,4 +25,5 @@ from backend.worker.translation import (
     lektor_segments,
     calculate_jaccard_similarity,
     get_llm_judge_score,
+    extract_video_frames,
 )

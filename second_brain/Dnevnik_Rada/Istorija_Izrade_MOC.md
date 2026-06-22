@@ -12,6 +12,12 @@ Ovaj dokument služi kao indeks svih izmena, implementacija i sesija razvoja na 
 
 ### Jun 2026.
 
+#### [[2026-06-21 - Priprema i kreiranje DESIGN.md za Stitch MCP]]
+*   **Opis**: Kreiranje centralnog [DESIGN.md](file:///home/gruya/Projektri/sinhronizuj.me/DESIGN.md) sa dizajnerskim smernicama za 5 ekrana, u pripremi za automatsko postavljanje UI/UX na Stitch platformu.
+
+#### [[2026-06-21 - Konfiguracija Stitch MCP-a]]
+*   **Opis**: Konfigurisanje Google-ovog Stitch MCP servera sa SSE endpoint-om i X-Goog-Api-Key zaglavljem u mcp_config.json klijenta.
+
 #### [[2026-06-21 - Implementacija Perpetual Learning System-a i Optimizacija Performansi Prevođenja]]
 *   **Opis**: Refaktorisana je arhitektura prevođenja i implementiran je trostepeni sistem kontinuiranog učenja (Perpetual Learning System): Real-time TM (Subagent Alpha), Dnevni Pattern Miner (Subagent Beta) i Nedeljni LoRA Fine-Tuner (Subagent Gamma).
 *   **Performanse**: Uvećan `batch_size` na 25 rečenica, Lektor early exit, paralelizacija (chunking) i vLLM APC.

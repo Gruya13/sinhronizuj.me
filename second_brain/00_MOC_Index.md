@@ -14,9 +14,11 @@ Sve o tehničkom dizajnu, infrastrukturi, bazi podataka i komunikaciji između k
 ### ⚙️ [[Funkcionalnosti_MOC|2. Funkcionalnosti & Moduli]]
 Detaljni tehnički opisi pojedinačnih delova sistema i AI modela.
 *   [[Audio_i_Video_Procesiranje]] – Demucs vokalna izolacija, SenseVoice STT, lektorisanje i FFmpeg audio-video renderovanje.
-*   [[Backend_Dokumentacija]] – FastAPI gateway, rute, autentifikacija, Redis i Celery orkestracija.
-*   [[Frontend_Dokumentacija]] – React/Vite Studio DAW interfejs, upravljanje stanjem i undo/redo mehanizam.
+*   [[Backend|Backend Dokumentacija]] – FastAPI gateway, rute, autentifikacija, Redis i Celery orkestracija.
+*   [[Frontend|Frontend Dokumentacija]] – React/Vite Studio DAW interfejs, upravljanje stanjem i undo/redo mehanizam.
 *   [[Modal_Workers_i_AI]] – Serverless GPU infrastruktura na Modal klasteru i AI modeli.
+*   [[Prevodilacki_Pipeline|Prevodilački Pipeline]] – Segmentacija, prevođenje, self-critique i lektorisanje.
+*   [[Sistem_Samounapredjenja|Sistem Samounapređenja]] – Trostepeni Perpetual Learning System (Alpha, Beta, Gamma).
 
 ### 📝 [[Dnevnik_Rada_MOC|3. Dnevnik Rada & Istorija]]
 Hronološki zapisi o razvoju i implementacijama.
