@@ -11,7 +11,8 @@ Ovaj fajl služi kao tvoj primarni sistemski prompt za interakciju sa wiki siste
 1.  **ČITAJ PRE RADA:** Pre nego što započneš rad na bilo kom zadatku (bilo da je to implementacija, popravka greške ili refaktorišući proces), tvoj prvi korak **mora** biti pretraga ovog trezora (`second_brain/`). Pogledaj da li postoji beleška koja opisuje modul na kojem radiš.
 2.  **PIŠI NAKON RADA:** Kada završiš implementaciju ili rešiš bag, tvoja je obaveza da ažuriraš postojeće fajlove ili kreiraš novu belešku u odgovarajućem folderu.
 3.  **KORISTI DVOSMERNE LINKOVE:** Povezuj beleške koristeći Obsidian sintaksu dvosmernih linkova: `[[Naziv Beleške]]`. Poveži novu belešku sa indeksnim fajlom `[[00_MOC_Index]]` ili odgovarajućim MOC fajlom u podfolderima.
-4.  **ISTORIJA IZDRE:** Svaka izmena mora biti zabeležena u fajlu [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md) sa tačnim datumom, vremenom i detaljnim opisom šta je urađeno. U toj belešci takođe možeš napraviti link ka novoj wiki belešci.
+4.  **ISTORIJA IZRADE I WIKI DOKUMENTACIJA:** Svaka izmena mora biti zabeležena u fajlu [istorija_izrade.md](file:///home/gruya/Projektri/sinhronizuj.me/istorija_izrade.md) sa tačnim datumom, vremenom i detaljnim opisom šta je urađeno. 
+    *   **OBAVEZNO PRAVILO:** Kada god se doda novi unos u istoriju izrade, sve sprovedene izmene i optimizacije se moraju automatski dokumentovati na svojim odgovarajućim mestima u Wiki-ju (`second_brain/`), ažuriranjem postojećih Wiki fajlova ili kreiranjem novih (uz obavezno linkovanje kroz mape sadržaja MOC), kako bi baza znanja uvek bila 100% sinhronizovana sa stvarnim stanjem repozitorijuma.
 5.  **JEZIK:** Sva komunikacija sa korisnikom i razmišljanje se odvija na **srpskom jeziku**, a dokumentacija u Wiki-ju se piše na srpskom jeziku (osim tehničkih termina koji se mogu pisati na engleskom ili u originalu).
 
 ---
