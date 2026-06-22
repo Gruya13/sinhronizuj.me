@@ -106,7 +106,7 @@ jobs:
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d
           
           # Pokretanje migracija
-          docker compose -f infra/hetzner/docker-compose.prod.yml exec -T api alembic upgrade head || echo "Nema migracija ili je došlo do greške"
+          docker compose -f infra/hetzner/docker-compose.prod.yml exec -T api alembic -c backend/alembic.ini upgrade head || echo "Nema migracija ili je došlo do greške"
 
   deploy-production:
     name: Deploy na Produkciju VPS
@@ -146,4 +146,4 @@ jobs:
           docker compose -f infra/hetzner/docker-compose.prod.yml up -d
           
           # Pokretanje migracija
-          docker compose -f infra/hetzner/docker-compose.prod.yml exec -T api alembic upgrade head || echo "Nema migracija ili je došlo do greške"
+          docker compose -f infra/hetzner/docker-compose.prod.yml exec -T api alembic -c backend/alembic.ini upgrade head || echo "Nema migracija ili je došlo do greške"
