@@ -297,3 +297,28 @@ Iako je prva verzija optimizacije sa pre-computation u `active_speaker.py` bila 
 - [audio_gender.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/audio_gender.py) — Učitavanje preko pydub-a + memorijsko keširanje
 
 
+## 2026-06-22 (07:10 CET) — Kompletiranje i ponovno generisanje nedostajućih ekrana na Stitch platformi
+
+### Problem
+Korisnik je primetio da su na Stitch platformi unutar projekta `sinhronizuj.me` bila vidljiva samo 3 panela/ekrana (Landing Page, Login & Waitlist, Dashboard). Preostala dva ekrana:
+- **sinhronizuj.me - Studio Editor** (DAW Workspace)
+- **sinhronizuj.me - Admin Panel**
+nisu bili prisutni na platnu niti na listi aktivnih ekrana, iako su u prethodnim fazama pozivi na API nivou bili pokrenuti (verovatno nisu bili uspešno upisani ili su ostali u privremenoj sesiji).
+
+### Rešenje
+1. **Skripta za generisanje ekrana** ([generate_missing_screens.py](file:///home/gruya/Projektri/sinhronizuj.me/scratch/generate_missing_screens.py)):
+   - Napisana je automatizovana Python skripta koja poziva Stitch MCP alat `generate_screen_from_text`.
+   - Formulisani su premium i detaljni promptovi na engleskom jeziku koji se oslanjaju na definisani dizajn sistem **Deep Space Studio** (ID: `assets/0dd043d9251145d887c484f3040c69d2`).
+   - Promptovi opisuju tamni režim (`#080B11`), glassmorphism panele (`rgba(18, 26, 41, 0.6)` sa backdrop blur-om), Neon Cyan i AI Purple akcentovane boje, namenske rotirajuće dugmiće (knobs), vremensku liniju (StudioTimeline) sa dvostrukim zvučnim talasom i konzolni terminal sa logovima u JetBrains Mono fontu.
+2. **Generisanje ekrana**:
+   - Skripta je uspešno pokrenuta u pozadini i generisala je oba nedostajuća ekrana.
+3. **Čisto listanje ekrana** ([list_screens_clean.py](file:///home/gruya/Projektri/sinhronizuj.me/scratch/list_screens_clean.py)):
+   - Kreirana je helper skripta za čist ispis svih ekrana na projektu bez dugih download URL-ova i prelamanja JSON-a.
+   - Verifikovano je da Stitch projekat sada sadrži svih 5 jedinstvenih ekrana (ukupno 10 instanci sa revizijama) koji su sada trajno dodati na platno projekta.
+
+### Status
+Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni testovi (pytest) su pokrenuti i svi prolaze (23 passed).
+ Izmene na pomoćnim lokalnim skriptama se nalaze u folderu `scratch/` koji je konfigurisan u `.gitignore` i ne ulazi u git repozitorijum. Radni direktorijum gita je čist.
+
+
+
