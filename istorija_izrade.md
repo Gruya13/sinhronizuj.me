@@ -1,3 +1,34 @@
+## 2026-06-21 (23:17 CET) — Dopuna i ažuriranje baze znanja (Obsidian Wiki)
+
+### Urađeno
+1. **Kreiranje dokumentacije o greškama**:
+   - Kreirana je nova Wiki beleška [[Česta_Pitanja_i_Bagovi]] u folderu `second_brain/Rešavanje_Problema/` koja detaljno pokriva rešene greške (NumPy 2.4.4 JSON serijalizacija, Nginx 504 Gateway Timeout, active speaker optimizacija, S3 basename preuzimanje, .env Docker compose interpolacija).
+2. **Dokumentovanje prevodilačkog cevovoda**:
+   - Kreirana je nova Wiki beleška [[Prevodilacki_Pipeline]] u folderu `second_brain/Funkcionalnosti/` koja detaljno opisuje sentence-level re-segmentaciju, samokritičku petlju (Self-Critique), CometKiwi QE procenu kvaliteta, lektorsku reviziju i determinističko post-procesiranje na latinici.
+3. **Dokumentovanje sistema samounapređenja**:
+   - Kreirana je nova Wiki beleška [[Sistem_Samounapredjenja]] u folderu `second_brain/Funkcionalnosti/` koja opisuje Perpetual Learning System i uloge Alpha, Beta i Gamma agenata, kao i Blue-Green hot-swap mehanizam za LoRA modele.
+4. **Ažuriranje mapa sadržaja (MOC)**:
+   - Ažurirane su centralne mape [[00_MOC_Index]] i [[Funkcionalnosti_MOC]] kako bi uključile nove Wiki fajlove i ispravile prekinute linkove.
+5. **Dopuna dokumentacije o obradi zvuka**:
+   - Ažurirana je stranica [[Audio_i_Video_Procesiranje]] odeljkom o optimizovanoj detekciji aktivnog govornika (Active Speaker Detection) koja koristi sekvencijalni batch pre-proračun.
+
+## 2026-06-21 (23:18 CET) — Priprema i kreiranje DESIGN.md za Stitch MCP
+
+### Urađeno
+1. **Kreiranje [DESIGN.md](file:///home/gruya/Projektri/sinhronizuj.me/DESIGN.md)**:
+   - Definisane su vizuelne i estetske smernice za dizajn sistem aplikacije (Studio stakleni tamni mod, neon prelive, Outfit/Inter fontove).
+   - Detaljno su opisane komponente (rotirajući Knob dial, StudioTimeline, SegmentEditor) i raspored za svih 5 ključnih ekrana (Landing Page, Login & Waitlist, Dashboard View, Studio DAW View, Admin Panel).
+2. **Kreiranje Plana Implementacije**:
+   - Napravljen je plan integracije sa Stitch MCP-om i zabeleženo je pitanje oko 401 Unauthorized greške na serveru.
+
+## 2026-06-21 (23:12 CET) — Konfiguracija Stitch MCP servera za Antigravity
+
+### Urađeno
+1. **Povezivanje Stitch MCP**:
+   - U konfiguracionu datoteku klijenta [mcp_config.json](file:///home/gruya/.gemini/antigravity/mcp_config.json) dodat je Google-ov **Stitch MCP** server.
+   - Konfigurisan je bezbedan pristup preko SSE API endpoint-a: `https://stitch.googleapis.com/mcp` sa odgovarajućim API ključem u zaglavlju `X-Goog-Api-Key`.
+   - Zadržana je postojeća konfiguracija za `pencil` MCP server kako bi oba servera bila dostupna.
+
 ## [2026-06-21 22:31:00] Kreiranje Obsidian Second Brain (Wiki) i smernica za AI agente
 - **Opis:**
   Uspostavljen je Obsidian Second Brain (Wiki) sistem znanja u folderu `second_brain/` radi boljeg dokumentovanja arhitekture i funkcionalnosti projekta:
@@ -234,4 +265,24 @@ Faza 1 analize videa je radila preko 20 minuta za kratak video. Glavni uzrok je 
 ### Izmenjeni fajlovi
 - [active_speaker.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/active_speaker.py) — Precompute i timeline logike
 - [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) — Integracija optimizacije u Celery worker
+
+## 2026-06-22 (06:50 CET) — Rešavanje drugog pada Faze 1 i optimizacija detekcije roda (pydub + keširanje)
+
+### Problem
+Iako je prva verzija optimizacije sa pre-computation u `active_speaker.py` bila pushovana, analiza je ponovo pukla na serveru sa `SoftTimeLimitExceeded()`. Detaljnom pretragom logova i stanja na daljinskom VPS-u ustanovljeno je:
+1. **Deploy problem**: Zbog zastarele i nepostojeće MinIO slike (`RELEASE.2024-05-10T01-39-38Z`), globalni `docker compose pull` u GitHub Actions-u je pucao, što je blokiralo primenu novog koda na VPS-u (radnici su izvršavali stari kod od pre 16 sati).
+2. **Torchaudio.info bag**: U logovima radnika detektovana je greška `AttributeError: module 'torchaudio' has no attribute 'info'` koja se ponavljala na svakom segmentu. PyTorch `2.11.0+cpu` na serveru nema `info` funkciju. Zbog ovoga je rod govornika stalno prepoznavan kao "male", a stalno bacanje izuzetaka i I/O čitanje audio fajla sa diska za svaki segment dodatno je usporavalo analizu.
+
+### Rešenje
+1. **Infrastrukturni deploy**: Ručno smo se povezali na VPS preko SSH i uspešno izvršili selektivan deploy i restart servisa (`api`, `worker-analyzer`, `worker-renderer`, `worker-default`, `beat`, `frontend`), zaobilazeći MinIO.
+2. **`audio_gender.py`**:
+   - Zamenjen uvoz `torchaudio.info` i `torchaudio.load` modulom `pydub.AudioSegment`.
+   - Implementirano memorijsko keširanje na nivou modula (`_cached_audio_segment`). Audio fajl se učitava u memoriju tačno **jednom** (na prvom segmentu), a svi preostali segmenti se trenutno (sečenjem iz memorije za <0.03s) procesiraju.
+3. **Merenje performansi**:
+   - Ubrzanje drugog i svakog sledećeg poziva za detekciju roda iznosi **12.5x** (sa 0.45s na 0.03s).
+   - Uklonjene su sve torchaudio greške u logovima na serveru.
+
+### Izmenjeni fajlovi
+- [audio_gender.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/audio_gender.py) — Učitavanje preko pydub-a + memorijsko keširanje
+
 

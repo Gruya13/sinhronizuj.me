@@ -69,6 +69,12 @@ Nakon dobijanja izvornog transkripta, tekst prolazi kroz modul za prevođenje [t
     *   *Korisnički definisan glosar* iz baze podataka (tabela `glossaries` za trenutnog korisnika). Vidi [[Baza_Podataka]].
     *   Reči se dinamički zamenjuju pre slanja na TTS engine kako bi se izbegli pogrešni prevodi tehničkih ili brendiranih pojmova.
 
+### 3.3. Detekcija Aktivnog Govornika (Active Speaker Detection)
+Za detekciju pokreta usana govornika i odlučivanje da li je segment govor na ekranu ili naracija (što diktira potrebu za Wav2Lip sintezom), koristi se visoko optimizovan modul [active_speaker.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/active_speaker.py):
+1. **Jednokratno pre-procesiranje (`precompute_active_speakers`)**: Tokom analize videa, Celery radnik jednom otvara video i sekvencijalno (frame-by-frame) uzorkuje frejmove (podrazumevano 8 FPS) kroz MediaPipe FaceMesh model. Za preskakanje frejmova koristi se brza metoda `cap.grab()` koja ne dekodira slike u memoriju, čime se izbegava skupo seek-ovanje i smanjuje vreme pre-procesiranja na svega par sekundi.
+2. **Računanje otvorenosti usana**: Na uzorkovanim frejmovima se računaju koordinate unutrašnjih ivica usana, a vertikalno rastojanje se normalizuje širinom usta kako bi se eliminisao uticaj dubine i daljine kamere.
+3. **Analiza Varijanse**: Ukoliko se u vremenskom opsegu nekog segmenta detektuje prisustvo lica na više od 30% frejmova, a varijansa otvorenosti usta je veća od praga `0.0015`, segment se označava sa `active_speaker=True`. U suprotnom, smatra se da je u pitanju naracija/voiceover i Wav2Lip se za taj deo preskače.
+
 ---
 
 ## 4. Sinteza Govora i Kloniranje Glasa
