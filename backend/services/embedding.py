@@ -1,6 +1,5 @@
 import numpy as np
 from typing import List
-from sentence_transformers import SentenceTransformer
 
 class EmbeddingService:
     _instance = None
@@ -15,6 +14,7 @@ class EmbeddingService:
     def model(self):
         if self._model is None:
             print("[EMBEDDING] Učitavam višejezični model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2...", flush=True)
+            from sentence_transformers import SentenceTransformer
             # paraphrase-multilingual-MiniLM-L12-v2 je lagan (110M parametara), brz i odličan za višejezični alignment (ENG-SRB)
             self._model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
             print("[EMBEDDING] Model uspešno učitan u memoriju.", flush=True)

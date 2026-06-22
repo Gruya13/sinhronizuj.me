@@ -4,6 +4,10 @@ from backend.services.embedding import embedding_service
 from backend.core.models import TranslationMemory, WikiRule, User
 from backend.routes.wiki import WikiRuleCreate, WikiRuleUpdate
 
+# Mock-ujemo get_embedding da ne uvozi stvarni model na CI/CD okruženju
+embedding_service.get_embedding = MagicMock(return_value=[0.1] * 384)
+
+
 # 1. Testiranje embedding servisa (kosinusna sličnost)
 def test_embedding_service_cosine_similarity():
     # Test identičnih vektora

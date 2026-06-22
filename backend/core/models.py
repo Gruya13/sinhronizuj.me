@@ -58,7 +58,7 @@ class Project(Base):
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status = Column(String, default="empty") # empty, analyzing, ready, completed
     video_title = Column(String, default="")
     
@@ -108,7 +108,7 @@ class Glossary(Base):
     __tablename__ = "glossaries"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     source_word = Column(String, nullable=False)
     target_word = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -127,7 +127,7 @@ class Job(Base):
     __tablename__ = "jobs"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    project_id = Column(GUID, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     type = Column(String, nullable=False) # e.g. "dubbing"
     status = Column(String, default="pending") # pending, running, completed, failed
     current_phase = Column(String, nullable=True) # e.g. "transcription", "translation", "tts", "mixing"
@@ -144,8 +144,8 @@ class TranslationMemory(Base):
     __tablename__ = "translation_memory"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     source_text = Column(String, nullable=False)
     target_text = Column(String, nullable=False)
     embedding = Column(JSON, nullable=True) # Lista float-ova za kosinusnu sličnost
@@ -159,7 +159,7 @@ class WikiRule(Base):
     __tablename__ = "wiki_rules"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     category = Column(String, default="general")
@@ -172,8 +172,8 @@ class PendingTranslationMemory(Base):
     __tablename__ = "pending_translation_memory"
 
     id = Column(GUID, primary_key=True, default=uuid.uuid4)
-    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(GUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id = Column(GUID, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     source_text = Column(String, nullable=False)
     target_text = Column(String, nullable=False)
     occurrence_count = Column(Integer, default=1, server_default="1")

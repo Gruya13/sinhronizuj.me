@@ -1,7 +1,4 @@
-import os
-import torch
 import modal
-from backend.core.config import settings
 
 # Definicija slike za Modal trening okruženje
 training_image = (
@@ -35,6 +32,8 @@ def train_lora(dry_run: bool = False):
     Modal funkcija za pokretanje LoRA treninga na A10G GPU.
     """
     import os
+    os.environ["HF_HOME"] = "/models/huggingface_cache"
+    
     import torch
     from datasets import load_dataset
     from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments

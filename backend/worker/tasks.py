@@ -1613,6 +1613,123 @@ def learn_user_glossary_task(user_id: str, original: str, old_translated: str, n
     except Exception as e:
         print(f"[CROSS-PROJECT LEARNING ERROR] Greška pri pozivu LLM-a: {e}", flush=True)
 
+@celery_app.task(name="learn_user_glossary_batch_task")
+def learn_user_glossary_batch_task(user_id: str, corrections: list):
+    """
+    Pozadinski Celery task koji prima listu korekcija (dict sa keys: original, old_translated, new_translated)
+    i uči korisničke preferencije u jednom batch pozivu ka LLM-u.
+    """
+    if not settings.MODAL_LEKTOR_URL or not corrections:
+        return
+        
+    # Formiramo prompt za sve korekcije odjednom
+    corrections_str = ""
+    for idx, c in enumerate(corrections):
+        corrections_str += (
+            f"KOREKCIJA #{idx+1}:\n"
+            f"Originalni engleski tekst: \"{c.get('original', '')}\"\n"
+            f"Prethodni automatski prevod: \"{c.get('old_translated', '')}\"\n"
+            f"Novi ručno korigovani prevod: \"{c.get('new_translated', '')}\"\n\n"
+        )
+        
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        "Korisnik je ručno ispravio prevode rečenica u našoj aplikaciji za sinhronizaciju videa.\n"
+        "Tvoj zadatak je da za svaku korekciju utvrdiš da li je korisnik ispravio prevod nekog specifičnog stručnog pojma ili termina, "
+        "i da izvučeš te parove (originalni engleski pojam i korisnikov novi srpski prevod).\n\n"
+        f"{corrections_str}"
+        "PRAVILA ZA EKSTRAKCIJU:\n"
+        "1. Ako je korisnik samo preformulisao rečenicu (npr. promenio red reči, promenio rod/padež bez promene prevoda ključnih reči), preskoči i ne dodaj u izlaz.\n"
+        "2. Ako je korisnik promenio prevod neke konkretne engleske imenice, fraze ili stručnog termina (npr. promenio 'welding machine' sa 'mašina za varenje' na 'aparat za zavarivanje'), izvuci taj termin.\n"
+        "3. Srpski prevod u rečniku treba da bude u svom osnovnom obliku (nominativ), ako je moguće.\n\n"
+        "Odgovori isključivo u validnom JSON formatu kao jednostavan rečnik gde su ključevi engleske reči, a vrednosti srpski prevodi, bez ikakvog dodatnog teksta ili uvoda:\n"
+        "{\n"
+        "  \"english term\": \"serbian translation\"\n"
+        "}"
+    )
+    
+    payload = {
+        "model": "qwen-lektor",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.1,
+        "max_tokens": 500
+    }
+    
+    try:
+        from backend.worker.utils import call_modal_endpoint
+        from backend.core.database import SessionLocal
+        from backend.core.models import Glossary, TranslationMemory
+        from backend.services.embedding import embedding_service
+        import json
+        
+        res = call_modal_endpoint(url=url, payload=payload)
+        content = res["choices"][0]["message"]["content"].strip()
+        content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
+        if content.startswith("```"):
+            content = re.sub(r'^```(?:json)?\n', '', content)
+            content = re.sub(r'\n```$', '', content)
+            
+        data = json.loads(content)
+        if isinstance(data, dict) and data:
+            db = SessionLocal()
+            try:
+                # 1. Učenje pojedinačnih reči za glosar
+                for eng, srb in data.items():
+                    if not eng or not srb:
+                        continue
+                    eng_clean = eng.strip().lower()
+                    srb_clean = srb.strip().lower()
+                    
+                    existing = db.query(Glossary).filter(
+                        Glossary.user_id == user_id,
+                        Glossary.source_word == eng_clean
+                    ).first()
+                    
+                    if existing:
+                        existing.target_word = srb_clean
+                    else:
+                        new_g = Glossary(
+                            user_id=user_id,
+                            source_word=eng_clean,
+                            target_word=srb_clean
+                        )
+                        db.add(new_g)
+                        
+                # 2. Učenje celih segmenata za Translation Memory (RAG)
+                for c in corrections:
+                    original = c.get('original', '')
+                    new_translated = c.get('new_translated', '')
+                    if not original or not new_translated:
+                        continue
+                    emb = embedding_service.get_embedding(original)
+                    if emb:
+                        existing_tm = db.query(TranslationMemory).filter(
+                            TranslationMemory.user_id == user_id,
+                            TranslationMemory.source_text == original
+                        ).first()
+                        
+                        if existing_tm:
+                            existing_tm.target_text = new_translated
+                            existing_tm.embedding = emb
+                        else:
+                            new_tm = TranslationMemory(
+                                user_id=user_id,
+                                source_text=original,
+                                target_text=new_translated,
+                                embedding=emb
+                            )
+                            db.add(new_tm)
+                            
+                db.commit()
+                print(f"[CROSS-PROJECT BATCH LEARNING] Uspešno naučeni termini za korisnika {user_id}: {data}", flush=True)
+            except Exception as e:
+                db.rollback()
+                print(f"[CROSS-PROJECT BATCH LEARNING ERROR] {e}", flush=True)
+            finally:
+                db.close()
+    except Exception as e:
+        print(f"[CROSS-PROJECT BATCH LEARNING ERROR] Greška pri pozivu LLM-a: {e}", flush=True)
+
 @celery_app.task(
     name="promote_pending_tm_task",
     acks_late=True,

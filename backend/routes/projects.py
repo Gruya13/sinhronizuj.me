@@ -361,17 +361,28 @@ def get_project_draft(project_id: str, current_user: User = Depends(get_current_
 def save_project_draft(project_id: str, request: SaveProjectRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Čuva najnovije izmene segmenata prevoda u PostgreSQL bazu.
+    Optimizovano: Rešen N+1 upit i batch-ovano slanje glosara.
     """
     p = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
     if not p:
         raise HTTPException(status_code=403, detail="Nemate pravo pristupa ovom projektu.")
         
+    # Učitavamo sve segmente projekta odjednom (izbegavanje N+1)
+    db_segments = db.query(Segment).filter(Segment.project_id == project_id).all()
+    db_segments_map = {s.segment_id: s for s in db_segments}
+    
+    corrections = []
+    
     for req_seg in request.segments:
-        db_seg = db.query(Segment).filter(Segment.project_id == project_id, Segment.segment_id == req_seg.id).first()
+        db_seg = db_segments_map.get(req_seg.id)
         if db_seg:
             if db_seg.translated != req_seg.translated:
-                from backend.worker.tasks import learn_user_glossary_task
-                learn_user_glossary_task.delay(str(current_user.id), db_seg.original, db_seg.translated, req_seg.translated)
+                # Skupljamo korekciju za batch slanje
+                corrections.append({
+                    "original": db_seg.original,
+                    "old_translated": db_seg.translated,
+                    "new_translated": req_seg.translated
+                })
                 db_seg.translated = req_seg.translated
             db_seg.voice_type = req_seg.voice_type or "clone"
             db_seg.volume = req_seg.volume if req_seg.volume is not None else 0.0
@@ -382,6 +393,11 @@ def save_project_draft(project_id: str, request: SaveProjectRequest, current_use
             db_seg.status = "edited"
             
     db.commit()
+    
+    # Batch slanje svih ispravki glosara u jednom Celery tasku
+    if corrections:
+        from backend.worker.tasks import learn_user_glossary_batch_task
+        learn_user_glossary_batch_task.delay(str(current_user.id), corrections)
     
     # Sinhronizujemo Redis
     get_project_draft(project_id, current_user, db)

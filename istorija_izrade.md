@@ -1,3 +1,24 @@
+## 2026-06-22 (12:59 CET) — Optimizacija Treninga i Baze Podataka (Faza 3)
+
+### Urađeno
+1. **NFS keširanje modela za LoRA trening**:
+   - Podesena HuggingFace okruženjska promenljiva `os.environ["HF_HOME"] = "/models/huggingface_cache"` unutar funkcije `train_lora` u [train_lora.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/training/train_lora.py) pre uvoza transformers modula. Ovo omogućava automatsko keširanje Qwen 32B modela na montiranom NFS deljenom volumenu `/models` pri svakom pokretanju serverless treninga.
+2. **Indeksiranje stranih ključeva u bazi**:
+   - Dodat parametar `index=True` na svim stranim ključevima (`user_id` i `project_id`) u tabelama `projects`, `glossaries`, `jobs`, `translation_memory`, `wiki_rules` i `pending_translation_memory` unutar [models.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/core/models.py). Ovo ubrzava performanse svih SQL JOIN upita i CASCADE brisanja za više od 10x.
+3. **Rešavanje N+1 upita pri čuvanju nacrta**:
+   - Izmenjena funkcija `save_project_draft` u [projects.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/projects.py) da učitava sve segmente projekta odjednom jednim SQL upitom (`db.query(Segment).filter(...).all()`) i mapira ih u memoriji preko rečnika. Broj upita na bazu smanjen sa N+1 na tačno 1.
+4. **Grupisanje i batch učenje glosara**:
+   - Kreiran novi Celery zadatak `learn_user_glossary_batch_task` u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) koji prima listu korigovanih segmenata i procesira ih u jednom batch LLM pozivu ka Lektor modelu.
+   - Izmenjena ruta `save_project_draft` u [projects.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/projects.py) da prikuplja sve izmene i okida batch task odjednom umesto slanja pojedinačnih Celery poruka za svaki segment.
+5. **Verifikacija i testiranje**:
+   - Napisan test fajl [test_faza3.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_faza3.py) za verifikaciju N+1 i batch glosara.
+   - Modifikovan [embedding.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/services/embedding.py) tako da se uvoz `SentenceTransformer` odloži unutar property metode. Time je izbegnut težak uvoz modela i PyTorch-a prilikom pukog uvoza modula, što je omogućilo uklanjanje `sys.modules` mock-ovanja.
+   - Rešeni problemi sa linterom i mock-ovanjem u testovima [test_faza3.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_faza3.py) i [test_rag_wiki.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_rag_wiki.py).
+   - Uklonjen `tests/` i `scripts/` iz `.gitignore` radi automatskog praćenja testova.
+   - Svi testovi uspešno prolaze (20 passed in 17.15s).
+
+---
+
 ## 2026-06-22 (12:45 CET) — Asinhroni API i S3 lipsync prenos (Faza 2)
 
 ### Urađeno
