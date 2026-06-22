@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Modal Radnici – Tok Podataka | sinhronizuj.me</title>
+  <meta name="description" content="Interaktivni grafikon kretanja podataka kroz Modal serverless radnike platforme sinhronizuj.me"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080b14;
+      --bg2: #0d1120;
+      --bg3: #111827;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.18);
+      --text: #e8eaf2;
+      --text-muted: #6b7280;
+      --text-dim: #9ca3af;
+
+      /* Layer colors */
+      --c-client: #3b82f6;
+      --c-api: #8b5cf6;
+      --c-celery: #f59e0b;
+      --c-modal: #10b981;
+      --c-storage: #ef4444;
+      --c-db: #06b6d4;
+
+      /* Worker colors */
+      --c-demucs: #ec4899;
+      --c-stt: #f59e0b;
+      --c-translate: #8b5cf6;
+      --c-tts: #10b981;
+      --c-lipsync: #3b82f6;
+      --c-lektor: #f97316;
+
+      --radius: 14px;
+      --radius-sm: 8px;
+      --glow: 0 0 40px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 2.5rem 2rem 1.5rem;
+      text-align: center;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 320px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(139,92,246,.5), transparent);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3);
+      color: #10b981; font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; padding: 4px 12px; border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+    .badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.4; transform:scale(.85); } }
+
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 50%, #34d399 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1.2; margin-bottom: .5rem;
+    }
+    .subtitle { color: var(--text-dim); font-size: .9rem; }
+
+    /* ── Legend ── */
+    .legend-bar {
+      display: flex; flex-wrap: wrap; gap: .5rem;
+      justify-content: center; padding: 1.2rem 2rem;
+    }
+    .leg-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 999px; font-size: .75rem; font-weight: 500;
+      cursor: pointer; transition: all .2s; border: 1px solid transparent;
+      user-select: none;
+    }
+    .leg-item:hover { transform: translateY(-1px); }
+    .leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── Main canvas ── */
+    .canvas-wrap {
+      padding: 1rem 1.5rem 3rem;
+      max-width: 1280px; margin: 0 auto;
+    }
+
+    /* ── Phase rows ── */
+    .phase {
+      position: relative;
+      margin-bottom: 1.4rem;
+    }
+    .phase-label {
+      font-size: .68rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text-muted);
+      margin-bottom: .6rem; padding-left: 4px;
+    }
+    .phase-row {
+      display: flex; align-items: stretch; gap: .75rem;
+      flex-wrap: wrap;
+    }
+
+    /* ── Nodes ── */
+    .node {
+      flex: 1; min-width: 160px; max-width: 260px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      cursor: pointer;
+      transition: transform .2s, box-shadow .2s, border-color .2s, background .2s;
+      position: relative; overflow: hidden;
+    }
+    .node::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(circle at top left, var(--accent, transparent) 0%, transparent 65%);
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .node:hover, .node.active {
+      border-color: var(--border-hover);
+      transform: translateY(-3px);
+    }
+    .node:hover::before, .node.active::before { opacity: 1; }
+    .node.active { box-shadow: 0 0 0 1px var(--glow-color, rgba(255,255,255,.2)), 0 8px 32px rgba(0,0,0,.5); }
+
+    .node-icon { font-size: 1.5rem; margin-bottom: .45rem; }
+    .node-title {
+      font-size: .82rem; font-weight: 700; color: var(--text);
+      margin-bottom: .2rem; line-height: 1.3;
+    }
+    .node-sub {
+      font-size: .7rem; color: var(--text-muted); line-height: 1.5;
+    }
+    .node-tag {
+      display: inline-block; margin-top: .5rem;
+      font-size: .63rem; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .node-badge {
+      position: absolute; top: .6rem; right: .7rem;
+      font-size: .6rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+    }
+
+    /* ── Arrow connector ── */
+    .arrow-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: .5rem; padding: .2rem 0; flex-wrap: wrap;
+    }
+    .arrow-line {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; flex: 0 0 auto;
+    }
+    .arrow-label {
+      font-size: .63rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;
+      white-space: nowrap; background: var(--bg2); padding: 1px 6px; border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+    .arrow-svg { opacity: .5; }
+    .arrow-big {
+      display: flex; flex-direction: column; align-items: center;
+      padding: .3rem 0;
+    }
+    .arrow-big svg { opacity: .4; }
+    .arrow-big .arrow-label { margin-top: 3px; }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex; align-items: center; gap: 1rem;
+      margin: .8rem 0;
+    }
+    .divider-line { flex: 1; height: 1px; background: var(--border); }
+    .divider-text {
+      font-size: .65rem; color: var(--text-muted); font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+    }
+
+    /* ── Modal cluster ── */
+    .modal-cluster {
+      border: 1px solid rgba(16,185,129,.2);
+      border-radius: 18px;
+      padding: 1rem 1.1rem 1.1rem;
+      background: rgba(16,185,129,.03);
+      position: relative;
+    }
+    .modal-cluster-label {
+      position: absolute; top: -10px; left: 18px;
+      font-size: .65rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      background: var(--bg); color: #10b981; padding: 0 8px;
+      border: 1px solid rgba(16,185,129,.3); border-radius: 4px;
+    }
+    .worker-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: .65rem; margin-top: .5rem;
+    }
+
+    /* ── Info Panel ── */
+    .info-panel {
+      position: fixed; right: 0; top: 0; bottom: 0; width: 340px;
+      background: #0d1120; border-left: 1px solid var(--border);
+      padding: 2rem 1.5rem; overflow-y: auto;
+      transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+      z-index: 100;
+    }
+    .info-panel.open { transform: translateX(0); }
+    .info-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text-dim); width: 30px; height: 30px; border-radius: 50%;
+      cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .info-close:hover { border-color: var(--border-hover); color: var(--text); }
+    .info-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+    .info-title { font-size: 1.1rem; font-weight: 700; margin-bottom: .3rem; }
+    .info-type {
+      font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+      margin-bottom: 1rem; opacity: .6;
+    }
+    .info-body { font-size: .82rem; line-height: 1.7; color: var(--text-dim); }
+    .info-body strong { color: var(--text); }
+    .info-row {
+      display: flex; gap: .5rem; flex-direction: column; margin-top: 1rem;
+    }
+    .info-chip {
+      display: flex; gap: .5rem; align-items: flex-start;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: .5rem .7rem;
+      font-size: .76rem;
+    }
+    .info-chip-label { color: var(--text-muted); min-width: 60px; flex-shrink: 0; }
+    .info-chip-val { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: .72rem; }
+    .info-cost {
+      margin-top: 1.2rem;
+      background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2);
+      border-radius: var(--radius-sm); padding: .7rem .9rem;
+    }
+    .info-cost-label { font-size: .65rem; color: #10b981; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .2rem; }
+    .info-cost-val { font-size: 1.3rem; font-weight: 800; color: #10b981; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Stats bar ── */
+    .stats-row {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      padding: .5rem 1.5rem 1.5rem; max-width: 1280px; margin: 0 auto;
+    }
+    .stat-card {
+      flex: 1; min-width: 140px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: .9rem 1.1rem;
+    }
+    .stat-label { font-size: .65rem; color: var(--text-muted); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-bottom: .3rem; }
+    .stat-val { font-size: 1.5rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+    .stat-sub { font-size: .68rem; color: var(--text-muted); margin-top: .15rem; }
+
+    /* ── Color helpers ── */
+    .c-client { color: var(--c-client); }
+    .c-api    { color: var(--c-api); }
+    .c-celery { color: var(--c-celery); }
+    .c-modal  { color: var(--c-modal); }
+    .c-storage{ color: var(--c-storage); }
+    .c-db     { color: var(--c-db); }
+
+    /* Node accent vars */
+    .node-client { --accent: rgba(59,130,246,.18); --glow-color: rgba(59,130,246,.4); }
+    .node-api    { --accent: rgba(139,92,246,.18); --glow-color: rgba(139,92,246,.4); }
+    .node-celery { --accent: rgba(245,158,11,.18); --glow-color: rgba(245,158,11,.4); }
+    .node-modal  { --accent: rgba(16,185,129,.18); --glow-color: rgba(16,185,129,.4); }
+    .node-s3     { --accent: rgba(239,68,68,.18);  --glow-color: rgba(239,68,68,.4); }
+    .node-db     { --accent: rgba(6,182,212,.18);  --glow-color: rgba(6,182,212,.4); }
+
+    .tag-client { background: rgba(59,130,246,.15); color: #60a5fa; }
+    .tag-api    { background: rgba(139,92,246,.15); color: #a78bfa; }
+    .tag-celery { background: rgba(245,158,11,.15); color: #fbbf24; }
+    .tag-modal  { background: rgba(16,185,129,.15); color: #34d399; }
+    .tag-s3     { background: rgba(239,68,68,.15);  color: #f87171; }
+    .tag-db     { background: rgba(6,182,212,.15);  color: #22d3ee; }
+
+    .badge-gpu  { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+    .badge-cpu  { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.3); }
+    .badge-sls  { background: rgba(139,92,246,.15); color: #a78bfa; border: 1px solid rgba(139,92,246,.3); }
+
+    /* ── Flow animation ── */
+    @keyframes flowIn { from{ opacity:0; transform:translateY(12px); } to{ opacity:1; transform:translateY(0); } }
+    .phase { animation: flowIn .4s ease both; }
+    .phase:nth-child(1){ animation-delay:.0s; }
+    .phase:nth-child(2){ animation-delay:.05s; }
+    .phase:nth-child(3){ animation-delay:.1s; }
+    .phase:nth-child(4){ animation-delay:.15s; }
+    .phase:nth-child(5){ animation-delay:.2s; }
+
+    /* ── Responsive ── */
+    @media(max-width:700px){
+      .node{ min-width: 130px; }
+      .info-panel{ width:100vw; }
+      h1{ font-size:1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Live Arhitektura</div>
+  <h1>Tok Podataka kroz Modal Radnike</h1>
+  <p class="subtitle">sinhronizuj.me &mdash; Serverless AI Pipeline Vizualizacija</p>
+</header>
+
+<!-- Stats row -->
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-label">Ukupna Cena / Video</div>
+    <div class="stat-val" style="color:#10b981;">~$0.047</div>
+    <div class="stat-sub">≈ 5.5 dinara po 5-min videu</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Vreme Obrade</div>
+    <div class="stat-val" style="color:#60a5fa;">~3.7 min</div>
+    <div class="stat-sub">za video od 5 minuta</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Modal Workers</div>
+    <div class="stat-val" style="color:#a78bfa;">6</div>
+    <div class="stat-sub">Serverless GPU kontejnera</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Cold Start</div>
+    <div class="stat-val" style="color:#fbbf24;">5–10s</div>
+    <div class="stat-sub">Warmup strategija aktivna</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Scale-to-Zero</div>
+    <div class="stat-val" style="color:#ef4444;">✓</div>
+    <div class="stat-sub">Auto-gašenje posle 5 min</div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend-bar">
+  <div class="leg-item" style="background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);">
+    <div class="leg-dot" style="background:var(--c-client);"></div> <span class="c-client">Frontend (React)</span>
+  </div>
+  <div class="leg-item" style="background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);">
+    <div class="leg-dot" style="background:var(--c-api);"></div> <span class="c-api">FastAPI Gateway</span>
+  </div>
+  <div class="leg-item" style="background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);">
+    <div class="leg-dot" style="background:var(--c-celery);"></div> <span class="c-celery">Celery + Redis</span>
+  </div>
+  <div class="leg-item" style="background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);">
+    <div class="leg-dot" style="background:var(--c-modal);"></div> <span class="c-modal">Modal GPU Workers</span>
+  </div>
+  <div class="leg-item" style="background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);">
+    <div class="leg-dot" style="background:var(--c-storage);"></div> <span class="c-storage">S3 Storage</span>
+  </div>
+  <div class="leg-item" style="background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.3);">
+    <div class="leg-dot" style="background:var(--c-db);"></div> <span class="c-db">PostgreSQL</span>
+  </div>
+</div>
+
+<!-- Main canvas -->
+<div class="canvas-wrap">
+
+  <!-- PHASE 1: Upload -->
+  <div class="phase">
+    <div class="phase-label">⬆ Faza 1 — Inicijalizacija i Upload</div>
+    <div class="phase-row">
+      <div class="node node-client" id="n-client" onclick="showInfo('client')">
+        <div class="node-icon">🖥️</div>
+        <div class="node-title">React / Vite Frontend</div>
+        <div class="node-sub">Korisnik bira video fajl. Inicira DAW Studio sesiju. Šalje warmup zahtev.</div>
+        <span class="node-tag tag-client">SPA · JWT Auth</span>
+      </div>
+
+      <div style="display:flex;align-items:center;flex-direction:column;gap:3px;align-self:center;min-width:80px;">
+        <svg width="60" height="18" viewBox="0 0 60 18" class="arrow-svg">
+          <line x1="0" y1="9" x2="48" y2="9" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <polygon points="48,4 60,9 48,14" fill="#8b5cf6"/>
+        </svg>
+        <span class="arrow-label">GET /upload_url</span>
+        <svg width="60" height="18" viewBox="0 0 60 18" class="arrow-svg" style="transform:scaleX(-1)">
+          <line x1="0" y1="9" x2="48" y2="9" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <polygon points="48,4 60,9 48,14" fill="#6b7280"/>
+        </svg>
+        <span class="arrow-label">Pre-signed URL</span>
+      </div>
+
+      <div class="node node-api" id="n-api" onclick="showInfo('api')">
+        <div class="node-icon">⚡</div>
+        <div class="node-title">FastAPI Gateway</div>
+        <div class="node-sub">Validacija JWT-a, Pydantic šema, generisanje pre-potpisanog S3 URL-a.</div>
+        <span class="node-tag tag-api">Port 8000 · Nginx SSL</span>
+      </div>
+
+      <div style="display:flex;align-items:center;flex-direction:column;gap:3px;align-self:center;min-width:80px;">
+        <svg width="60" height="18" viewBox="0 0 60 18" class="arrow-svg">
+          <line x1="0" y1="9" x2="48" y2="9" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <polygon points="48,4 60,9 48,14" fill="#ef4444"/>
+        </svg>
+        <span class="arrow-label">Direct Upload</span>
+      </div>
+
+      <div class="node node-s3" id="n-s3-1" onclick="showInfo('s3')">
+        <div class="node-icon">🪣</div>
+        <div class="node-title">S3 Object Storage</div>
+        <div class="node-sub">MinIO / Cloudflare R2 / Hetzner. Direktan upload iz browsera bez opterećenja API-ja.</div>
+        <span class="node-tag tag-s3">raw_video.mp4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow down -->
+  <div class="arrow-big">
+    <svg width="18" height="36" viewBox="0 0 18 36">
+      <line x1="9" y1="0" x2="9" y2="26" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <polygon points="2,24 9,36 16,24" fill="#f59e0b"/>
+    </svg>
+    <span class="arrow-label">POST /api/v1/process-video → Celery Task</span>
+  </div>
+
+  <!-- PHASE 2: Analysis -->
+  <div class="phase">
+    <div class="phase-label">🔬 Faza 2 — Analiza Videa (analyze_video_task)</div>
+    <div class="phase-row" style="align-items:flex-start;">
+
+      <div class="node node-celery" id="n-celery" onclick="showInfo('celery')" style="max-width:220px;">
+        <div class="node-icon">⚙️</div>
+        <div class="node-title">Celery Worker</div>
+        <div class="node-sub">CPU host mašina. Preuzima video sa S3. Orkestrira sve Modal pozive. Prati progres u Redis-u.</div>
+        <span class="node-tag tag-celery">tasks.py · Redis Broker</span>
+        <span class="node-badge badge-cpu">CPU</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:3px;align-self:center;min-width:60px;flex-direction:column;">
+        <svg width="50" height="18" viewBox="0 0 50 18" class="arrow-svg">
+          <line x1="0" y1="9" x2="38" y2="9" stroke="#10b981" stroke-width="2" stroke-dasharray="4 3"/>
+          <polygon points="38,4 50,9 38,14" fill="#10b981"/>
+        </svg>
+        <span class="arrow-label">HTTP API Calls</span>
+      </div>
+
+      <!-- Modal Cluster -->
+      <div class="modal-cluster" style="flex:1;">
+        <div class="modal-cluster-label">☁ Modal Serverless GPU Klaster</div>
+        <div class="worker-grid">
+
+          <div class="node node-modal" id="n-demucs" onclick="showInfo('demucs')" style="max-width:none;">
+            <div class="node-badge badge-gpu">T4 / L4</div>
+            <div class="node-icon">🎵</div>
+            <div class="node-title">Demucs Worker</div>
+            <div class="node-sub">Razdvaja vokale od muzike. Izlaz: vocals.wav + no_vocals.wav</div>
+            <span class="node-tag tag-modal">~30s · $0.005</span>
+          </div>
+
+          <div class="node node-modal" id="n-whisper" onclick="showInfo('whisper')" style="max-width:none;">
+            <div class="node-badge badge-gpu">T4</div>
+            <div class="node-icon">👂</div>
+            <div class="node-title">Faster-Whisper STT</div>
+            <div class="node-sub">Transkripcija sa word-level timestamps. SenseVoice arbitraža.</div>
+            <span class="node-tag tag-modal">~15s · $0.003</span>
+          </div>
+
+          <div class="node node-modal" id="n-translate" onclick="showInfo('translate')" style="max-width:none;">
+            <div class="node-badge badge-gpu">A10G</div>
+            <div class="node-icon">🌐</div>
+            <div class="node-title">Translator (Qwen)</div>
+            <div class="node-sub">Prevod na srpski + RAG TM + self-critique + lektor + ekavizacija.</div>
+            <span class="node-tag tag-modal">~10s · $0.003</span>
+          </div>
+
+          <div class="node node-modal" id="n-speaker" onclick="showInfo('speaker')" style="max-width:none;">
+            <div class="node-badge badge-cpu">CPU</div>
+            <div class="node-icon">🎭</div>
+            <div class="node-title">Active Speaker Det.</div>
+            <div class="node-sub">MediaPipe FaceMesh. 8FPS uzorkovanje. Detektuje govornika na ekranu.</div>
+            <span class="node-tag tag-celery">active_speaker.py</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Arrow to DB -->
+  <div class="arrow-big">
+    <svg width="18" height="36" viewBox="0 0 18 36">
+      <line x1="9" y1="0" x2="9" y2="26" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <polygon points="2,24 9,36 16,24" fill="#06b6d4"/>
+    </svg>
+    <span class="arrow-label">Segmenti upisani u PostgreSQL → status: ready</span>
+  </div>
+
+  <!-- PHASE 3: DB + DAW -->
+  <div class="phase">
+    <div class="phase-label">🎛 Faza 3 — Uređivanje u DAW Studio</div>
+    <div class="phase-row">
+      <div class="node node-db" id="n-db" onclick="showInfo('db')">
+        <div class="node-icon">🗄️</div>
+        <div class="node-title">PostgreSQL</div>
+        <div class="node-sub">SQLAlchemy modeli. Segmenti sa prevodima, vremenskim kodovima i parametrima.</div>
+        <span class="node-tag tag-db">UUID PKs · Alembic</span>
+      </div>
+
+      <div style="display:flex;align-items:center;flex-direction:column;gap:3px;align-self:center;min-width:80px;">
+        <svg width="60" height="18" viewBox="0 0 60 18" class="arrow-svg" style="transform:scaleX(-1)">
+          <line x1="0" y1="9" x2="48" y2="9" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <polygon points="48,4 60,9 48,14" fill="#3b82f6"/>
+        </svg>
+        <span class="arrow-label">GET /project/{id}</span>
+        <svg width="60" height="18" viewBox="0 0 60 18" class="arrow-svg">
+          <line x1="0" y1="9" x2="48" y2="9" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <polygon points="48,4 60,9 48,14" fill="#8b5cf6"/>
+        </svg>
+        <span class="arrow-label">POST /project/{id}/save</span>
+      </div>
+
+      <div class="node node-client" id="n-daw" onclick="showInfo('daw')">
+        <div class="node-icon">🎚️</div>
+        <div class="node-title">DAW Studio Interface</div>
+        <div class="node-sub">Uređivanje prevoda, jačine zvuka, brzine i tona. Undo/redo stek. Real-time preview.</div>
+        <span class="node-tag tag-client">React + Zustand</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div class="arrow-big">
+    <svg width="18" height="36" viewBox="0 0 18 36">
+      <line x1="9" y1="0" x2="9" y2="26" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <polygon points="2,24 9,36 16,24" fill="#10b981"/>
+    </svg>
+    <span class="arrow-label">POST /segment/{id}/tts → TTS Modal Worker</span>
+  </div>
+
+  <!-- PHASE 4: Synthesis -->
+  <div class="phase">
+    <div class="phase-label">🔊 Faza 4 — Sinteza Govora i Renderovanje</div>
+    <div class="phase-row" style="align-items:flex-start;">
+
+      <div class="modal-cluster" style="flex:1;">
+        <div class="modal-cluster-label">☁ Modal TTS & LipSync Klaster</div>
+        <div class="worker-grid">
+
+          <div class="node node-modal" id="n-tts" onclick="showInfo('tts')" style="max-width:none;">
+            <div class="node-badge badge-gpu">L4 / A10G</div>
+            <div class="node-icon">🗣️</div>
+            <div class="node-title">Piper + OpenVoice TTS</div>
+            <div class="node-sub">Piper generiše srpski govor (model Marko). OpenVoice klonira boju glasa iz vocals.wav.</div>
+            <span class="node-tag tag-modal">~60s · $0.021</span>
+          </div>
+
+          <div class="node node-modal" id="n-wav2lip" onclick="showInfo('wav2lip')" style="max-width:none;">
+            <div class="node-badge badge-gpu">T4</div>
+            <div class="node-icon">👄</div>
+            <div class="node-title">Wav2Lip LipSync</div>
+            <div class="node-sub">Fotorealistična sinhronizacija pokreta usana. Aktivira se samo za active_speaker segmente.</div>
+            <span class="node-tag tag-modal">~90s · $0.015</span>
+          </div>
+
+          <div class="node node-celery" id="n-merger" onclick="showInfo('merger')" style="max-width:none;">
+            <div class="node-badge badge-cpu">CPU</div>
+            <div class="node-icon">🎬</div>
+            <div class="node-title">FFmpeg Merger</div>
+            <div class="node-sub">Dinamičko miksovanje. Rubberband kompresija tempa. Spajanje video+audio trake.</div>
+            <span class="node-tag tag-celery">merger.py · ~15s</span>
+          </div>
+
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;flex-direction:column;gap:3px;align-self:center;min-width:70px;">
+        <svg width="50" height="18" viewBox="0 0 50 18" class="arrow-svg">
+          <line x1="0" y1="9" x2="38" y2="9" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 3"/>
+          <polygon points="38,4 50,9 38,14" fill="#ef4444"/>
+        </svg>
+        <span class="arrow-label">Upload finalni video</span>
+      </div>
+
+      <div class="node node-s3" id="n-s3-2" onclick="showInfo('s3')" style="max-width:220px;">
+        <div class="node-icon">☁️</div>
+        <div class="node-title">S3 Finalni Video</div>
+        <div class="node-sub">Finalni .mp4 sa srpskim glasom, lipsync sinhronizacijom i originalnom pozadinskom muzikom.</div>
+        <span class="node-tag tag-s3">final_video_s3_key</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 5: Delivery -->
+  <div class="arrow-big">
+    <svg width="18" height="36" viewBox="0 0 18 36">
+      <line x1="9" y1="0" x2="9" y2="26" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <polygon points="2,24 9,36 16,24" fill="#3b82f6"/>
+    </svg>
+    <span class="arrow-label">WebSocket / Polling → status: completed → Download URL</span>
+  </div>
+
+  <div class="phase">
+    <div class="phase-label">📦 Faza 5 — Isporuka Korisniku</div>
+    <div class="phase-row" style="justify-content:center;">
+      <div class="node node-client" id="n-download" onclick="showInfo('download')" style="max-width:360px;text-align:center;">
+        <div class="node-icon">🎉</div>
+        <div class="node-title">Korisnik Preuzima Finalni Video</div>
+        <div class="node-sub">Frontend dobija signal o završetku putem Redis status polling-a (/api/v1/status/{task_id}). Prikazuje link za preuzimanje sinhronizovanog videa.</div>
+        <span class="node-tag tag-client">status: completed</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.canvas-wrap -->
+
+<!-- Info panel -->
+<div class="info-panel" id="infoPanel">
+  <button class="info-close" onclick="closeInfo()">✕</button>
+  <div class="info-icon" id="ipIcon">⚙️</div>
+  <div class="info-title" id="ipTitle">Node</div>
+  <div class="info-type" id="ipType">Tip</div>
+  <div class="info-body" id="ipBody">Opis</div>
+  <div class="info-row" id="ipChips"></div>
+  <div class="info-cost" id="ipCost" style="display:none;">
+    <div class="info-cost-label">Procenjena cena (5 min video)</div>
+    <div class="info-cost-val" id="ipCostVal"></div>
+  </div>
+</div>
+<div id="overlay" onclick="closeInfo()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;"></div>
+
+<script>
+const nodeData = {
+  client: {
+    icon: '🖥️', title: 'React / Vite Frontend', type: 'Klijentski Sloj',
+    body: `<strong>Tehnologije:</strong> React.js + Vite bundler, Zustand upravljanje stanjem, JWT Bearer autentifikacija.<br><br>
+<strong>Uloga:</strong> Inicijalna tačka korisničkog iskustva. Korisnik biraDa video fajl koji se šalje direktno na S3 (zaobilazeći API gateway). Čim se korisnik prijavi, frontend proaktivno šalje <code>/api/v1/warmup</code> zahtev kako bi Modal kontejneri bili "<em>warm</em>" i spremi.`,
+    chips: [
+      { l: 'Port', v: 'Vite Dev :5173 / Nginx prod' },
+      { l: 'Auth', v: 'JWT Bearer (60 min TTL)' },
+      { l: 'State', v: 'Zustand + Undo/Redo stek' }
+    ]
+  },
+  api: {
+    icon: '⚡', title: 'FastAPI API Gateway', type: 'Aplikacioni Sloj',
+    body: `Centralni orkestratorski servis koji prihvata sve klijentske zahteve. Implementiran sa <strong>SlowAPI rate-limiterom</strong>, Pydantic validacijom i modularnim ruterima.<br><br>
+Zaštita: Nginx SSL reverse proxy + UFW firewall + Cloudflare DDoS zaštita + Sentry monitoring.`,
+    chips: [
+      { l: 'Port', v: '8000 (interni)' },
+      { l: 'Framework', v: 'FastAPI + Uvicorn' },
+      { l: 'Rate limit', v: '10 req/min login, 5 req/min waitlist' },
+      { l: 'Monitoring', v: 'Sentry SDK' }
+    ]
+  },
+  celery: {
+    icon: '⚙️', title: 'Celery Worker', type: 'Orkestratorski Sloj (CPU)',
+    body: `Asinhroni radnici koji se pokreću na CPU resursima host VPS-a. Koriste <strong>Redis</strong> kao broker poruka sa AOF perzistencijom.<br><br>
+Celery radnik je "dirigent" celog pipeline-a: preuzima video sa S3, poziva Modal GPU workere, prati napredak i u slučaju pada menja status u bazi na <code>failed</code>.`,
+    chips: [
+      { l: 'Broker', v: 'Redis (AOF perzistencija)' },
+      { l: 'Zadaci', v: 'analyze_video_task, render_video_task' },
+      { l: 'Progres', v: '/api/v1/status/{task_id} polling' }
+    ]
+  },
+  demucs: {
+    icon: '🎵', title: 'Demucs Worker', type: 'Modal GPU Serverless',
+    body: `Koristi <strong>Facebook Demucs v4 (Hybrid Transformer)</strong> model za razdvajanje audio izvora.<br><br>
+<strong>Ulaz:</strong> Sirova audio traka iz videa.<br>
+<strong>Izlaz:</strong><br>
+• <code>vocals.wav</code> — čist ljudski glas (koristi se za STT i kloniranje glasa)<br>
+• <code>no_vocals.wav</code> — muzika + efekti (koristi se kao zvučna podloga u finalnom miksu)`,
+    chips: [
+      { l: 'GPU', v: 'Nvidia T4 (16GB) ili L4' },
+      { l: 'Vreme', v: '~30 sekundi za 5 min video' },
+      { l: 'Model', v: 'Demucs v4 HT (htdemucs)' }
+    ],
+    cost: '~$0.005'
+  },
+  whisper: {
+    icon: '👂', title: 'Faster-Whisper STT', type: 'Modal GPU Serverless',
+    body: `Hibridni pristup prepoznavanju govora:<br><br>
+1. <strong>Faster-Whisper large-v3</strong> — primarni ASR sa <em>word-level timestamps</em>.<br>
+2. <strong>SenseVoice-Small</strong> — paralelno pokrenut, detektuje interpunkciju i emocije.<br>
+3. <strong>LLM Arbitraža</strong> — Qwen lektor koriguje Whisper greške na osnovu SenseVoice transkripta.`,
+    chips: [
+      { l: 'GPU', v: 'Nvidia T4' },
+      { l: 'Vreme', v: '~15 sekundi za 5 min video' },
+      { l: 'Primarni', v: 'Faster-Whisper large-v3' },
+      { l: 'Sekundarni', v: 'Alibaba SenseVoice-Small' }
+    ],
+    cost: '~$0.003'
+  },
+  translate: {
+    icon: '🌐', title: 'Translator (Qwen)', type: 'Modal GPU Serverless',
+    body: `Kompleksan višestepeni prevodilački pipeline:<br><br>
+• <strong>RAG Translation Memory</strong> — pretraga potvrđenih prevoda (cosine ≥ 0.80)<br>
+• <strong>Dinamički glosar</strong> — detekcija stručnih termina i konzistentnost<br>
+• <strong>Self-Critique Loop</strong> — max 2 pokušaja popravke (QE score < 0.85)<br>
+• <strong>Regex Bypass</strong> — preskače Judge za visokokvalitetne prevode (QE ≥ 0.88, ubrzanje ~40%)<br>
+• <strong>Lektor</strong> — TTS-aware kompresija, ekavizacija (350+ pravila)`,
+    chips: [
+      { l: 'GPU', v: 'Nvidia A10G (24GB)' },
+      { l: 'Model', v: 'Qwen2-VL-7B-Instruct-AWQ (vLLM)' },
+      { l: 'Batch', v: '25 segmenata po pozivu' },
+      { l: 'Vreme', v: '~10 sekundi za 5 min video' }
+    ],
+    cost: '~$0.003'
+  },
+  speaker: {
+    icon: '🎭', title: 'Active Speaker Detection', type: 'Celery CPU Modul',
+    body: `Modul koji odlučuje da li je potreban Wav2Lip lipsync za svaki segment.<br><br>
+• Uzorkuje video na <strong>8 FPS</strong> koristeći <code>cap.grab()</code> (bez dekodiranja = brzo)<br>
+• <strong>MediaPipe FaceMesh</strong> meri otvorenost usta<br>
+• Segment dobija <code>active_speaker=True</code> ako: lice prisutno >30% frejmova <strong>I</strong> varijansa otvorenosti usta > 0.0015`,
+    chips: [
+      { l: 'Library', v: 'MediaPipe FaceMesh' },
+      { l: 'FPS', v: '8 FPS uzorkovanje' },
+      { l: 'Prag', v: 'variance > 0.0015, lice > 30%' }
+    ]
+  },
+  db: {
+    icon: '🗄️', title: 'PostgreSQL Baza', type: 'Sloj Podataka',
+    body: `Primarno skladište svih strukturiranih podataka platforme.<br><br>
+Sve tabele koriste <strong>UUID primarne ključeve</strong>. Migracije upravljane sa <strong>Alembic</strong>.<br><br>
+Ključne tabele: <code>users</code>, <code>projects</code>, <code>segments</code>, <code>translation_memory</code>, <code>wiki_rules</code>, <code>glossaries</code>, <code>waitlist</code>`,
+    chips: [
+      { l: 'ORM', v: 'SQLAlchemy (async)' },
+      { l: 'PKs', v: 'UUID4 (sve tabele)' },
+      { l: 'Migracije', v: 'Alembic' }
+    ]
+  },
+  s3: {
+    icon: '🪣', title: 'S3 Object Storage', type: 'Sloj Skladišta',
+    body: `Distribuirano objektno skladište za sve binarne resurse.<br><br>
+Kompatibilni provajderi: <strong>MinIO</strong> (self-hosted), <strong>Cloudflare R2</strong> ili <strong>Hetzner Object Storage</strong>.<br><br>
+Direktan upload iz browsera koristeći pre-potpisane URL-ove eliminiše opterećenje na API gateway.`,
+    chips: [
+      { l: 'Provajder', v: 'MinIO / Cloudflare R2 / Hetzner' },
+      { l: 'Fajlovi', v: 'raw_video, vocals, no_vocals, tts_segments, final_video' }
+    ]
+  },
+  daw: {
+    icon: '🎚️', title: 'DAW Studio Interface', type: 'Klijentski Sloj',
+    body: `Profesionalni editor sličan audio radnim stanicama.<br><br>
+Korisnik može u realnom vremenu da:<br>
+• Uređuje tekst prevoda po segmentu<br>
+• Podešava jačinu zvuka, brzinu i visinu tona<br>
+• Bira tip glasa (klonirani ili generički)<br>
+• Sluša preview svakog segmenta<br>
+• Vrši undo/redo operacije na steku u memoriji`,
+    chips: [
+      { l: 'Čuvanje', v: 'POST /project/{id}/save → PostgreSQL' },
+      { l: 'Preview', v: 'POST /segment/{id}/tts → Modal TTS' },
+      { l: 'State', v: 'Lokalni undo/redo stek' }
+    ]
+  },
+  tts: {
+    icon: '🗣️', title: 'Piper + OpenVoice TTS', type: 'Modal GPU Serverless',
+    body: `Dvostepena sinteza govora sa kloniranjem glasa:<br><br>
+1. <strong>Piper TTS</strong> (srpski model Marko) — generiše prirodan srpski govor<br>
+2. <strong>OpenVoice v2</strong> — ekstraktuje akustički stil iz <code>vocals.wav</code> i primenjuje ga na generisani srpski govor<br>
+3. <strong>Resemble Enhance</strong> — CFM model za uklanjanje šuma i upsampling na 44.1kHz`,
+    chips: [
+      { l: 'GPU', v: 'Nvidia L4 (24GB) ili A10G' },
+      { l: 'Vreme', v: '~60 sekundi (paralelno)' },
+      { l: 'Ulaz', v: 'Prevedeni tekst + vocals.wav uzorak' },
+      { l: 'Izlaz', v: 'Klonirani srpski govor (.wav)' }
+    ],
+    cost: '~$0.021'
+  },
+  wav2lip: {
+    icon: '👄', title: 'Wav2Lip LipSync', type: 'Modal GPU Serverless',
+    body: `Fotorealistična sinhronizacija pokreta usana koristeći <strong>Wav2Lip</strong> model.<br><br>
+Aktivira se <em>selektivno</em> — samo za segmente gde je detektovan aktivan govornik na ekranu (<code>active_speaker=True</code>). NFS skladište omogućava keširanje modela između hladnih startova.`,
+    chips: [
+      { l: 'GPU', v: 'Nvidia T4 (16GB)' },
+      { l: 'Vreme', v: '~90 sekundi (selektivno)' },
+      { l: 'Model', v: 'Wav2Lip + NFS model cache' }
+    ],
+    cost: '~$0.015'
+  },
+  merger: {
+    icon: '🎬', title: 'FFmpeg Audio Merger', type: 'Celery CPU Modul',
+    body: `Dinamičko miksovanje i sklapanje finalnog videa:<br><br>
+1. <strong>Analiza trajanja</strong> — meri stvarno trajanje TTS audio fajlova<br>
+2. <strong>Rubberband kompresija</strong> — FFmpeg ubrzava srpski govor ako je duži od vremenskog prozora segmenta<br>
+3. <strong>Pydub mikser</strong> — lipi segmente na tačne pozicije sa parametrima jačine<br>
+4. <strong>FFmpeg spajanje</strong> — kopira video strim (bez rekompresije) + novi srpski audio → final .mp4`,
+    chips: [
+      { l: 'Library', v: 'FFmpeg + pydub' },
+      { l: 'Algoritam', v: 'Rubberband tempo compression' },
+      { l: 'Vreme', v: '~15 sekundi (CPU)' },
+      { l: 'Cena', v: '$0.000 (host resurs)' }
+    ]
+  },
+  download: {
+    icon: '🎉', title: 'Isporuka Finalnog Videa', type: 'Klijentski Sloj',
+    body: `Nakon što render_video_task završi obradu, frontend prima signal putem Redis status polling-a (<code>/api/v1/status/{task_id}</code>).<br><br>
+Prikazuje se link za preuzimanje videa direktno sa S3 skladišta. Finalni video sadrži: srpski klonirani glas, originalna pozadinska muzika na zadatoj jačini, lipsync sinhronizaciju (opciono).`,
+    chips: [
+      { l: 'Signal', v: 'status: completed (Redis → API → Frontend)' },
+      { l: 'Preuzimanje', v: 'Pre-signed S3 URL (vremenski ograničen)' }
+    ]
+  }
+};
+
+let activeNode = null;
+
+function showInfo(key) {
+  const d = nodeData[key];
+  if (!d) return;
+
+  // Highlight node
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+  const nodeEl = document.querySelector(`[onclick="showInfo('${key}')"]`);
+  if (nodeEl) nodeEl.classList.add('active');
+
+  document.getElementById('ipIcon').textContent = d.icon;
+  document.getElementById('ipTitle').textContent = d.title;
+  document.getElementById('ipType').textContent = d.type;
+  document.getElementById('ipBody').innerHTML = d.body;
+
+  const chips = document.getElementById('ipChips');
+  chips.innerHTML = (d.chips || []).map(c =>
+    `<div class="info-chip"><span class="info-chip-label">${c.l}</span><span class="info-chip-val">${c.v}</span></div>`
+  ).join('');
+
+  const costEl = document.getElementById('ipCost');
+  if (d.cost) {
+    costEl.style.display = 'block';
+    document.getElementById('ipCostVal').textContent = d.cost;
+  } else {
+    costEl.style.display = 'none';
+  }
+
+  document.getElementById('infoPanel').classList.add('open');
+  document.getElementById('overlay').style.display = 'block';
+  activeNode = key;
+}
+
+function closeInfo() {
+  document.getElementById('infoPanel').classList.remove('open');
+  document.getElementById('overlay').style.display = 'none';
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+  activeNode = null;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
+</script>
+</body>
+</html>

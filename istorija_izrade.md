@@ -1,3 +1,17 @@
+## 2026-06-22 (10:15 CET) — Kreiranje interaktivnog grafikona toka podataka Modal radnika
+
+### Urađeno
+1. **Kreiran interaktivni HTML grafikon** [modal_radnik_tok_podataka.html](file:///home/gruya/Projektri/sinhronizuj.me/second_brain/modal_radnik_tok_podataka.html):
+   - Vizualizuje kompletan tok podataka kroz svih 6 Modal serverless GPU radnika (Demucs, Faster-Whisper, SenseVoice, Translator/Qwen, Piper+OpenVoice TTS, Wav2Lip LipSync).
+   - Grafikon prikazuje 5 faza obrade: Upload → Analiza → DAW Uređivanje → Sinteza → Isporuka.
+   - Uključen je i Celery orkestratorski sloj, PostgreSQL, S3 skladište i FastAPI gateway.
+   - Svaki čvor je klikabilan i otvara detaljan info panel sa specifikacijama GPU-a, procenjenim troškovima i tehničkim detaljima.
+   - Premium dark UI dizajn sa glassmorphism efektima, animacijama i kodnim bojama po slojevima.
+   - Statistike: ~$0.047 po videu, ~3.7 min ukupno, 6 serverless radnika, 5–10s cold start.
+2. **Izvor podataka**: Wiki dokumentacija iz `second_brain/Funkcionalnosti/Modal_Workers_i_AI.md`, `Arhitektura/Arhitektura_Sistema.md`, `Funkcionalnosti/Prevodilacki_Pipeline.md` i `Funkcionalnosti/Audio_i_Video_Procesiranje.md`.
+
+---
+
 ## 2026-06-22 (07:25 CET) — Rešavanje padova i popravka brisanja projekta (Alembic & MinIO deploy)
 
 ### Problem
