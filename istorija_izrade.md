@@ -1,3 +1,14 @@
+## 2026-06-22 (06:55 CET) — Instalacija Stitch-Skills pluginova za Antigravity
+
+### Urađeno
+1. **Instalacija Stitch-Skills biblioteke**:
+   - Privremeno kloniran zvanični repozitorijum sa skill-ovima: `https://github.com/google-labs-code/stitch-skills.git`.
+   - Instalirana su sva tri Stitch plugina u globalni Antigravity direktorijum `/home/gruya/.gemini/config/plugins/`:
+     - `stitch-design` — skilovi za sinhronizaciju koda i upravljanje sistemom dizajna.
+     - `stitch-build` — skilovi za prevođenje Stitch dizajna u UI komponente.
+     - `stitch-utilities` — pomoćni alati za poboljšanje promptova i evaluaciju kvaliteta dizajna.
+   - Očišćeni su privremeni fajlovi iz `/tmp`.
+
 ## 2026-06-21 (23:17 CET) — Dopuna i ažuriranje baze znanja (Obsidian Wiki)
 
 ### Urađeno

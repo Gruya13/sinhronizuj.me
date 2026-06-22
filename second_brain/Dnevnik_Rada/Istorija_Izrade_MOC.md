@@ -12,6 +12,9 @@ Ovaj dokument služi kao indeks svih izmena, implementacija i sesija razvoja na 
 
 ### Jun 2026.
 
+#### [[2026-06-22 - Instalacija Stitch-Skills]]
+*   **Opis**: Instalacija zvanične biblioteke Stitch-Skills pluginova (`stitch-design`, `stitch-build`, `stitch-utilities`) u globalnu Antigravity konfiguraciju.
+
 #### [[2026-06-21 - Priprema i kreiranje DESIGN.md za Stitch MCP]]
 *   **Opis**: Kreiranje centralnog [DESIGN.md](file:///home/gruya/Projektri/sinhronizuj.me/DESIGN.md) sa dizajnerskim smernicama za 5 ekrana, u pripremi za automatsko postavljanje UI/UX na Stitch platformu.
 
