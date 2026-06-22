@@ -132,3 +132,22 @@ Produkcioni Docker Compose fajlovi se nalaze u direktorijumu `infra/hetzner/`. P
 ### Rešenje
 U GitHub Actions deploy skriptu ([deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml)) dodat je korak koji kopira `.env` fajl u odgovarajući folder pre pokretanja kontejnera:
 `cp .env infra/hetzner/.env`
+
+---
+
+## 🐛 7. Greška 500 pri brisanju projekta (Nedostatak Alembic-a i migracija u Docker slici)
+
+### Simptom
+Prilikom pokušaja brisanja projekta na interfejsu (ruta `DELETE /api/v1/project/{project_id}`), server je vraćao grešku 500 (Internal Server Error), a na klijentu se pojavljivala poruka `Greška pri brisanju projekta: Failed to fetch`. Logovi API kontejnera su prijavljivali:
+`sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column segments.qe_score does not exist`
+
+### Uzrok (Root Cause)
+Uvođenjem funkcija za Perpetual Learning u bazu su dodate kolone `qe_score` i druge u tabelu `segments`, ali migracije se na VPS serveru nisu izvršile jer `alembic` paket uopšte nije bio prisutan u `requirements.txt` niti instaliran u Docker slici. Zbog ovoga je deploy pipeline tiho ignorisao grešku prilikom pokretanja migracija, a baza je ostala na zastareloj verziji. Pored toga, deploy je dodatno otežavao nepostojeći i povučeni tag za MinIO sliku (`minio/minio:RELEASE.2024-05-10T01-39-38Z`) koji je blokirao globalni `docker compose pull` na VPS-u.
+
+### Rešenje
+1. **Instalacija Alembic-a**: Paket `alembic==1.18.4` je dodat u [requirements.txt](file:///home/gruya/Projektri/sinhronizuj.me/requirements.txt) kako bi bio deo produkcione slike.
+2. **Ispravka MinIO taga**: U [docker-compose.prod.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/hetzner/docker-compose.prod.yml) zamenjen je nepostojeći tag sa `minio/minio:latest`, što je omogućilo stabilan pull i rad kontejnera.
+3. **Konfiguracija Alembic putanje**: Ažurirani su pozivi migracija u deploy skripti [deploy.yml](file:///home/gruya/Projektri/sinhronizuj.me/.github/workflows/deploy.yml) dodavanjem tačne putanje do konfiguracije:
+   `alembic -c backend/alembic.ini upgrade head`
+4. **Verifikacija**: Ručno su izvršene preostale migracije u kontejneru na VPS-u, ažurirajući šemu baze na najnoviju verziju (`bce39c06dfe4`). Izbrisan je test projekat čime je potvrđeno da kaskadno brisanje DB segmenata i pripadajućih S3/MinIO fajlova sada prolazi bez ikakvih izuzetaka.
+

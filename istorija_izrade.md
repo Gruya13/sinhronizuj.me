@@ -1,3 +1,19 @@
+## 2026-06-22 (07:25 CET) — Rešavanje padova i popravka brisanja projekta (Alembic & MinIO deploy)
+
+### Problem
+1. **Pad pri brisanju projekta (500 Internal Server Error)**: Korisnik je prijavio grešku pri brisanju projekata. Logovi su ukazivali da u tabeli `segments` nedostaje kolona `qe_score` i druge nedavno dodate kolone. Alembic migracije nisu bile izvršene na serveru jer `alembic` paket nije bio instaliran u produkcionoj Docker slici.
+2. **Pucanje Deploy Pipeline-a na MinIO**: Automatski deploy je tiho padao ili bivao blokiran zbog MinIO slike sa nepostojećim tagom `minio/minio:RELEASE.2024-05-10T01-39-38Z` koji je uklonjen sa Docker Hub-a.
+3. **Tihi promašaj Alembic migracija**: Čak i kada se alembic pozivao u deploy workflow-u, izvršavao se u pogrešnom direktorijumu i vraćao grešku `No 'script_location' key found in configuration`, koja je bila ignorisana preko `|| echo ...`.
+
+### Rešenje
+1. **Dodavanje Alembic-a**: `alembic==1.18.4` je uspešno dodat u `requirements.txt` kako bi bio deo Docker slika.
+2. **Stabilizacija MinIO slike**: U `infra/hetzner/docker-compose.prod.yml` zamenjen je nepostojeći tag za MinIO sa stabilnom slikom `minio/minio:latest`, što je omogućilo uspešno izvršavanje `docker compose pull` i deploy-a na VPS-u.
+3. **Ispravka poziva migracija**: Ažuriran je `.github/workflows/deploy.yml` tako da alembic poziva sa ispravnom konfiguracijom: `alembic -c backend/alembic.ini upgrade head`.
+4. **Izvršavanje i Verifikacija**:
+   - Ručno su pokrenute migracije na VPS-u (`alembic -c /app/backend/alembic.ini upgrade head`), čime je baza ažurirana na najnoviju verziju (`bce39c06dfe4`) i dodata je kolona `qe_score` u tabelu `segments`.
+   - Napisan je i pokrenut test skript u kontejneru za brisanje projekta `test` (ID: `d8a674d8-1109-4cba-8209-c3382b47949d`) koji je verifikovao da se S3 fajlovi i DB segmenti uspešno brišu pod CASCADE vezom bez ijedne greške.
+   - Svi lokalni testovi (`pytest`), Ruff i Bandit provere su uspešno prošle.
+
 ## 2026-06-22 (06:55 CET) — Instalacija Stitch-Skills pluginova za Antigravity
 
 ### Urađeno
