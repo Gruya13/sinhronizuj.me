@@ -35,7 +35,6 @@ def serve():
     """
     import subprocess
     import os
-    from modal.experimental import stop_fetching_inputs
 
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
@@ -52,10 +51,10 @@ def serve():
 
     api_key = os.environ.get("MODAL_API_KEY")
     if api_key:
-        print(f"[LEKTOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        print("[LEKTOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
         cmd.extend(["--api-key", api_key])
 
-    print(f"Pokretanje vLLM servera za model: Qwen/Qwen3-32B-AWQ")
+    print("Pokretanje vLLM servera za model: Qwen/Qwen3-32B-AWQ")
     subprocess.Popen(cmd)
 
 if __name__ == "__main__":

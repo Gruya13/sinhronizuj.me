@@ -9,7 +9,6 @@ VOLUME_PATH = "/models_nfs"
 
 def download_wav2lip_checkpoints():
     import os
-    import urllib.request
     wav2lip_dir = f"{VOLUME_PATH}/wav2lip"
     os.makedirs(wav2lip_dir, exist_ok=True)
     
@@ -33,7 +32,6 @@ def download_wav2lip_checkpoints():
 
 def download_gfpgan_checkpoint():
     import os
-    import urllib.request
     gfpgan_dir = f"{VOLUME_PATH}/gfpgan"
     os.makedirs(gfpgan_dir, exist_ok=True)
     gfpgan_path = f"{gfpgan_dir}/GFPGANv1.4.pth"

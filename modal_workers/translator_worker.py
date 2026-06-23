@@ -88,7 +88,7 @@ def serve():
     
     api_key = os.environ.get("MODAL_API_KEY")
     if api_key:
-        print(f"[TRANSLATOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        print("[TRANSLATOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
         cmd.extend(["--api-key", api_key])
     
     subprocess.Popen(cmd)

@@ -1,11 +1,8 @@
 import modal
 import os
 import base64
-import tempfile
 import shutil
 import uuid
-import glob
-import numpy as np
 
 app = modal.App("sm-tts-openvoice")
 
@@ -118,7 +115,6 @@ class OpenVoiceWorker:
         """
         import torch
         import wave
-        from scipy.io import wavfile
         
         seg_id = segment.get("id", "0")
         text = segment.get("text", "")
@@ -472,7 +468,7 @@ class OpenVoiceWorker:
         except Exception as e:
             import traceback
             print(f"[OpenVoice PIPELINE ERROR] {e}\n{traceback.format_exc()}")
-            return {"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}
+            return {"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}
 
 @app.local_entrypoint()
 def main():

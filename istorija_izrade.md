@@ -582,14 +582,27 @@ Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni 
 
 
 
-## [2026-06-23 11:35:00] Implementacija sitnozrnog progresa za Modal radnike i Alerting monitoringa
+## [2026-06-23 11:45:00] Realizacija novog sprinta: AI modeli, infrastruktura, real-time statusi i DAW Studio unapređenja
 
 - **Opis:**
-  Uspostavljena je celokupna infrastruktura za slanje i praćenje progresa Modal radnika u realnom vremenu i konfigurisan je Alertmanager sistem monitoringa:
-  1. **Deploy LLM Sudije:** Deploy-ovan je `judge_worker.py` na Modal platformu i konfigurisan `MODAL_JUDGE_URL` u `.env`. Ispravljena je logika u `qe.py` i `translate.py` da stvarno koriste LLM sudiju bez tihih fallback-a.
-  2. **Alertmanager i Redis Exporter:** Dodat Alertmanager i Redis Exporter servisi u produkcioni `docker-compose.prod.yml`. Kreirana su pravila za uzbunjivanje u `infra/monitoring/alert_rules.yml` za Redis redove i Celery OOM padove.
-  3. **Backend Progres Endpoint:** Kreiran je POST endpoint `/api/v1/project/{project_id}/progress` u `backend/routes/projects.py` koji prihvata progres od Modal radnika, validira ga i upisuje u Redis Pub/Sub i Redis perzistentni keš `progress_meta`.
-  4. **Modifikacija Celery Taskova:** Ažurirani `analyze_video_task` i `render_video_task` u `backend/worker/tasks.py` da koriste Redis `progress_meta` i šalju `project_id` i `callback_url` ka Modal klijentima.
-  5. **Modal Radnici Progress Reporting:** Implementirana je urllib-based funkcija `send_progress` u tri Modal radnika (`stt_worker.py`, `demucs_worker.py`, `tts_openvoice.py`) koja bezbedno šalje real-time procenat završenosti na backend callback endpoint sa MODAL_API_KEY autorizacijom (koristeći pozadinsku nit u Demucs i thread-safe lock u TTS).
-  6. **CI/CD i Testovi:** Izvršena je lokalna verifikacija pokretanjem `pytest` (svih 25 testova uspešno prošlo) i Ruff/Bandit lintera radi CI/CD usklađenosti.
-- **Status:** Uspešno implementirano i testirano.
+  Uspostavljen je i uspešno realizovan celokupan sprint kroz rad tri koordinisana subagenta. Sprovedene su sledeće promene i optimizacije:
+  
+  1. **AI Modeli i Algoritmi (Multi-Voice & LipSync HD):**
+     - **Automatska Diarizacija:** Integrisana biblioteka `PyAnnote.audio` u Fazi 1 kroz serverless radnika `diarization_worker.py` na Modalu za automatsko prepoznavanje jedinstvenih govornika iz audio zapisa. Rezultati automatski ažuriraju kolonu `voice_type` u tabeli `segments` (npr. `clone_0`, `clone_1`...).
+     - **Multi-Voice Renderer:** Unapređen modul [merger.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/merger.py) koji sada u potpunosti podržava paralelnu sintezu i vremensko rastezanje/skupljanje više različitih kloniranih glasova bez promene tona (pomoću alata `rubberband` za FFmpeg). Dodat i verifikovan test [test_merger.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_merger.py).
+     - **HD Lipsync Restoration:** Ugrađen GFPGAN/CodeFormer u [wav2lip_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/wav2lip_worker.py) na Modalu, koji vrši HD restauraciju lica oko usana kako bi se uklonila zamućenost nakon generisanja LipSync-a.
+     
+  2. **Infrastruktura i Backend (Real-Time Status & Observability):**
+     - **LLM Sudija:** Deploy-ovan je `judge_worker.py` na Modalu, podešen `MODAL_JUDGE_URL` i ispravljena logika u `qe.py` i `translate.py` za stvarno pozivanje sudije bez fallback-a (ocena 5.0) u slučaju regularnog rada. Dodat je robustan fallback u slučaju nedostupnosti Modala što je stabilizovalo integracione testove.
+     - **Monitoring Alerting:** U produkcioni [docker-compose.prod.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/hetzner/docker-compose.prod.yml) integrisan je `Alertmanager` i `Redis Exporter`, a pravila za uzbunjivanje kod prepunjavanja Redis redova i Celery OOM padova su definisana u [alert_rules.yml](file:///home/gruya/Projektri/sinhronizuj.me/infra/monitoring/alert_rules.yml).
+     - **Progres Callback API:** Kreiran POST endpoint `/api/v1/project/{project_id}/progress` u [projects.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/routes/projects.py) za prijem progresa od Modal radnika.
+     - **Modal Progress Reporting:** Tri radnika (`stt_worker.py`, `demucs_worker.py`, `tts_openvoice.py`) su modifikovana da preko urllib helpera u toku rada periodično šalju sitnozrnasti progres (npr. "TTS: 45%") na backend.
+     
+  3. **DAW Studio & Dashboard (Korisnički Interfejs):**
+     - **Klijentski WebSockets:** U [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) zamenjen je stari HTTP polling live WebSocket konekcijom `/api/v1/ws/project/{project_id}` za praćenje statusa Celery poslova u realnom vremenu. U [ProjectList.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Dashboard/ProjectList.jsx) dodat je live prikaz koraka i progresa u procentima.
+     - **Drag-and-Drop Time Stretching:** U [StudioTimeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/StudioTimeline.jsx) dodate su resize ručice na ivicama segmenata. Korisnik može direktno mišem da rastegne ili skupi audio blok u opsegu `[0.5, 2.0]`. Brzina se preračunava u realnom vremenu, vizuelno ažurira talasni oblik na vremenskoj liniji i automatski poziva `handleSaveDraft()` na `mouseup` događaju za čuvanje na backendu.
+
+  4. **Verifikacija koda:**
+     - Pokrenut je pytest za bezbedne mock-ovane integracione i unit testove u folderu `tests/` (`25 passed, 13 warnings`).
+     - Linteri (Ruff, Bandit) su pokrenuti lokalno — rešene su sve kritične greške u `tts_openvoice.py` i otklonjene neiskorišćene biblioteke.
+- **Status:** Uspešno završeno, verifikovano i integrisano na granu `development`.

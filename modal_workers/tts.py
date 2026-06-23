@@ -2,7 +2,6 @@
 import modal
 import os
 import base64
-import tempfile
 import subprocess
 import glob
 
@@ -72,9 +71,7 @@ class WorkerV110:
     @modal.method()
     def generate_segment(self, segment: dict, ref_indices_path: str, ref_text: str, uuid_str: str) -> dict:
         import os
-        import subprocess
         import base64
-        import glob
         
         seg_id = segment["id"]
         text = segment["text"]
@@ -89,8 +86,8 @@ class WorkerV110:
             llama_ckpt = next(glob.iglob(f"{VOLUME_PATH}/fish-speech-1.5/**/model.ckpt", recursive=True), None)
         vqgan_ckpt = next(glob.iglob(f"{VOLUME_PATH}/fish-speech-1.5/**/firefly-gan-vq-fsq-8x1024-21hz-generator.pth", recursive=True), None)
         
-        vqgan_script = next(glob.iglob(f"/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
-        llama_script = next(glob.iglob(f"/opt/fish-speech/**/text2semantic/inference.py", recursive=True), None)
+        vqgan_script = next(glob.iglob("/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
+        llama_script = next(glob.iglob("/opt/fish-speech/**/text2semantic/inference.py", recursive=True), None)
         
         if not all([llama_ckpt, vqgan_ckpt, vqgan_script, llama_script]):
             return {"id": seg_id, "error": f"Modeli ili skripte nisu pronadjeni. Llama={llama_ckpt}, VQGAN={vqgan_ckpt}"}
@@ -150,10 +147,8 @@ class WorkerV110:
     @modal.fastapi_endpoint(method="POST")
     def task(self, data: dict, request = None):
         import traceback
-        import base64
         import os
         import subprocess
-        import glob
         import uuid
         import shutil
         from fastapi.responses import JSONResponse
@@ -179,7 +174,7 @@ class WorkerV110:
 
             # Pretraga modela za korak 1 (Encode)
             vqgan_ckpt = next(glob.iglob(f"{self.fish_path}/**/firefly-gan-vq-fsq-8x1024-21hz-generator.pth", recursive=True), None)
-            vqgan_script = next(glob.iglob(f"/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
+            vqgan_script = next(glob.iglob("/opt/fish-speech/**/vqgan/inference.py", recursive=True), None)
             
             if not vqgan_ckpt or not vqgan_script:
                 return {"error": f"VQGAN checkpoint ili skripta nisu pronadjeni. CKPT={vqgan_ckpt}, Script={vqgan_script}"}
@@ -241,7 +236,7 @@ class WorkerV110:
                     if os.path.exists(nfs_npy_path): os.remove(nfs_npy_path)
                     return {"error": "Morate poslati 'text' ili 'segments'"}
                 
-                print(f"[TTS] Pokrecem pojedinacnu obradu (backward compatibility)")
+                print("[TTS] Pokrecem pojedinacnu obradu (backward compatibility)")
                 single_segment = {"id": "0", "text": text}
                 res = self.generate_segment.local(single_segment, nfs_npy_path, ref_text, req_uuid)
                 if os.path.exists(nfs_npy_path): os.remove(nfs_npy_path)

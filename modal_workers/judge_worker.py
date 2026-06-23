@@ -48,10 +48,10 @@ def serve():
 
     api_key = os.environ.get("MODAL_API_KEY")
     if api_key:
-        print(f"[JUDGE-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        print("[JUDGE-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
         cmd.extend(["--api-key", api_key])
 
-    print(f"Pokretanje vLLM servera za model: meta-llama/Llama-3.1-8B-Instruct")
+    print("Pokretanje vLLM servera za model: meta-llama/Llama-3.1-8B-Instruct")
     subprocess.Popen(cmd)
 
 if __name__ == "__main__":
