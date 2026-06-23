@@ -12,6 +12,9 @@ Ovaj dokument služi kao indeks svih izmena, implementacija i sesija razvoja na 
 
 ### Jun 2026.
 
+#### [[2026-06-23 - Uklanjanje Realnih Modal Testova i Deploy na Produkciju]]
+*   **Opis**: Uklanjanje nepravilnih testova iz scratch foldera koji šalju zahteve Modal radnicima, optimizacija brzine test paketa i spajanje izmena na granu main radi pokretanja produkcionog deploy-a.
+
 #### [[2026-06-22 - Kompletiranje Ekrana na Stitch-u]]
 *   **Opis**: Generisanje preostala dva ekrana (Studio Editor DAW i Admin Panel) sa premium estetikom i dizajn sistemom Deep Space Studio, te verifikacija svih 5 ekrana na Stitch platformi.
 

@@ -606,3 +606,15 @@ Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni 
      - Pokrenut je pytest za bezbedne mock-ovane integracione i unit testove u folderu `tests/` (`25 passed, 13 warnings`).
      - Linteri (Ruff, Bandit) su pokrenuti lokalno — rešene su sve kritične greške u `tts_openvoice.py` i otklonjene neiskorišćene biblioteke.
 - **Status:** Uspešno završeno, verifikovano i integrisano na granu `development`.
+
+## [2026-06-23 11:50:00] Ažuriranje statusa nezavršenih radova i definisanje novih dugoročnih ciljeva
+- **Opis:**
+  Ažuriran je fajl [nezavrseni_radovi.md](file:///home/gruya/Projektri/sinhronizuj.me/nezavrseni_radovi.md) u skladu sa uspešno realizovanim sprintom od strane koordinisanog tima subagenata. Svi prethodno planirani i započeti zadaci su prebačeni u sekciju "Uspešno Završeni Radovi", a definisana su tri nova dugoročna cilja (optimizacija DBSCAN-a za Beta agenta, A/B evaluacija kvaliteta preko BLEU/TER-a i postavljanje S3 Lifecycle Policies za privremene fajlove).
+- **Status:** Završeno bez izmena koda aplikacije.
+
+## [2026-06-23 11:55:00] Uklanjanje realnih Modal testova i deploy na produkciju
+- **Opis:**
+  - Pregledani su svi test fajlovi u repozitorijumu. Verifikovano je da su svi integracioni i unit testovi unutar foldera `tests/` potpuno bezbedni i da imaju 100% mock-ovane pozive ka Modal radnicima (putem `@patch`).
+  - Identifikovani su privremeni testovi u folderu `scratch/` (`test_lektor_raw.py` i `test_lektor_batch1.py`) koji su vršili stvarne HTTP pozive na Modal endpoints. Ovi fajlovi su preimenovani u `run_lektor_raw.py` i `run_lektor_batch1.py`, a funkcije unutar njih su preimenovane iz `test_*` u `run_*`. Ovo sprečava `pytest` da automatski pokreće ove fajlove, čime se eliminišu nepotrebni troškovi i ubrzava izvršavanje testova (ukupno vreme izvršavanja smanjeno sa 38.64s na 17.70s, broj pokrenutih testova smanjen sa 34 na 31).
+  - Pripremljeno je spajanje najnovijih izmena sa grane `development` na granu `main` radi pokretanja produkcionog deploy-a.
+- **Status:** Uspešno verifikovano lokalno; pripremljeno za produkcioni deploy.
