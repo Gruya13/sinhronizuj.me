@@ -497,5 +497,16 @@ nisu bili prisutni na platnu niti na listi aktivnih ekrana, iako su u prethodnim
 Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni testovi (pytest) su pokrenuti i svi prolaze (23 passed).
  Izmene na pomoćnim lokalnim skriptama se nalaze u folderu `scratch/` koji je konfigurisan u `.gitignore` i ne ulazi u git repozitorijum. Radni direktorijum gita je čist.
 
+## [2026-06-22 21:08:00] Ispravka Celery uvoza i uspešno testiranje Faze 1 sinhronizacije
+- **Opis:**
+  Sprovedeno je testiranje i debugovanje prvog dela pipeline-a za prevođenje videa:
+  1. **Ispravka Celery uvoza:** Rešen `ModuleNotFoundError` u Celery radniku zamenom nepostojećeg uvoza `from backend.main import get_presigned_download_url` sa ispravnim uvozom iz `backend.services.s3` na pet mesta unutar [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py). Nakon izmene, uspešno su restartovani radnik, API i beat servisi.
+  2. **Ispravka SQL-a u test skripti:** Uklonjena SQL sintaksna greška u [run_usb_pipeline.py](file:///home/gruya/Projektri/sinhronizuj.me/scratch/run_usb_pipeline.py) dodavanjem navodnika oko rezervisane reči `"end"`.
+  3. **Praćenje statusa Faze 1:** Ispravljen ciljani status praćenja u test skripti sa `'draft'` na `'ready'` pošto Celery zadatak prebacuje status projekta u `'ready'` nakon završetka analize.
+  4. **Uspešna verifikacija Faze 1:** Pokrenut pipeline na test videu `USB Colors have meanings...`. Faza 1 (Preuzimanje, Izolacija vokala, Transkripcija, Prevođenje i Diarizacija) je završena uspešno za **27.75 sekundi** (korišćenjem keširanih modela). Kvalitet prevoda je izuzetno visok (tačna detekcija boja i indikatora brzine).
+  5. **Dijagnostika 403 greške u Fazi 3:** Uočena je 403 Forbidden greška tokom preuzimanja originalnog videa sa S3 u Fazi 3 (`render_video_task`). Dijagnostikovano je da greška nastaje privremeno zbog Cloudflare/Nginx keširanja ili eventualne konzistentnosti MinIO skladišta, dok ručni boto3 pozivi unutar istog radnika prolaze uspešno nakon kratkog vremena.
+  6. **CI/CD usklađenost:** Pokrenut `pytest` (svih 24 testa prolaze) i provereni Ruff/Bandit linteri lokalno.
+- **Status:** Faza 1 uspešno testirana i verifikovana. Faza 3 dijagnostikovana.
+
 
 

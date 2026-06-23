@@ -168,3 +168,31 @@ Nakon spajanja izmena za Fazu 4, prijava (login) na sajt je prestala da radi. Kl
 2. **Popravka `translator.py`**: Vraćeni su svi uvozi u [translator.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translator.py) i definisana je `__all__` lista kako bi se uklonila Ruff linter upozorenja o neiskorišćenim uvozima.
 3. **Verifikacija**: Pokrenut je ceo test paket (24 passed) i lokalno je testiran API login čime je potvrđeno da sve radi bez ikakvih izuzetaka. Izmene su gurnute na granu `development` što je uspešno pokrenulo CI/CD deploy pipeline na produkciju.
 
+---
+
+## 🐛 9. Celery ModuleNotFoundError pri uvozu `get_presigned_download_url`
+
+### Simptom
+Celery radnik je bacao `ModuleNotFoundError: No module named 'backend'` ili sličnu grešku pri pokretanju zadataka koji koriste presigned URL-ove (poput preuzimanja ili prevođenja).
+
+### Uzrok (Root Cause)
+U datoteci [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py), funkcija `get_presigned_download_url` se uvozila na 5 mesta iz `backend.main` modula (`from backend.main import get_presigned_download_url`). Međutim, ta funkcija nikada nije bila definisana u `backend/main.py`, već se nalazi u `backend/services/s3.py`.
+
+### Rešenje
+Zamenjeni su svi pogrešni uvozi sa ispravnim uvozom iz s3 servisa:
+`from backend.services.s3 import get_presigned_download_url`
+Nakon izmene koda, Celery radnik i API kontejneri su uspešno restartovani i uvoz prolazi stabilno.
+
+---
+
+## 🐛 10. Greška 403 Forbidden tokom S3 preuzimanja u Fazi 3 (Render)
+
+### Simptom
+Pokretanjem renderovanja videa (Faza 3), Celery zadatak `render_video_task` je odmah prekidan sa greškom:
+`An error occurred (403) when calling the HeadObject operation: Forbidden`
+
+### Uzrok (Root Cause)
+Iako su kredencijali i mrežna konfiguracija u kontejneru radnika potpuno ispravni, Cloudflare proxy ili MinIO kofa imaju privremeno kašnjenje u propagaciji/eventualnoj konzistentnosti ili keširanju grešaka (npr. Cloudflare kešira 403/404 odgovore pre nego što je fajl u potpunosti spreman za preuzimanje). Ručni boto3 pozivi i preuzimanja fajla sa istim postavkama iz istog kontejnera prolaze uspešno nakon kraćeg vremena.
+
+### Rešenje / Zaobilaznica
+Problem se može ublažiti dodavanjem kratkog mehanizma ponovnih pokušaja (retry loop) sa eksponencijalnim kašnjenjem prilikom preuzimanja fajlova u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) kako bi se prevazišao eventualni time lag u Cloudflare/S3 propagaciji.

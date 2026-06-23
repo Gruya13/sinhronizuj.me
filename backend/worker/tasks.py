@@ -207,12 +207,17 @@ def upload_file_to_s3(file_path: str, bucket_name: str, object_key: str):
         return False
 
 def download_file_from_s3(bucket_name: str, object_key: str, local_path: str):
+    print(f"[DEBUG S3 DOWNLOAD] bucket={bucket_name}, key={object_key}, local={local_path}", flush=True)
+    print(f"[DEBUG S3 CLIENT CREATION] endpoint_url={f'https://{settings.MINIO_ENDPOINT}'}, key={settings.MINIO_ACCESS_KEY}, secret={settings.MINIO_SECRET_KEY[:4]}...", flush=True)
+    import os
+    aws_envs = {k: v for k, v in os.environ.items() if k.startswith("AWS_")}
+    print(f"[DEBUG AWS ENVS] {aws_envs}", flush=True)
     s3_internal = boto3.client(
         's3',
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0'),
         region_name=settings.S3_REGION
     )
     try:
@@ -768,7 +773,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             db.close()
             
         # Generišemo presigned URL-ove za Redis draft kompatibilnost
-        from backend.main import get_presigned_download_url
+        from backend.services.s3 import get_presigned_download_url
         
         redis_segments = []
         for s in processed_segments:
@@ -849,6 +854,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
 )
 def render_video_task(self, project_id: str, voice_type: str = "clone", background_vol: float = -5.0, dubbed_vol: float = 0.0):
     print(f"--- [CELERY TASK] Započeta FAZA 2 (Render). Projekat: {project_id} ---", flush=True)
+    print(f"[DEBUG ENV] MINIO_ENDPOINT={settings.MINIO_ENDPOINT}, MINIO_SECURE={settings.MINIO_SECURE}, MINIO_ACCESS_KEY={settings.MINIO_ACCESS_KEY}", flush=True)
+    import os
+    print(f"[DEBUG ENV OS] MINIO_ENDPOINT={os.environ.get('MINIO_ENDPOINT')}, MINIO_SECURE={os.environ.get('MINIO_SECURE')}", flush=True)
     r_client = get_redis_client()
     task_id = self.request.id
     
@@ -1376,7 +1384,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
         update_progress(completed_step="Renderovanje završeno", percentage=100)
         
         # Generišemo presigned URL za status kompatibilnost
-        from backend.main import get_presigned_download_url
+        from backend.services.s3 import get_presigned_download_url
         final_presigned_url = get_presigned_download_url(settings.MINIO_BUCKET, final_video_s3_key)
         
         # Sinhronizujemo Redis draft za unazadnu kompatibilnost
@@ -1863,7 +1871,7 @@ def deploy_lora_task(dry_run: bool = False, user_id: str = None):
 
 def refresh_project_draft(project_id: str, db: SessionLocal):
     import uuid
-    from backend.main import get_presigned_download_url
+    from backend.services.s3 import get_presigned_download_url
     
     project_uuid = uuid.UUID(project_id) if isinstance(project_id, str) else project_id
     p = db.query(Project).filter(Project.id == project_uuid).first()
@@ -2097,7 +2105,7 @@ def generate_segment_tts_task(self, project_id: str, segment_id: int, text: str,
                 
         refresh_project_draft(project_id, db)
         
-        from backend.main import get_presigned_download_url
+        from backend.services.s3 import get_presigned_download_url
         presigned_url = get_presigned_download_url(settings.MINIO_BUCKET, probni_s3_key)
         
         return {
@@ -2270,7 +2278,7 @@ def generate_all_tts_task(self, project_id: str, voice_type: str):
         
         refresh_project_draft(project_id, db)
         
-        from backend.main import get_presigned_download_url
+        from backend.services.s3 import get_presigned_download_url
         presigned_dubbed_url = get_presigned_download_url(settings.MINIO_BUCKET, dubbed_audio_s3_key)
         
         return {

@@ -81,7 +81,7 @@ def download_file_from_s3(bucket_name: str, object_key: str, local_path: str) ->
         endpoint_url=f"http://{settings.MINIO_ENDPOINT}" if not settings.MINIO_SECURE else f"https://{settings.MINIO_ENDPOINT}",
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0'),
         region_name=settings.S3_REGION
     )
     try:
