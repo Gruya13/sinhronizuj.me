@@ -296,8 +296,47 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # 14. Alertmanager (Upravljanje uzbunama)
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: sinhronizuj-alertmanager
+    restart: always
+    volumes:
+      - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 15. Redis Exporter (Metrike za Redis i Celery redove)
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: sinhronizuj-redis-exporter
+    restart: always
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command:
+      - '--check-keys=default_queue,analyze_queue,render_queue'
+    ports:
+      - "127.0.0.1:9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   postgres_data:
   minio_data:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
+

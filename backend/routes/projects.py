@@ -403,3 +403,89 @@ def save_project_draft(project_id: str, request: SaveProjectRequest, current_use
     get_project_draft(project_id, current_user, db)
     
     return {"status": "success", "message": "Promene na prevodu su sačuvane."}
+
+@router.post("/api/v1/project/{project_id}/progress")
+def update_project_progress(
+    project_id: str,
+    payload: dict,
+    request: Request
+):
+    # Provera API ključa
+    expected_key = settings.MODAL_API_KEY
+    if expected_key:
+        api_key = request.headers.get("X-API-Key")
+        if api_key != expected_key:
+            raise HTTPException(status_code=403, detail="Neovlašćen pristup.")
+
+    r = get_redis_client()
+    channel_name = f"project:{project_id}:progress"
+    redis_key = f"project:{project_id}:progress_meta"
+    
+    # Pročitaj trenutni progres iz Redis-a
+    meta_data = None
+    try:
+        cached_meta = r.get(redis_key)
+        if cached_meta:
+            meta_data = json.loads(cached_meta)
+    except Exception as e:
+        print(f"[PROGRESS API ERROR] Greška pri čitanju iz Redis-a: {e}", flush=True)
+
+    if not meta_data:
+        meta_data = {
+            'id': project_id,
+            'current_step': "Obrada na Modalu...",
+            'percent': 0,
+            'completed_steps': [],
+            'segments': [],
+            'detail': "",
+            'logs': [],
+            'costs': {
+                'phases': {},
+                'total_usd': 0.0
+            }
+        }
+
+    # Definišemo raspon procenata na osnovu trenutnog koraka
+    step_ranges = {
+        "Izolacija vokala...": (25, 50),
+        "Prepoznavanje govora (Whisper)...": (50, 75),
+        "Prevođenje (Modal + Multimodal)...": (75, 85),
+        "Sinteza govora...": (20, 60),
+        "Lip Sync sinhronizacija...": (80, 95)
+    }
+
+    worker_percent = payload.get("percent")
+    worker_detail = payload.get("detail", "")
+
+    # Ažuriramo detalje
+    if worker_detail:
+        meta_data["detail"] = worker_detail
+        # Dodajemo u logove
+        ts = datetime.utcnow().strftime("%H:%M:%S")
+        meta_data['logs'].append(f"[{ts}] {worker_detail}")
+        if len(meta_data['logs']) > 20:
+            meta_data['logs'] = meta_data['logs'][-20:]
+
+    # Ažuriramo procenat
+    if worker_percent is not None:
+        current_step = meta_data.get("current_step")
+        if current_step in step_ranges:
+            min_p, max_p = step_ranges[current_step]
+            global_p = int(min_p + (worker_percent / 100.0) * (max_p - min_p))
+            # Osiguravamo da procenat ne opada niti da prelazi max_p
+            meta_data["percent"] = max(meta_data.get("percent", 0), min(global_p, max_p))
+        else:
+            # Ako korak nije u rasponima, direktno upisujemo
+            meta_data["percent"] = worker_percent
+
+    from backend.worker.tasks import safe_json_dumps
+    
+    # Čuvamo u Redis i šaljemo preko Pub/Sub
+    try:
+        r.set(redis_key, safe_json_dumps(meta_data), ex=86400)
+        r.publish(channel_name, safe_json_dumps(meta_data))
+    except Exception as e:
+        print(f"[PROGRESS API ERROR] Greška pri pisanju u Redis: {e}", flush=True)
+
+    return {"status": "success"}
+

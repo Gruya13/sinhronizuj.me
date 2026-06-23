@@ -16,6 +16,7 @@ class Settings:
     MODAL_JUDGE_URL: str = os.getenv("MODAL_JUDGE_URL", "")
     MODAL_TTS_URL: str = os.getenv("MODAL_TTS_URL", "")
     MODAL_DEMUCS_URL: str = os.getenv("MODAL_DEMUCS_URL", "")
+    MODAL_DIARIZATION_URL: str = os.getenv("MODAL_DIARIZATION_URL", "")
     MODAL_WAV2LIP_URL: str = os.getenv("MODAL_WAV2LIP_URL", "")
     MODAL_API_KEY: str = os.getenv("MODAL_API_KEY", "")
     
@@ -52,6 +53,7 @@ class Settings:
     ENHANCE_LAMBD: float = float(os.getenv("ENHANCE_LAMBD", "0.9"))
     
     TEMP_WORKSPACE: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../temp_workspace"))
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://api.sinhronizuj.me")
 
     # Kvote i limiti (Zadatak 4)
     MAX_SINGLE_FILE_SIZE_MB: int = int(os.getenv("MAX_SINGLE_FILE_SIZE_MB", "250"))

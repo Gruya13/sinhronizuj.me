@@ -3,7 +3,7 @@ import base64
 from backend.core.config import settings
 from backend.worker.utils import call_modal_endpoint
 
-def separate_audio(audio_path: str, progress_callback=None, workspace_path: str = None) -> dict:
+def separate_audio(audio_path: str, progress_callback=None, workspace_path: str = None, project_id: str = None) -> dict:
     """
     Koristi Demucs na Modal.com za odvajanje vokala od pozadinske muzike.
     Zahvaljujući --two-stems vocals, Demucs generiše samo dva fajla:
@@ -22,8 +22,22 @@ def separate_audio(audio_path: str, progress_callback=None, workspace_path: str 
     if progress_callback:
         progress_callback(detail="Separacija vokala na Modal-u... ⏳")
 
+    # Računamo trajanje audia za procenu progresa na Modalu
+    audio_duration = 0.0
     try:
-        payload = {"audio_base64": audio_b64}
+        from pydub import AudioSegment
+        aud = AudioSegment.from_file(audio_path)
+        audio_duration = len(aud) / 1000.0
+    except Exception as e:
+        print(f"[DEMUCS-CLIENT] Upozorenje: Računanje trajanja nije uspelo: {e}")
+
+    try:
+        payload = {
+            "audio_base64": audio_b64,
+            "project_id": project_id,
+            "audio_duration": audio_duration,
+            "callback_url": f"{settings.BACKEND_URL}/api/v1/project/{project_id}/progress" if project_id and settings.BACKEND_URL else None
+        }
         output = call_modal_endpoint(
             url=settings.MODAL_DEMUCS_URL,
             payload=payload,

@@ -6,7 +6,8 @@ from backend.worker.utils import call_modal_endpoint
 
 def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: str = "clone", 
                      disable_openvoice: bool = False, disable_enhance: bool = False,
-                     progress_callback=None, all_segments: list = None, workspace_path: str = None) -> dict:
+                     progress_callback=None, all_segments: list = None, workspace_path: str = None,
+                     project_id: str = None) -> dict:
     """
     Poziva Modal Serverless Fish Speech (TTS) za paralelnu sintezu segmenata.
     Zatim spaja izgenerisane audio delove na tacne vremenske pozicije pomocu pydub-a.
@@ -21,130 +22,152 @@ def synthesize_audio(vocals_path: str, translated_segments: list, voice_type: st
         print("[WARNING] MODAL_TTS_URL nije definisan. Preskacem sintezu.")
         return {"status": "error", "message": "MODAL_TTS_URL nedostaje."}
 
-    # 1. Priprema i isecanje referentnog audia za kloniranje glasa
+    # 1. Priprema i isecanje referentnih audia za sve klonirane glasove
     if progress_callback:
-        progress_callback(detail="Priprema referentnog audia...")
+        progress_callback(detail="Priprema referentnih audia za kloniranje glasova...")
     
+    reference_audios = {}
+    default_ref_b64 = None
+    default_ref_text = "Ovo je originalni glas iz videa."
+    
+    # Pronađemo sve jedinstvene klonirane glasove iz segmenata
+    clone_voices = set()
+    ref_source_segments = all_segments if all_segments else translated_segments
+    for seg in ref_source_segments:
+        v_type = seg.get("voice_type")
+        if v_type and v_type.startswith("clone"):
+            clone_voices.add(v_type)
+            
+    # Ako nema nijednog specifičnog clone_X glasa, koristimo podrazumevani "clone"
+    if not clone_voices:
+        clone_voices.add(voice_type)
+        
     try:
-        # Sakupi više segmenata za bolji referentni glas (ciljamo 5-10 sekundi ukupno)
-        good_segments = []
-        total_duration = 0.0
-        
-        # Koristimo sve segmente projekta za referentni glas ako su obezbeđeni
-        ref_source_segments = all_segments if all_segments else translated_segments
-        
-        for seg in ref_source_segments:
-            orig_txt = seg.get("original_text") or seg.get("original")
-            if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
-                duration = seg["end"] - seg["start"]
-                if duration >= 1.5: # Samo segmenti koji imaju dovoljno govora
-                    good_segments.append(seg)
-                    total_duration += duration
-                    if total_duration >= 10.0: # Dovoljno nam je 10 sekundi
-                        break
-                        
-        # Ako nismo nakupili dovoljno od dužih, probajmo da dodamo i kraće od 1.5s (ali > 0.5s)
-        if total_duration < 6.0:
-            for seg in ref_source_segments:
-                if seg not in good_segments:
-                    orig_txt = seg.get("original_text") or seg.get("original")
-                    if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
-                        duration = seg["end"] - seg["start"]
-                        if duration >= 0.5:
-                            good_segments.append(seg)
-                            total_duration += duration
-                            if total_duration >= 10.0:
-                                break
-                                
         ref_audio_all = AudioSegment.from_wav(vocals_path)
         
-        if good_segments:
-            # Sortiramo ih po vremenu početka kako bi se spojili prirodnim redosledom
-            good_segments = sorted(good_segments, key=lambda x: x["start"])
-            
-            # Spajamo audio delove i tekst
-            ref_sub_audio = None
-            ref_text_parts = []
-            
-            for seg in good_segments:
-                start_ms = int(seg["start"] * 1000)
-                end_ms = int(seg["end"] * 1000)
-                # Isecanje i spajanje
-                chunk = ref_audio_all[start_ms:end_ms]
+        for c_voice in clone_voices:
+            try:
+                good_segments = []
+                total_duration = 0.0
                 
-                # Dodajemo blagi fade_in i fade_out da eliminišemo pucketanje na krajevima segmenata
-                chunk = chunk.fade_in(50).fade_out(50)
+                # Sakupi više segmenata za bolji referentni glas za ovaj konkretan voice_type
+                for seg in ref_source_segments:
+                    seg_v_type = seg.get("voice_type") or voice_type
+                    if seg_v_type == c_voice:
+                        orig_txt = seg.get("original_text") or seg.get("original")
+                        if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
+                            duration = seg["end"] - seg["start"]
+                            if duration >= 1.5:
+                                good_segments.append(seg)
+                                total_duration += duration
+                                if total_duration >= 10.0:
+                                    break
+                                    
+                # Fallback na kraće segmente
+                if total_duration < 6.0:
+                    for seg in ref_source_segments:
+                        seg_v_type = seg.get("voice_type") or voice_type
+                        if seg_v_type == c_voice and seg not in good_segments:
+                            orig_txt = seg.get("original_text") or seg.get("original")
+                            if orig_txt and seg.get("start") is not None and seg.get("end") is not None:
+                                duration = seg["end"] - seg["start"]
+                                if duration >= 0.5:
+                                    good_segments.append(seg)
+                                    total_duration += duration
+                                    if total_duration >= 10.0:
+                                        break
                 
-                if ref_sub_audio is None:
-                    ref_sub_audio = chunk
-                else:
-                    ref_sub_audio = ref_sub_audio.append(chunk, crossfade=100)
-                ref_text_parts.append(seg.get("original_text") or seg.get("original"))
+                if good_segments:
+                    good_segments = sorted(good_segments, key=lambda x: x["start"])
+                    ref_sub_audio = None
+                    ref_text_parts = []
+                    
+                    for seg in good_segments:
+                        start_ms = int(seg["start"] * 1000)
+                        end_ms = int(seg["end"] * 1000)
+                        chunk = ref_audio_all[start_ms:end_ms]
+                        chunk = chunk.fade_in(50).fade_out(50)
+                        
+                        if ref_sub_audio is None:
+                            ref_sub_audio = chunk
+                        else:
+                            ref_sub_audio = ref_sub_audio.append(chunk, crossfade=100)
+                        ref_text_parts.append(seg.get("original_text") or seg.get("original"))
+                        
+                    buffer = io.BytesIO()
+                    ref_sub_audio.export(buffer, format="wav")
+                    ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    ref_text = " ".join(ref_text_parts)
+                    
+                    reference_audios[c_voice] = ref_b64
+                    if default_ref_b64 is None:
+                        default_ref_b64 = ref_b64
+                        default_ref_text = ref_text
+                        
+                    print(f"[TTS V2] Uspešno pripremljen referentni glas za {c_voice} sa {len(good_segments)} segmenata ({total_duration:.2f}s).")
+            except Exception as e:
+                print(f"[TTS V2 WARNING] Greška pri pripremi referentnog glasa za {c_voice}: {e}")
                 
-            # Izvoz u buffer
-            buffer = io.BytesIO()
-            ref_sub_audio.export(buffer, format="wav")
-            ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            ref_text = " ".join(ref_text_parts)
-            print(f"[TTS V2] Uspešno spojeno {len(good_segments)} referentnih segmenata (ukupno trajanje: {total_duration:.2f}s) za kloniranje glasa.")
-        else:
-            # Fallback na prvih 15 sekundi celog vokala
+        # Ako nismo napravili nijedan referentni audio, uradimo fallback na prvih 15s celog vokala
+        if not reference_audios:
             duration_ms = len(ref_audio_all)
-            limit_ms = min(duration_ms, 15000) # Max 15 sekundi
+            limit_ms = min(duration_ms, 15000)
             ref_sub_audio = ref_audio_all[:limit_ms]
             
             buffer = io.BytesIO()
             ref_sub_audio.export(buffer, format="wav")
-            ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            ref_text = "Ovo je originalni glas iz videa."
+            default_ref_b64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            reference_audios[voice_type] = default_ref_b64
             print("[WARNING] Nije nađen referentni segment. Koristim prvih 15 sekundi audia kao fallback.")
             
     except Exception as e:
         return {"status": "error", "message": f"Greška pri pripremi referentnog audia: {e}"}
-
+ 
     # 2. Učitavamo originalni vokal da bismo znali ukupnu dužinu i izračunali maksimalna trajanja segmenata
     try:
         ref_audio = AudioSegment.from_wav(vocals_path)
         video_duration_ms = len(ref_audio)
     except Exception as e:
         return {"status": "error", "message": f"Greška pri učitavanju originalnog vokala: {e}"}
-
+ 
     # Priprema segmenata za slanje na Modal sa dinamičkim length_scale faktorom
-    # kako bi Piper generisao audio direktno u optimalnom tempu za dužinu segmenta.
     modal_segments = []
     for idx, s in enumerate(translated_segments):
         orig_duration = max(0.05, s["end"] - s["start"])
         char_count = len(s["text"])
         
         # Procena prirodnog trajanja na srpskom (Piper-Marko model)
-        # Prosečno 16 karaktera u sekundi + 0.2s fiksna pauza
         estimated_duration = (char_count / 16.0) + 0.2
         target_scale = orig_duration / estimated_duration
         
-        # Ograničavamo length_scale između 0.75 (brži izgovor) i 1.25 (sporiji izgovor)
-        # kako bi glas zvučao prirodno bez preteranog ubrzanja/usporavanja
+        # Ograničavamo length_scale između 0.75 i 1.25
         length_scale = min(max(target_scale, 0.75), 1.25)
         
-        print(f"[TTS V2] Segment {s['id']} (video_dur={orig_duration:.2f}s, chars={char_count}) -> proračunat length_scale: {length_scale:.2f}", flush=True)
+        seg_voice = s.get("voice_type") or voice_type
+        print(f"[TTS V2] Segment {s['id']} (voice_type={seg_voice}, video_dur={orig_duration:.2f}s, chars={char_count}) -> proračunat length_scale: {length_scale:.2f}", flush=True)
         
         modal_segments.append({
             "id": str(s["id"]),
             "text": s["text"],
             "max_duration": 0.0,
-            "length_scale": float(round(length_scale, 2))
+            "length_scale": float(round(length_scale, 2)),
+            "voice_type": seg_voice
         })
     
     payload = {
         "segments": modal_segments,
-        "reference_audio_base64": ref_b64,
-        "reference_text": ref_text,
+        "reference_audios": reference_audios,
+        "reference_audio_base64": default_ref_b64,
+        "reference_text": default_ref_text,
         "voice_type": voice_type,
         "disable_openvoice": disable_openvoice,
         "disable_enhance": disable_enhance,
         "enhance_tau": settings.ENHANCE_TAU,
-        "enhance_lambd": settings.ENHANCE_LAMBD
+        "enhance_lambd": settings.ENHANCE_LAMBD,
+        "project_id": project_id,
+        "callback_url": f"{settings.BACKEND_URL}/api/v1/project/{project_id}/progress" if project_id and settings.BACKEND_URL else None
     }
-
+ 
     print(f"[TTS V2] Pozivam Modal OpenVoice V2 (Paralelno) za {len(translated_segments)} segmenata sa dynamic duration limitiranjem...")
     
     try:

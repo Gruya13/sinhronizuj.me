@@ -390,10 +390,116 @@ export default function StudioTimeline() {
     document.removeEventListener('mouseup', handleGlobalMouseUp);
   };
 
+  const handleStartTtsResizeLeft = (e, seg) => {
+    if (e.shiftKey) {
+      handleStartDragScroll(e);
+      return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+    if (!timelineRef.current) return;
+    saveToHistory(project.segments); // Sačuvaj pre početka
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    const baseTtsDuration = seg.tts_duration || (seg.end - seg.start);
+    const lastGenSpeed = seg.last_generated_speed || 1.0;
+    const startSpeed = seg.speed || 1.0;
+    const startEstimatedTtsDuration = baseTtsDuration * (lastGenSpeed / startSpeed);
+
+    dragInfoRef.current = {
+      type: 'tts-resize-start',
+      segId: seg.id,
+      startX: e.clientX,
+      baseTtsDuration,
+      lastGenSpeed,
+      startEstimatedTtsDuration,
+      timelineWidth: rect.width,
+      videoDuration: getVideoDuration()
+    };
+    document.addEventListener('mousemove', handleGlobalTtsMouseMove);
+    document.addEventListener('mouseup', handleGlobalTtsMouseUp);
+  };
+
+  const handleStartTtsResizeRight = (e, seg) => {
+    if (e.shiftKey) {
+      handleStartDragScroll(e);
+      return;
+    }
+    e.stopPropagation();
+    e.preventDefault();
+    if (!timelineRef.current) return;
+    saveToHistory(project.segments); // Sačuvaj pre početka
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    const baseTtsDuration = seg.tts_duration || (seg.end - seg.start);
+    const lastGenSpeed = seg.last_generated_speed || 1.0;
+    const startSpeed = seg.speed || 1.0;
+    const startEstimatedTtsDuration = baseTtsDuration * (lastGenSpeed / startSpeed);
+
+    dragInfoRef.current = {
+      type: 'tts-resize-end',
+      segId: seg.id,
+      startX: e.clientX,
+      baseTtsDuration,
+      lastGenSpeed,
+      startEstimatedTtsDuration,
+      timelineWidth: rect.width,
+      videoDuration: getVideoDuration()
+    };
+    document.addEventListener('mousemove', handleGlobalTtsMouseMove);
+    document.addEventListener('mouseup', handleGlobalTtsMouseUp);
+  };
+
+  const handleGlobalTtsMouseMove = (e) => {
+    if (!dragInfoRef.current) return;
+    const info = dragInfoRef.current;
+    const deltaX = e.clientX - info.startX;
+    const deltaSeconds = (deltaX / info.timelineWidth) * info.videoDuration;
+
+    let newEstimatedTtsDuration = info.startEstimatedTtsDuration;
+
+    if (info.type === 'tts-resize-start') {
+      newEstimatedTtsDuration = Math.max(0.2, info.startEstimatedTtsDuration - deltaSeconds);
+    } else if (info.type === 'tts-resize-end') {
+      newEstimatedTtsDuration = Math.max(0.2, info.startEstimatedTtsDuration + deltaSeconds);
+    }
+
+    // Izračunavamo novu brzinu
+    let newSpeed = (info.baseTtsDuration * info.lastGenSpeed) / newEstimatedTtsDuration;
+    
+    // Ograničavamo brzinu na opseg [0.5, 2.0]
+    newSpeed = Math.max(0.5, Math.min(2.0, newSpeed));
+
+    setProject(prevProj => {
+      if (!prevProj) return prevProj;
+      const updated = prevProj.segments.map(s => {
+        if (s.id === info.segId) {
+          return { 
+            ...s, 
+            speed: parseFloat(newSpeed.toFixed(2)),
+            status: 'edited'
+          };
+        }
+        return s;
+      });
+      return { ...prevProj, segments: updated };
+    });
+  };
+
+  const handleGlobalTtsMouseUp = () => {
+    if (!dragInfoRef.current) return;
+    handleSaveDraft();
+    dragInfoRef.current = null;
+    document.removeEventListener('mousemove', handleGlobalTtsMouseMove);
+    document.removeEventListener('mouseup', handleGlobalTtsMouseUp);
+  };
+
   useEffect(() => {
     return () => {
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('mousemove', handleGlobalTtsMouseMove);
+      document.removeEventListener('mouseup', handleGlobalTtsMouseUp);
     };
   }, []);
 
@@ -769,72 +875,45 @@ export default function StudioTimeline() {
                     setSelectedSegmentId(seg.id);
                     setSelectedSegmentIds([seg.id]);
                   }
-
+                  
                   if (videoRef.current) {
                     videoRef.current.currentTime = seg.start;
-                    if (activeAudioSource === "dubbed") {
-                      if (dubbedAudioRef.current) dubbedAudioRef.current.currentTime = seg.start;
-                      if (bgAudioRef.current) bgAudioRef.current.currentTime = seg.start;
+                    if (activeAudioSource === "original") {
+                        // N/A for dubbed click unless needed
                     }
                   }
                 }}
                 style={{
                   position: 'absolute',
                   left: `${left}%`,
-                  width: `${Math.max(origWidth, ttsWidth)}%`,
+                  width: `${ttsWidth}%`,
                   height: '36px',
                   bottom: '4px',
+                  background: isActive 
+                    ? 'rgba(34, 197, 94, 0.25)' 
+                    : (isTrackActive ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.02)'),
+                  border: isActive 
+                    ? '2px solid #22c55e' 
+                    : (isTrackActive ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)'),
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  overflow: 'visible',
-                  zIndex: isHovered ? 9999 : 2,
-                  background: isActive 
-                    ? 'rgba(34, 197, 94, 0.2)' 
-                    : (isTrackActive ? 'rgba(34, 197, 94, 0.05)' : 'rgba(255, 255, 255, 0.02)'),
-                  border: hasCollision
-                    ? '2px solid #f43f5e'
-                    : (isActive 
-                        ? '2px solid #22c55e' 
-                        : (isTrackActive ? '1px solid rgba(34, 197, 94, 0.15)' : '1px solid rgba(255, 255, 255, 0.05)')),
-                  boxShadow: hasCollision 
-                    ? '0 0 12px #f43f5e, inset 0 0 6px rgba(244, 63, 94, 0.4)' 
-                    : (isActive ? '0 0 10px rgba(34, 197, 94, 0.2)' : 'none'),
-                  transition: 'background-color 0.15s, border-color 0.15s, box-shadow 0.2s'
+                  paddingLeft: '6px',
+                  zIndex: isHovered ? 50 : 2,
+                  transition: 'background-color 0.15s, border-color 0.15s'
                 }}
               >
-                {/* Drag-and-drop i resize kontrole za ivice */}
-                <div 
-                  onMouseDown={(e) => handleStartResizeLeft(e, seg)}
-                  style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
-                />
-                <div 
-                  onMouseDown={(e) => handleStartDragMove(e, seg)}
-                  style={{ position: 'absolute', left: '6px', right: '6px', top: 0, bottom: 0, cursor: 'move', zIndex: 10 }}
-                />
-                <div 
-                  onMouseDown={(e) => handleStartResizeRight(e, seg)}
-                  style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30 }}
-                />
-
-                {/* Premium Tooltip prozorčić na hover ako segment ima upozorenje ili koliziju */}
-                {(isLonger || hasCollision) && isHovered && (
+                {(isHovered || isActive) && (isLonger || hasCollision) && (
                   <div style={{
                     position: 'absolute',
-                    bottom: '100%',
                     ...tooltipStyle,
                     background: 'rgba(15, 23, 42, 0.95)',
-                    backdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 10px rgba(239, 68, 68, 0.2)',
-                    borderRadius: '10px',
-                    padding: '10px 14px',
-                    zIndex: 9999,
-                    width: '240px',
-                    color: '#fff',
-                    pointerEvents: 'none',
-                    transition: 'all 0.2s ease',
-                    display: 'block'
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #475569',
+                    zIndex: 100,
+                    width: '280px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.5)'
                   }}>
                     <div style={{
                       position: 'absolute',
@@ -873,19 +952,7 @@ export default function StudioTimeline() {
                 )}
          
                 {/* Waveform */}
-                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 4px', opacity: isActive ? 0.5 : (isTrackActive ? 0.25 : 0.1), overflow: 'hidden', pointerEvents: 'none' }}>
-                  {generateWaveformBars(estimatedTtsDuration, seg.id + 10).map((h, i) => (
-                    <div key={i} style={{ width: '2px', height: `${h}%`, background: (isLonger || hasCollision) ? '#f87171' : (isTrackActive ? '#4ade80' : '#64748b'), borderRadius: '1px' }} />
-                  ))}
-                </div>
-         
-                <span style={{ fontSize: '0.65rem', color: (isLonger || hasCollision) ? '#f87171' : (isTrackActive ? '#86efac' : '#64748b'), fontWeight: 'bold', marginLeft: '6px', zIndex: 20, pointerEvents: 'none' }}>
-                  #{seg.id} {(isLonger && !hasCollision) ? `(⚠️ +${(estimatedTtsDuration - (seg.end - seg.start)).toFixed(1)}s)` : ''} {hasCollision ? '(⚠️ KOLIZIJA)' : ''}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+
 
         {/* 5. TRAKA: POZADINSKA MUZIKA */}
         <div style={{ height: '40px', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>

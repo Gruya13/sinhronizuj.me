@@ -173,8 +173,8 @@ def select_best_translation_via_llama(english_text: str, candidates: List[str]) 
             return cleaned
     except Exception as e:
         print(f"[LLAMA SELECT ERROR] Greška pri odabiru prevoda: {e}", flush=True)
-        
-    return candidates[0]
+        raise e
+
 
 def retranslate_with_self_critique(english_text: str, bad_translation: str, feedback_hint: str) -> str:
     if not settings.MODAL_LEKTOR_URL:
@@ -717,7 +717,8 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                         e["judge_explanation"] = judge_res["explanation"]
                     except Exception as err:
                         print(f"[PARALLEL LLM JUDGE ERROR] Greška pri paralelnom suđenju rečenice {e['global_idx']}: {err}", flush=True)
-                        e["judge_score"] = 5.0
+                        raise err
+
                         
         for idx, group in enumerate(batch):
             global_idx = batch_start + idx

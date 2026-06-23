@@ -1,0 +1,32 @@
+groups:
+  - name: sinhronizuj_alerts
+    rules:
+      # 1. Prepunjavanje Redis redova
+      - alert: RedisQueueOverflow
+        expr: redis_key_length{key=~"default_queue|analyze_queue|render_queue"} > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis red {{ $labels.key }} je prepunjen"
+          description: "Dužina reda {{ $labels.key }} je preko 100 već 2 minuta. Trenutna dužina: {{ $value }}"
+
+      # 2. Celery radnik OOM (Out of Memory)
+      - alert: CeleryWorkerOOM
+        expr: container_oom_events_total{container_label_com_docker_compose_service=~"worker-.*"} > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Celery radnik OOM pad"
+          description: "Kontejner {{ $labels.container_label_com_docker_compose_service }} je doživeo OOM (Out Of Memory) pad."
+
+      # 3. Visoka potrošnja memorije Celery radnika (Blizu OOM-a)
+      - alert: CeleryWorkerHighMemoryUsage
+        expr: (container_memory_working_set_bytes{container_label_com_docker_compose_service=~"worker-.*"} / container_spec_memory_limit_bytes{container_label_com_docker_compose_service=~"worker-.*"}) * 100 > 90
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Visoka potrošnja memorije Celery radnika"
+          description: "Kontejner {{ $labels.container_label_com_docker_compose_service }} koristi više od 90% dodeljene memorije. Trenutno: {{ $value | printf \"%.2f\" }}%."

@@ -297,45 +297,30 @@ export function StudioProvider({ children }) {
     return () => clearInterval(timer);
   }, [loading, videoUrl, startTime]);
 
-  // Polling za Fazu 1 (Analiza) ili Fazu 2 (Render)
+  // WebSocket i Polling za Fazu 1 (Analiza) ili Fazu 2 (Render)
   useEffect(() => {
-    let interval;
     const currentTask = renderTaskId || taskId;
-    if (currentTask && !videoUrl && !error) {
-      interval = setInterval(async () => {
+    if (!currentTask || videoUrl || error) return;
+
+    let ws = null;
+    let fallbackInterval = null;
+    let isConnected = false;
+
+    // Funkcija za pokretanje HTTP Polling-a kao fallback
+    const startPollingFallback = () => {
+      if (fallbackInterval) return;
+      console.log("[WS] Pokrećem HTTP Polling fallback za zadatak:", currentTask);
+      fallbackInterval = setInterval(async () => {
         try {
           const data = await api.getTaskStatus(currentTask);
           consecutiveErrorsRef.current = 0;
 
           if (data.status === 'SUCCESS') {
-            if (renderTaskId) {
-              // Faza 2 završena
-              setVideoUrl(`${API_BASE_URL}${data.video_url}`);
-              setRendering(false);
-              setLoading(false);
-              if (data.costs) setCosts(data.costs);
-              localStorage.removeItem('sinhronizuj_me_task_id');
-              setRenderTaskId(null);
-              clearInterval(interval);
-              fetchProjects();
-            } else {
-              // Faza 1 završena, prelazimo u Studio mod
-              setProgressData(null);
-              setLoading(false);
-              const targetProjId = data.project_id || taskId;
-              setCurrentProjectId(targetProjId);
-              loadProjectData(targetProjId);
-              clearInterval(interval);
-              fetchProjects();
-            }
+            handleTaskSuccessData(data);
+            clearInterval(fallbackInterval);
           } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
-            setError(data.error || 'Greška pri obradi.');
-            setLoading(false);
-            setRendering(false);
-            localStorage.removeItem('sinhronizuj_me_task_id');
-            setRenderTaskId(null);
-            clearInterval(interval);
-            fetchProjects();
+            handleTaskFailureData(data);
+            clearInterval(fallbackInterval);
           } else {
             // PROGRESS status
             if (data.progress_data) {
@@ -359,9 +344,151 @@ export function StudioProvider({ children }) {
           }
         }
       }, 2000);
-    }
-    return () => clearInterval(interval);
-  }, [taskId, renderTaskId, videoUrl, error]);
+    };
+
+    const handleTaskSuccessData = (data) => {
+      if (renderTaskId) {
+        // Faza 2 završena
+        setVideoUrl(`${API_BASE_URL}${data.video_url}`);
+        setRendering(false);
+        setLoading(false);
+        if (data.costs) setCosts(data.costs);
+        localStorage.removeItem('sinhronizuj_me_task_id');
+        setRenderTaskId(null);
+        fetchProjects();
+      } else {
+        // Faza 1 završena, prelazimo u Studio mod
+        setProgressData(null);
+        setLoading(false);
+        const targetProjId = data.project_id || taskId;
+        setCurrentProjectId(targetProjId);
+        loadProjectData(targetProjId);
+        fetchProjects();
+      }
+    };
+
+    const handleTaskFailureData = (data) => {
+      setError(data.error || 'Greška pri obradi.');
+      setLoading(false);
+      setRendering(false);
+      localStorage.removeItem('sinhronizuj_me_task_id');
+      setRenderTaskId(null);
+      fetchProjects();
+    };
+
+    // Povezivanje na WebSocket
+    const connectWS = () => {
+      const projectId = currentProjectId || (project && project.project_id) || currentTask;
+      if (!projectId) {
+        startPollingFallback();
+        return;
+      }
+
+      const activeToken = localStorage.getItem('sinhronizuj_me_token');
+      let wsUrlStr = API_BASE_URL;
+      if (wsUrlStr.startsWith("http://")) {
+        wsUrlStr = wsUrlStr.replace("http://", "ws://");
+      } else if (wsUrlStr.startsWith("https://")) {
+        wsUrlStr = wsUrlStr.replace("https://", "wss://");
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        wsUrlStr = `${protocol}//${host}${API_BASE_URL}`;
+      }
+
+      const fullWsUrl = `${wsUrlStr}/api/v1/ws/project/${projectId}${activeToken ? `?token=${activeToken}` : ''}`;
+      console.log(`[WS] Pokušavam povezivanje na: ${fullWsUrl}`);
+
+      try {
+        ws = new WebSocket(fullWsUrl);
+
+        ws.onopen = () => {
+          isConnected = true;
+          console.log("[WS] Veza uspostavljena.");
+          consecutiveErrorsRef.current = 0;
+        };
+
+        ws.onmessage = async (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.status === "connected") {
+              return;
+            }
+
+            setProgressData(data);
+            if (data.current_step) {
+              setStatus(data.current_step);
+            }
+            if (data.costs) {
+              setCosts(data.costs);
+            }
+
+            if (data.percent === 100) {
+              console.log("[WS] Detektovan 100% progres, preuzimam finalni status...");
+              setTimeout(async () => {
+                try {
+                  const finalStatus = await api.getTaskStatus(currentTask);
+                  if (finalStatus.status === 'SUCCESS') {
+                    handleTaskSuccessData(finalStatus);
+                    if (ws) ws.close();
+                  } else {
+                    startPollingFallback();
+                  }
+                } catch (e) {
+                  console.error("[WS] Greška pri dobijanju finalnog statusa:", e);
+                  startPollingFallback();
+                }
+              }, 1000);
+            }
+          } catch (err) {
+            console.error("[WS] Greška u parsiranju poruke:", err);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.error("[WS] Greška na WebSocket-u:", err);
+          if (!isConnected) {
+            startPollingFallback();
+          }
+        };
+
+        ws.onclose = (event) => {
+          console.log(`[WS] Veza zatvorena. Code: ${event.code}, Reason: ${event.reason}`);
+          if (event.code !== 1000 && event.code !== 1001 && !videoUrl && !error) {
+            setTimeout(async () => {
+              try {
+                const finalStatus = await api.getTaskStatus(currentTask);
+                if (finalStatus.status === 'SUCCESS') {
+                  handleTaskSuccessData(finalStatus);
+                } else if (finalStatus.status === 'FAILURE' || finalStatus.status === 'REVOKED') {
+                  handleTaskFailureData(finalStatus);
+                } else {
+                  startPollingFallback();
+                }
+              } catch (e) {
+                startPollingFallback();
+              }
+            }, 1000);
+          }
+        };
+      } catch (err) {
+        console.error("[WS] Kreiranje WebSocket-a nije uspelo:", err);
+        startPollingFallback();
+      }
+    };
+
+    connectWS();
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
+  }, [taskId, renderTaskId, videoUrl, error, currentProjectId, project]);
 
   // Resetovanje studija
   function resetStudio() {

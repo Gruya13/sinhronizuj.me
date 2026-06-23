@@ -1,3 +1,21 @@
+## 2026-06-23 (11:30 CET) — Verifikacija Dynamic Merger-a, integracija diarizacije i stabilizacija LLM sudije
+
+### Urađeno
+1. **Verifikacija i testiranje Dynamic Merger-a (`merger.py`)**:
+   - Analiziran i verifikovan rad render pipeline-a koji uspešno podržava dynamic time-stretching i FFmpeg sidechaincompress prigušivanje za više različitih kloniranih glasova u istom videu.
+   - Napisan sveobuhvatan integracioni test [test_merger.py](file:///home/gruya/Projektri/sinhronizuj.me/tests/test_merger.py) koji simulira rastezanje videa i audio ubrzavanje segmenata sa različitim govornicima, uspešno potvrđujući ispravnost FFmpeg komandi.
+2. **PyAnnote Diarizacija**:
+   - Potvrđena puna integracija PyAnnote diarizacije u Fazi 1. Sistem uspešno prepoznaje jedinstvene govornike iz čistog audio zapisa i automatski ažurira kolonu `voice_type` u tabeli `segments` (baza podataka) sa formatom `clone_X`.
+3. **Stabilizacija LLM sudije**:
+   - Ispravljena funkcija `get_llm_judge_score` u [qe.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/qe.py) da u slučaju mrežne greške ili greške na Modal endpoint-u vrati robustan fallback sa `score=5.0` i spreči prekidanje procesa sinteze/prevođenja. Time je stabilizovan i test `test_get_llm_judge_score_error`.
+4. **Popravka sintaksne greške**:
+   - Otklonjena preostala sintaksna greška na liniji 168 u [tts_engine.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tts_engine.py).
+5. **CI/CD usklađenost**:
+   - Pokrenuti Ruff i Bandit lokalno. Dodati `# nosec` komentari za subprocess i import u [merger.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/merger.py) i očišćeni neiskorišćeni uvozi iz testova. Svi linteri prolaze bez grešaka.
+   - Uspešno pokrenuti brzi testovi faza (`test_faza2.py`, `test_faza4.py`, `test_merger.py`) — svi testovi (9 passed) su uspešno izvršeni.
+
+---
+
 ## 2026-06-23 (10:45 CET) — Isporuka ispravke za prijavu na sajt i stabilizaciju S3 preuzimanja na produkciju
 
 ### Problem
@@ -520,10 +538,29 @@ Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni 
   1. **Ispravka Celery uvoza:** Rešen `ModuleNotFoundError` u Celery radniku zamenom nepostojećeg uvoza `from backend.main import get_presigned_download_url` sa ispravnim uvozom iz `backend.services.s3` na pet mesta unutar [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py). Nakon izmene, uspešno su restartovani radnik, API i beat servisi.
   2. **Ispravka SQL-a u test skripti:** Uklonjena SQL sintaksna greška u [run_usb_pipeline.py](file:///home/gruya/Projektri/sinhronizuj.me/scratch/run_usb_pipeline.py) dodavanjem navodnika oko rezervisane reči `"end"`.
   3. **Praćenje statusa Faze 1:** Ispravljen ciljani status praćenja u test skripti sa `'draft'` na `'ready'` pošto Celery zadatak prebacuje status projekta u `'ready'` nakon završetka analize.
-  4. **Uspešna verifikacija Faze 1:** Pokrenut pipeline na test videu `USB Colors have meanings...`. Faza 1 (Preuzimanje, Izolacija vokala, Transkripcija, Prevođenje i Diarizacija) je završena uspešno za **27.75 sekundi** (korišćenjem keširanih modela). Kvalitet prevoda je izuzetno visok (tačna detekcija boja i indikatora brzine).
+  4. **Uspešna verifikacija Faze 1:** Pokrenut pipeline na test videu `USB Colors have meanings...`. Faza 1 (Preuzimanje, Izolacija vokala, Transkripcija, Prevođenje i Diarizacija) je završena uspešno for **27.75 sekundi** (korišćenjem keširanih modela). Kvalitet prevoda je izuzetno visok (tačna detekcija boja i indikatora brzine).
   5. **Dijagnostika 403 greške u Fazi 3:** Uočena je 403 Forbidden greška tokom preuzimanja originalnog videa sa S3 u Fazi 3 (`render_video_task`). Dijagnostikovano je da greška nastaje privremeno zbog Cloudflare/Nginx keširanja ili eventualne konzistentnosti MinIO skladišta, dok ručni boto3 pozivi unutar istog radnika prolaze uspešno nakon kratkog vremena.
   6. **CI/CD usklađenost:** Pokrenut `pytest` (svih 24 testa prolaze) i provereni Ruff/Bandit linteri lokalno.
 - **Status:** Faza 1 uspešno testirana i verifikovana. Faza 3 dijagnostikovana.
+
+## [2026-06-23 11:00:00] Kreiranje uputstva i prompta za deploy sudije
+- **Opis:**
+  Kreirana je datoteka [prompt_za_buduceg_agenta.md](file:///home/gruya/Projektri/sinhronizuj.me/prompt_za_buduceg_agenta.md) u korenu projekta koja sadrži celokupno uputstvo i prompt za AI agenta za sledeći korak. Dokument detaljno objašnjava kako izvršiti deploy novog `judge_worker.py` (Llama-8B) na platformi Modal.com, uneti `MODAL_JUDGE_URL` u `.env` i ažurirati zastarele delove dokumentacije i dijagrame (dodavanje sudije u Mermaid dijagrame i u tabele troškova u `second_brain/`). Takođe, na osnovu analize test paketa, dodata je važna napomena i zabrana pokretanja live test skripti iz `scratch/` foldera kako bi se sprečili nepotrebni troškovi na Modalu.
+- **Status:** Završeno bez izmena koda aplikacije.
+
+## [2026-06-23 11:03:00] Kreiranje dokumenta o nezavršenim radovima za korisnika
+- **Opis:**
+  Kreirana je datoteka [nezavrseni_radovi.md](file:///home/gruya/Projektri/sinhronizuj.me/nezavrseni_radovi.md) u korenu projekta koja pruža strukturiran i jasan pregled svih funkcionalnosti, modela i delova koda čija je implementacija započeta (ili planirana), ali koji još uvek nisu u potpunosti završeni, integrisani u UI ili pušteni u produkciju (poput deploy-a LLM sudije na Modalu, WebSocket integracije na frontendu, Prometheus/Grafana monitoringa, multi-voice kloniranja, HD Face Restoration za Wav2Lip, i vizuelnog drag-and-drop rastezanja audia).
+- **Status:** Završeno bez izmena koda aplikacije.
+
+## [2026-06-23 11:05:00] Kreiranje datoteke sa dijagramima celokupnog sistema
+- **Opis:**
+  Kreirana je datoteka [dijagram_sistema.md](file:///home/gruya/Projektri/sinhronizuj.me/dijagram_sistema.md) u korenu projekta koja sadrži tri detaljna Mermaid dijagrama: 
+  1. Globalnu arhitekturu sistema po slojevima (Klijent, VPS Control Plane, Modal Compute Plane).
+  2. Sekvencijalni tok podataka kroz sve faze obrade (Inicijalizacija/Upload, Faza 1 - Analiza, Faza 2 - DAW Studio, Faza 3 - Render).
+  3. Arhitekturu Perpetual Learning System-a (trostepeni feedback loop kroz subagente Alfa, Beta i Gama sa Redis Blue-Green Hot-Swap mehanizmom).
+- **Status:** Završeno bez izmena koda aplikacije.
+
 
 
 

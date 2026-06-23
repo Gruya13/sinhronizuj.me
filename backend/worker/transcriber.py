@@ -223,7 +223,7 @@ def arbitrate_transcripts(whisper_segments: list, sensevoice_text: str) -> list:
         print(f"[WARNING] Arbitraža nije uspela: {e}. Vraćam originalne Whisper segmente.")
         return whisper_segments
 
-def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callback=None) -> dict:
+def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callback=None, project_id: str = None) -> dict:
     if not os.path.exists(audio_path):
         return {"status": "error", "message": f"Fajl nije pronađen: {audio_path}"}
 
@@ -249,12 +249,14 @@ def transcribe_audio(audio_path: str, initial_prompt: str = None, progress_callb
         payload = {
             "task": "transcribe", 
             "audio_base64": audio_base64,
+            "project_id": project_id,
             "vad_filter": False,
             "condition_on_previous_text": True,
             "word_timestamps": False,
             "no_speech_threshold": None,
             "log_prob_threshold": None,
-            "compression_ratio_threshold": None
+            "compression_ratio_threshold": None,
+            "callback_url": f"{settings.BACKEND_URL}/api/v1/project/{project_id}/progress" if project_id and settings.BACKEND_URL else None
         }
         if initial_prompt:
             payload["initial_prompt"] = initial_prompt

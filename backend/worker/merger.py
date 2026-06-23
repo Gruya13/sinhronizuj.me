@@ -1,5 +1,5 @@
 import os
-import subprocess
+import subprocess  # nosec B404
 import uuid
 from pydub import AudioSegment
 from backend.core.config import settings
@@ -10,7 +10,7 @@ def get_video_duration(path: str) -> float:
     """
     try:
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)  # nosec B603
         return float(res.stdout.decode().strip())
     except Exception as e:
         print(f"[DYNAMIC MERGER WARNING] Greška pri dobijanju dužine videa preko ffprobe: {e}")
@@ -27,7 +27,7 @@ def speedup_audio_file(input_path: str, speedup: float) -> str:
         "-filter:a", f"rubberband=tempo={speedup}",
         output_path
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # nosec B603
     return output_path
 
 def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: str, background_vol: float = -5.0, dubbed_vol: float = 0.0, workspace_path: str = None) -> dict:
@@ -49,7 +49,7 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
             "-af", "aresample=44100,highpass=f=80,lowpass=f=12000,compand=attacks=0.01:decays=0.1:points=-90/-90|-20/-10|0/-3,aecho=1.0:0.8:15:0.2",
             processed_dubbed_path
         ]
-        subprocess.run(postprocess_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(postprocess_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # nosec B603
         
         workspace = workspace_path or settings.TEMP_WORKSPACE
         final_video_path = os.path.join(workspace, f"sinhronizuj_me_final_{uuid.uuid4().hex[:6]}.mp4")
@@ -82,7 +82,7 @@ def merge_audio_and_video(video_path: str, background_path: str, dubbed_path: st
             final_video_path
         ]
         
-        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # nosec B603
         
         if os.path.exists(processed_dubbed_path):
             os.remove(processed_dubbed_path)
@@ -305,7 +305,7 @@ def merge_audio_and_video_dynamic(
         ])
         
         print("[DYNAMIC MERGER] Pokrećem FFmpeg za generisanje rastegnutog videa i vokala...")
-        res = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        res = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # nosec B603
         
         if res.returncode != 0:
             print(f"[DYNAMIC MERGER ERROR] FFmpeg je pukao sa kodom {res.returncode}")

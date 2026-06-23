@@ -331,6 +331,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
         try:
+            r_client.set(f"project:{project_id}:progress_meta", safe_json_dumps(progress_metadata), ex=86400)
             r_client.publish(f"project:{project_id}:progress", safe_json_dumps(progress_metadata))
         except Exception as pub_err:
             print(f"[REDIS PUB ERROR] Greška pri slanju na kanal: {pub_err}", flush=True)
@@ -396,7 +397,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             sep_result = separate_audio(
                 result['audio_path'],
                 progress_callback=lambda detail: update_progress(detail=detail),
-                workspace_path=task_workspace
+                workspace_path=task_workspace,
+                project_id=effective_project_id
             )
             duration_sep = time.time() - t_start_sep
             if sep_result["status"] == "error": 
@@ -457,7 +459,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             transcription_result = transcribe_audio(
                 stable_vocals_path,
                 initial_prompt=initial_prompt,
-                progress_callback=lambda detail: update_progress(detail=detail)
+                progress_callback=lambda detail: update_progress(detail=detail),
+                project_id=effective_project_id
             )
             duration_trans = time.time() - t_start_trans
             if transcription_result["status"] == "error": 
@@ -665,14 +668,73 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         duration_asd = time.time() - t_asd_start
         print(f"[ACTIVE SPEAKER] Skeniranje usana završeno za {duration_asd:.2f}s. Ukupno frejmova: {len(asd_timeline)}", flush=True)
         
+        # Pozivamo Modal diarization worker za prepoznavanje jedinstvenih glasova
+        diarization_segments = []
+        if settings.MODAL_DIARIZATION_URL:
+            try:
+                print(f"[DIARIZATION] Pokrećem diarizaciju na Modalu...", flush=True)
+                update_progress(detail="Pokrećem PyAnnote.audio diarizaciju na Modalu...")
+                
+                with open(stable_vocals_path, "rb") as f_aud:
+                    vocals_b64 = base64.b64encode(f_aud.read()).decode('utf-8')
+                
+                payload = {"audio_base64": vocals_b64}
+                t_start_diar = time.time()
+                
+                from backend.worker.utils import call_modal_endpoint
+                diar_res = call_modal_endpoint(
+                    url=settings.MODAL_DIARIZATION_URL,
+                    payload=payload,
+                    timeout_seconds=300
+                )
+                duration_diar = time.time() - t_start_diar
+                
+                if diar_res and diar_res.get("status") == "success":
+                    diarization_segments = diar_res.get("diarization", [])
+                    print(f"[DIARIZATION] Uspešno diarizovano za {duration_diar:.2f}s. Prepoznato {len(diarization_segments)} segmenata.", flush=True)
+                    add_phase_cost("diarization", "Diarizacija govornika (PyAnnote)", "T4", duration_diar, 0.00016)
+                else:
+                    print(f"[DIARIZATION WARNING] Modal diarizacija vratila grešku: {diar_res.get('error') if diar_res else 'Nema odgovora'}", flush=True)
+            except Exception as diar_err:
+                print(f"[DIARIZATION WARNING] Greška pri pozivanju diarizacije: {diar_err}", flush=True)
+        
         processed_segments = []
         for i, s in enumerate(translation_result["translated_segments"]):
             update_progress(detail=f"Analiziram segment {i+1}/{len(translation_result['translated_segments'])}...")
             
-            # Detektujemo rod iz audio trake
-            gender = detect_gender_from_audio(stable_vocals_path, s["start"], s["end"])
-            voice_type = "male" if gender == "male" else "clone"
+            # Detektujemo govornika iz diarizacije ako je dostupna
+            assigned_voice = None
+            if diarization_segments:
+                best_overlap = 0.0
+                best_speaker = None
+                
+                seg_start = s["start"]
+                seg_end = s["end"]
+                
+                for ds in diarization_segments:
+                    overlap_start = max(seg_start, ds["start"])
+                    overlap_end = min(seg_end, ds["end"])
+                    overlap = max(0.0, overlap_end - overlap_start)
+                    
+                    if overlap > best_overlap:
+                        best_overlap = overlap
+                        best_speaker = ds["speaker"]
+                
+                if best_speaker:
+                    try:
+                        if "_" in best_speaker:
+                            sp_idx = int(best_speaker.split("_")[-1])
+                        else:
+                            sp_idx = int(''.join(filter(str.isdigit, best_speaker)))
+                        assigned_voice = f"clone_{sp_idx}"
+                    except Exception:
+                        assigned_voice = "clone_0"
             
+            # Fallback na rodnu detekciju ako diarizacija nije uspela ili nema preklapanja
+            if not assigned_voice:
+                gender = detect_gender_from_audio(stable_vocals_path, s["start"], s["end"])
+                assigned_voice = "male" if gender == "male" else "clone"
+                
             # Proveravamo aktivnost govornika iz precomputovanog timeline-a
             is_active = check_speaker_activity_from_timeline(asd_timeline, s["start"], s["end"])
             
@@ -682,7 +744,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                 "end": s["end"],
                 "original": s.get("original_text", ""),
                 "translated": s["text"],
-                "voice_type": voice_type,
+                "voice_type": assigned_voice,
                 "active_speaker": is_active,
                 "tts_path": None,
                 "tts_duration": None,
@@ -949,6 +1011,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 progress_metadata['logs'] = progress_metadata['logs'][-20:]
         self.update_state(task_id=task_id, state='PROGRESS', meta=progress_metadata)
         try:
+            r_client.set(f"project:{project_id}:progress_meta", safe_json_dumps(progress_metadata), ex=86400)
             r_client.publish(f"project:{project_id}:progress", safe_json_dumps(progress_metadata))
         except Exception as pub_err:
             print(f"[REDIS PUB ERROR] Greška pri slanju na kanal: {pub_err}", flush=True)
@@ -1044,7 +1107,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 disable_enhance=settings.DISABLE_ENHANCE,
                 progress_callback=lambda detail: update_progress(detail=detail),
                 all_segments=segments,
-                workspace_path=task_workspace
+                workspace_path=task_workspace,
+                project_id=project_id
             )
             duration_tts = time.time() - t_start_tts
             if tts_result["status"] == "error":
@@ -1251,7 +1315,8 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                             disable_openvoice=settings.DISABLE_OPENVOICE,
                             disable_enhance=settings.DISABLE_ENHANCE,
                             all_segments=[{"id": s.segment_id, "start": s.start, "end": s.end, "original": s.original, "translated": s.translated} for s in all_segs_db],
-                            workspace_path=task_workspace
+                            workspace_path=task_workspace,
+                            project_id=project_id
                         )
                         
                         if tts_result["status"] != "error":
@@ -2022,7 +2087,8 @@ def generate_segment_tts_task(self, project_id: str, segment_id: int, text: str,
                 disable_openvoice=settings.DISABLE_OPENVOICE,
                 disable_enhance=settings.DISABLE_ENHANCE,
                 all_segments=segments_list_dicts,
-                workspace_path=task_workspace
+                workspace_path=task_workspace,
+                project_id=project_id
             )
             
             if tts_result["status"] == "error":
@@ -2187,7 +2253,8 @@ def generate_all_tts_task(self, project_id: str, voice_type: str):
             disable_openvoice=settings.DISABLE_OPENVOICE,
             disable_enhance=settings.DISABLE_ENHANCE,
             all_segments=segments_list_dicts,
-            workspace_path=task_workspace
+            workspace_path=task_workspace,
+            project_id=project_id
         )
         
         if tts_result["status"] == "error":

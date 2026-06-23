@@ -151,7 +151,7 @@ class OpenVoiceWorker:
                 
             # 2. Promena boje glasa pomoću OpenVoice V2
             seg_voice_type = segment.get("voice_type", default_voice_type)
-            if not disable_openvoice and seg_voice_type == "clone":
+            if not disable_openvoice and seg_voice_type.startswith("clone") and ref_se_path is not None:
                 target_se = torch.load(ref_se_path)
                 base_se = torch.load(base_se_path)
                 
@@ -230,7 +230,7 @@ class OpenVoiceWorker:
                 api_key = request.headers.get("X-API-Key")
                 if api_key != expected_key:
                     return JSONResponse(status_code=403, content={"error": "Neovlašćen pristup. API ključ je neispravan."})
-
+ 
         from unittest.mock import MagicMock
         sys.modules['faster_whisper'] = MagicMock()
         
@@ -252,6 +252,11 @@ class OpenVoiceWorker:
             disable_enhance = data.get("disable_enhance", False)
             voice_type = data.get("voice_type", "clone")
             
+            # Novo: Mapa referentnih audia za više govornika
+            reference_audios = data.get("reference_audios", {})
+            if not reference_audios and ref_audio_b64:
+                reference_audios = {voice_type: ref_audio_b64}
+            
             enhance_params = {
                 "denoise": data.get("enhance_denoise", True),
                 "nfe": data.get("enhance_nfe", 64),
@@ -261,61 +266,14 @@ class OpenVoiceWorker:
             }
             
             req_uuid = str(uuid.uuid4())
-            ref_se_path = None
+            ref_se_paths = {}
             base_se_path = None
             
-            if not disable_openvoice:
-                if not ref_audio_b64:
-                    return {"error": "Nedostaje parametar: reference_audio_base64"}
-                    
-                tmp_ref_path = f"/tmp/ref_{req_uuid}.wav"
-                
-                # Snimanje referentnog audia na disk
-                with open(tmp_ref_path, "wb") as f:
-                    f.write(base64.b64decode(ref_audio_b64))
-                    
-                # Poboljšanje referentnog audia pre ekstrakcije SE pomoću Resemble Enhance
-                if not disable_enhance:
-                    try:
-                        import torchaudio
-                        from resemble_enhance.enhancer.inference import denoise as resemble_denoise_fn
-                        from resemble_enhance.enhancer.inference import enhance as resemble_enhance_fn
-                        
-                        print("[OpenVoice] Poboljšavam referentni audio pomoću Resemble Enhance pre ekstrakcije SE...")
-                        ref_dwav, ref_sr = torchaudio.load(tmp_ref_path)
-                        ref_dwav = ref_dwav.mean(dim=0)  # Konverzija u mono
-                        
-                        # Denoise
-                        if enhance_params.get("denoise", True):
-                            ref_dwav, ref_sr = resemble_denoise_fn(ref_dwav, ref_sr, self.device)
-                        
-                        # Enhance
-                        ref_enhanced, ref_new_sr = resemble_enhance_fn(
-                            ref_dwav, ref_sr, self.device,
-                            nfe=enhance_params.get("nfe", 64),
-                            solver=enhance_params.get("solver", "midpoint"),
-                            lambd=enhance_params.get("lambd", 0.9),
-                            tau=enhance_params.get("tau", 0.2)
-                        )
-                        
-                        # Čuvanje poboljšanog referentnog audia nazad
-                        torchaudio.save(tmp_ref_path, ref_enhanced.unsqueeze(0).cpu(), ref_new_sr)
-                        print(f"[OpenVoice] Referentni audio uspešno poboljšan (sr={ref_new_sr}Hz)")
-                    except Exception as enh_err:
-                        print(f"[OpenVoice WARNING] Neuspešno poboljšanje referentnog audia pre SE: {enh_err}")
-                    
-                # 1. Ekstrakcija Speaker Embedding-a (SE) za referentni target glas
-                print("[OpenVoice] Ekstrakujem SE za referentni audio...")
-                processed_dir = f"/tmp/processed_{req_uuid}"
-                os.makedirs(processed_dir, exist_ok=True)
-                
-                try:
-                    target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=True)
-                except Exception as e:
-                    print(f"[OpenVoice WARNING] Ekstrakcija sa vad=True nije uspela: {e}. Pokušavam sa vad=False...")
-                    target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=False)
-                
-                # 2. Generisanje/Učitavanje baznog SE za Marko Piper model
+            nfs_temp_dir = f"{VOLUME_PATH}/temp"
+            os.makedirs(nfs_temp_dir, exist_ok=True)
+            
+            if not disable_openvoice and reference_audios:
+                # 1. Generisanje/Učitavanje baznog SE za Marko Piper model
                 base_se_cache_path = f"{VOLUME_PATH}/openvoice_v2/base_se.pt"
                 base_se = None
                 if os.path.exists(base_se_cache_path):
@@ -347,7 +305,9 @@ class OpenVoiceWorker:
                         wav_file.setframerate(sample_rate)
                         wav_file.writeframes(audio_bytes)
                     
-                    base_se, _ = se_extractor.get_se(tmp_sample_wav, self.tone_color_converter, target_dir=processed_dir, vad=True)
+                    processed_base_dir = f"/tmp/base_processed_{req_uuid}"
+                    os.makedirs(processed_base_dir, exist_ok=True)
+                    base_se, _ = se_extractor.get_se(tmp_sample_wav, self.tone_color_converter, target_dir=processed_base_dir, vad=True)
                     
                     try:
                         torch.save(base_se, base_se_cache_path)
@@ -357,21 +317,62 @@ class OpenVoiceWorker:
                     
                     if os.path.exists(tmp_sample_wav):
                         os.remove(tmp_sample_wav)
+                    shutil.rmtree(processed_base_dir, ignore_errors=True)
                 
-                # Snimanje embedding-a na NFS
-                nfs_temp_dir = f"{VOLUME_PATH}/temp"
-                os.makedirs(nfs_temp_dir, exist_ok=True)
-                
-                ref_se_path = f"{nfs_temp_dir}/ref_{req_uuid}.pt"
                 base_se_path = f"{nfs_temp_dir}/base_{req_uuid}.pt"
-                
-                torch.save(target_se, ref_se_path)
                 torch.save(base_se, base_se_path)
                 
-                # Brisanje privremenih fajlova
-                if os.path.exists(tmp_ref_path):
-                    os.remove(tmp_ref_path)
-                shutil.rmtree(processed_dir, ignore_errors=True)
+                # 2. Ekstrakcija Speaker Embedding-a (SE) za svaki referentni glas
+                for voice_name, ref_b64 in reference_audios.items():
+                    try:
+                        print(f"[OpenVoice] Ekstrakujem SE za glas: {voice_name}...")
+                        tmp_ref_path = f"/tmp/ref_{req_uuid}_{voice_name}.wav"
+                        with open(tmp_ref_path, "wb") as f:
+                            f.write(base64.b64decode(ref_b64))
+                            
+                        # Poboljšanje referentnog audia pre ekstrakcije SE pomoću Resemble Enhance
+                        if not disable_enhance:
+                            try:
+                                import torchaudio
+                                from resemble_enhance.enhancer.inference import denoise as resemble_denoise_fn
+                                from resemble_enhance.enhancer.inference import enhance as resemble_enhance_fn
+                                
+                                ref_dwav, ref_sr = torchaudio.load(tmp_ref_path)
+                                ref_dwav = ref_dwav.mean(dim=0)  # Konverzija u mono
+                                
+                                if enhance_params.get("denoise", True):
+                                    ref_dwav, ref_sr = resemble_denoise_fn(ref_dwav, ref_sr, self.device)
+                                
+                                ref_enhanced, ref_new_sr = resemble_enhance_fn(
+                                    ref_dwav, ref_sr, self.device,
+                                    nfe=enhance_params.get("nfe", 64),
+                                    solver=enhance_params.get("solver", "midpoint"),
+                                    lambd=enhance_params.get("lambd", 0.9),
+                                    tau=enhance_params.get("tau", 0.2)
+                                )
+                                
+                                torchaudio.save(tmp_ref_path, ref_enhanced.unsqueeze(0).cpu(), ref_new_sr)
+                            except Exception as enh_err:
+                                print(f"[OpenVoice WARNING] Neuspešno poboljšanje referentnog audia za {voice_name}: {enh_err}")
+                            
+                        processed_dir = f"/tmp/processed_{req_uuid}_{voice_name}"
+                        os.makedirs(processed_dir, exist_ok=True)
+                        
+                        try:
+                            target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=True)
+                        except Exception as e:
+                            print(f"[OpenVoice WARNING] Ekstrakcija sa vad=True za {voice_name} nije uspela: {e}. Pokušavam sa vad=False...")
+                            target_se, _ = se_extractor.get_se(tmp_ref_path, self.tone_color_converter, target_dir=processed_dir, vad=False)
+                        
+                        ref_se_path = f"{nfs_temp_dir}/ref_{req_uuid}_{voice_name}.pt"
+                        torch.save(target_se, ref_se_path)
+                        ref_se_paths[voice_name] = ref_se_path
+                        
+                        if os.path.exists(tmp_ref_path):
+                            os.remove(tmp_ref_path)
+                        shutil.rmtree(processed_dir, ignore_errors=True)
+                    except Exception as ve:
+                        print(f"[OpenVoice ERROR] Greška prilikom ekstrakcije SE za {voice_name}: {ve}")
             
             # 3. Paralelna obrada segmenata u ThreadPoolExecutor-u
             if segments:
@@ -380,9 +381,16 @@ class OpenVoiceWorker:
                 
                 def process_single(seg):
                     try:
+                        seg_voice = seg.get("voice_type") or voice_type
+                        ref_se_p = ref_se_paths.get(seg_voice)
+                        
+                        # Ako za ovaj glas nismo našli SE ali počinje sa "clone", probajmo sa fallbackom na prvi raspoloživi
+                        if not ref_se_p and seg_voice.startswith("clone"):
+                            ref_se_p = ref_se_paths.get("clone") or (list(ref_se_paths.values())[0] if ref_se_paths else None)
+                            
                         return self._generate_segment(
                             seg,
-                            ref_se_path=ref_se_path,
+                            ref_se_path=ref_se_p,
                             base_se_path=base_se_path,
                             enhance_params=enhance_params,
                             disable_openvoice=disable_openvoice,
@@ -391,34 +399,48 @@ class OpenVoiceWorker:
                         )
                     except Exception as e:
                         return {"id": seg.get("id"), "error": str(e)}
-
+ 
                 with ThreadPoolExecutor(max_workers=8) as executor:
                     results = list(executor.map(process_single, segments))
                 
                 # Brisanje embedding-a sa NFS-a
-                for f in [ref_se_path, base_se_path]:
-                    if f and os.path.exists(f): os.remove(f)
+                for f in list(ref_se_paths.values()) + [base_se_path]:
+                    if f and os.path.exists(f): 
+                        try:
+                            os.remove(f)
+                        except Exception:
+                            pass
                     
                 return {"status": "success", "results": results}
             else:
                 text = data.get('text')
                 if not text:
-                    for f in [ref_se_path, base_se_path]:
-                        if f and os.path.exists(f): os.remove(f)
+                    for f in list(ref_se_paths.values()) + [base_se_path]:
+                        if f and os.path.exists(f):
+                            try:
+                                os.remove(f)
+                            except Exception:
+                                pass
                     return {"error": "Morate poslati 'text' ili 'segments'"}
                 
                 print("[OpenVoice] Pokrećem pojedinačnu konverziju...")
                 single_segment = {"id": "0", "text": text}
-                res = self._generate_segment(single_segment, ref_se_path, base_se_path, enhance_params, disable_openvoice, disable_enhance, default_voice_type=voice_type)
                 
-                for f in [ref_se_path, base_se_path]:
-                    if f and os.path.exists(f): os.remove(f)
+                ref_se_p = ref_se_paths.get(voice_type) or (list(ref_se_paths.values())[0] if ref_se_paths else None)
+                res = self._generate_segment(single_segment, ref_se_p, base_se_path, enhance_params, disable_openvoice, disable_enhance, default_voice_type=voice_type)
+                
+                for f in list(ref_se_paths.values()) + [base_se_path]:
+                    if f and os.path.exists(f):
+                        try:
+                            os.remove(f)
+                        except Exception:
+                            pass
                 return res
                 
         except Exception as e:
             import traceback
             print(f"[OpenVoice PIPELINE ERROR] {e}\n{traceback.format_exc()}")
-            return {"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}
+            return {"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}"error": f"PIPELINE_ERROR: {str(e)}\n{traceback.format_exc()}"}
 
 @app.local_entrypoint()
 def main():

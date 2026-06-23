@@ -234,5 +234,10 @@ def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = 
             "errors": data.get("errors", [])
         }
     except Exception as e:
-        print(f"[LLM JUDGE ERROR] Greška pri pozivanju LLM sudije: {e}. Vraćam default prolaz.", flush=True)
-        return {"score": 5.0, "explanation": f"Greška sudije: {e}", "errors": []}
+        print(f"[LLM JUDGE ERROR] Greška pri pozivanju LLM sudije: {e}.", flush=True)
+        return {
+            "score": 5.0,
+            "explanation": f"Greška sudije (fallback): {str(e)}",
+            "errors": []
+        }
+
