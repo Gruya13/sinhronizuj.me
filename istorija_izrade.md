@@ -1,3 +1,14 @@
+## 2026-06-24 (01:30 CET) — Integracija i optimizacija sistemskog prompta sa novim prevodilačkim smernicama
+
+### Urađeno
+1. **Unapređenje sistemskog prompta**:
+   - Integrisana nova pravila u [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) za morfološku tačnost (padežni oblici), prirodnost glagolskih vremena, zabranu haluciniranja kod stručnih izraza i očuvanje programskih varijabli (poput `{user}`, `{date}`).
+   - Zadržan je striktan neformalni "ti" ton obraćanja radi obezbeđivanja optimalnog i prirodnog govora tokom TTS sinteze i sinhronizacije na srpskom.
+2. **Verifikacija**:
+   - Pokrenuti Ruff i Bandit linteri i svi testovi (`pytest` 18 passed) su uspešno izvršeni.
+
+---
+
 ## 2026-06-24 (01:15 CET) — Migracija na Mistral Small 8-bit model i implementacija jedinstvenog prolaza prevođenja i lekture (Single-Pass)
 
 ### Urađeno
