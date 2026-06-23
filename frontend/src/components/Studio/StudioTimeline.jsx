@@ -847,11 +847,10 @@ export default function StudioTimeline() {
               .filter(s => s.start >= seg.end && (s.tts_path || probniAudios[s.id]) && s.status !== "edited" && s.status !== "draft")
               .sort((a, b) => a.start - b.start)[0];
             const hasCollision = nextSeg && (seg.start + estimatedTtsDuration > nextSeg.start);
-
             const isTrackActive = activeAudioSource === "dubbed";
             const isActive = isTrackActive && selectedSegmentIds.includes(seg.id);
             const isHovered = hoveredSegmentId === seg.id;
-            
+
             return (
               <div 
                 key={seg.id}
@@ -875,13 +874,7 @@ export default function StudioTimeline() {
                     setSelectedSegmentId(seg.id);
                     setSelectedSegmentIds([seg.id]);
                   }
-                  
-                  if (videoRef.current) {
-                    videoRef.current.currentTime = seg.start;
-                    if (activeAudioSource === "original") {
-                        // N/A for dubbed click unless needed
-                    }
-                  }
+                  if (videoRef.current) videoRef.current.currentTime = seg.start;
                 }}
                 style={{
                   position: 'absolute',
@@ -889,49 +882,50 @@ export default function StudioTimeline() {
                   width: `${ttsWidth}%`,
                   height: '36px',
                   bottom: '4px',
-                  background: isActive 
-                    ? 'rgba(34, 197, 94, 0.25)' 
-                    : (isTrackActive ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.02)'),
-                  border: isActive 
-                    ? '2px solid #22c55e' 
-                    : (isTrackActive ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)'),
+                  background: isActive ? 'rgba(34, 197, 94, 0.25)' : (isTrackActive ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.02)'),
+                  border: isActive ? '2px solid #22c55e' : (isTrackActive ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)'),
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
                   paddingLeft: '6px',
                   zIndex: isHovered ? 50 : 2,
-                  transition: 'background-color 0.15s, border-color 0.15s'
+                  transition: 'background-color 0.15s, border-color 0.15s',
+                  overflow: 'hidden'
                 }}
               >
+                <div onMouseDown={(e) => handleStartTtsResizeLeft(e, seg)} data-testid={`tts-resize-left-${seg.id}`} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30, background: isHovered ? 'rgba(34, 197, 94, 0.3)' : 'transparent', borderRadius: '4px 0 0 4px', transition: 'background-color 0.15s' }} />
+                <div onMouseDown={(e) => handleStartTtsResizeRight(e, seg)} data-testid={`tts-resize-right-${seg.id}`} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '6px', cursor: 'ew-resize', zIndex: 30, background: isHovered ? 'rgba(34, 197, 94, 0.3)' : 'transparent', borderRadius: '0 4px 4px 0', transition: 'background-color 0.15s' }} />
+                <div style={{ position: 'absolute', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '0 8px', opacity: isActive ? 0.45 : (isTrackActive ? 0.15 : 0.08), pointerEvents: 'none' }}>
+                  {generateWaveformBars(estimatedTtsDuration, seg.id).map((h, i) => (
+                    <div key={i} style={{ width: '2px', height: `${h}%`, background: isTrackActive ? '#22c55e' : '#64748b', borderRadius: '1px' }} />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '0 8px', zIndex: 20, pointerEvents: 'none', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.65rem', color: isTrackActive ? '#86efac' : '#64748b', fontWeight: 'bold' }}>#{seg.id}</span>
+                  {seg.speed && seg.speed !== 1.0 && (
+                    <span style={{ fontSize: '0.65rem', background: 'rgba(15, 23, 42, 0.75)', padding: '1px 4px', borderRadius: '3px', color: seg.speed > 1.0 ? '#86efac' : '#f87171', fontWeight: 'bold', border: '1px solid rgba(255, 255, 255, 0.1)' }}>{seg.speed.toFixed(2)}x</span>
+                  )}
+                </div>
                 {(isHovered || isActive) && (isLonger || hasCollision) && (
-                  <div style={{
-                    position: 'absolute',
-                    ...tooltipStyle,
-                    background: 'rgba(15, 23, 42, 0.95)',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #475569',
-                    zIndex: 100,
-                    width: '280px',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.5)'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      ...arrowStyle,
-                      width: '0',
-                      height: '0',
-                      borderLeft: '6px solid transparent',
-                      borderRight: '6px solid transparent',
-                      borderTop: '6px solid rgba(15, 23, 42, 0.95)'
-                    }} />
-                    
+                  <div style={{ position: 'absolute', ...tooltipStyle, background: 'rgba(15, 23, 42, 0.95)', padding: '8px 12px', borderRadius: '6px', border: '1px solid #475569', zIndex: 100, width: '280px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.5)' }}>
+                    <div style={{ position: 'absolute', top: '100%', ...arrowStyle, width: '0', height: '0', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid rgba(15, 23, 42, 0.95)' }} />
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                       <span style={{ fontSize: '1.1rem', marginTop: '-2px' }}>⚠️</span>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', whiteSpace: 'normal' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>
-                          {hasCollision ? "Kolizija tajminga!" : "Predugačak srpski izgovor!"}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>{hasCollision ? "Kolizija tajminga!" : "Predugačak srpski izgovor!"}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>{hasCollision ? "Audio segment se preklapa sa sledećim. Skratite audio ili promenite tajming." : "Trajanje izgovora je duže od trajanje originalnog video segmenta."}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
+        {/* 5. TRAKA: MUZIKA I EFEKTI */}
+        <div style={{ height: '40px', background: 'rgba(241, 245, 249, 0.03)', borderRadius: '6px', border: '1px solid rgba(241, 245, 249, 0.08)', position: 'relative' }}>
+          {noVocalsAudioUrl && (
             <div 
               ref={musicWaveformRef} 
               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} 

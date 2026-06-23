@@ -138,7 +138,9 @@ export default function ProjectList() {
             let iconColor = "#94a3b8";
 
             if (proj.status === "analyzing") { 
-              statusText = "Analiza..."; 
+              const pct = proj.progress_data ? Math.round(proj.progress_data.percent) : 0;
+              const step = proj.progress_data && proj.progress_data.current_step ? proj.progress_data.current_step : "Priprema";
+              statusText = `${step} (${pct}%)`; 
               statusClass = "analyzing"; 
               StatusIcon = Clock;
               iconColor = "#06b6d4";

@@ -1,3 +1,21 @@
+## 2026-06-23 (11:45 CET) — Integracija WebSocket statusa na frontendu i drag-and-drop promena brzine TTS segmenata
+
+### Urađeno
+1. **WebSocket integracija na frontendu (Dashboard i DAW Studio)**:
+   - **Dashboard**: U [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) dodat `useEffect` koji locira sve projekte u statusu `analyzing` i asinhrono otvara WebSocket konekcije (`/api/v1/ws/project/{project_id}`) za svaki od njih. Time je uklonjen HTTP polling na Dashboard-u. Kada se primeti progres, ažurira se stanje u listi projekata u realnom vremenu.
+   - **Dashboard UI**: U [ProjectList.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Dashboard/ProjectList.jsx) dodat je live prikaz trenutnog koraka analize i procenta napretka (npr. "Prevođenje (45%)") koji se očitava iz WebSocket poruka.
+   - **DAW Studio**: U [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) unapređen je `useEffect` za praćenje faza (analiza i renderovanje) tako da se primarno povezuje preko WebSocket protokola, sa automatskim HTTP Polling fallback-om isključivo u slučaju gubitka konekcije.
+2. **Drag-and-drop promena brzine (timestretch) TTS segmenata**:
+   - **Resize ručke**: U [StudioTimeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/StudioTimeline.jsx) dodate su leve i desne resize ručke na srpskim TTS audio segmentima.
+   - **Izračunavanje brzine**: Prevlačenjem ivica (putem `handleStartTtsResizeLeft` i `handleStartTtsResizeRight`) menja se procenjeno trajanje segmenta (`estimatedTtsDuration`). Iz odnosa bazičnog trajanja i procenjenog trajanja izračunava se nova brzina (`speed = (baseTtsDuration * lastGenSpeed) / estimatedTtsDuration`).
+   - **Vizuelni prikaz**: Brzina je ograničena na opseg `[0.5, 2.0]`. U realnom vremenu se menja širina segmenta na vremenskoj liniji, prikazuje se indikator brzine (npr. "1.15x") i talasni oblik se dinamički regeneriše širenjem ili skupljanjem bars-ova.
+   - **Auto-save**: Nakon otpuštanja miša, poziva se `handleSaveDraft()` za automatsko čuvanje brzine na backendu.
+3. **Verifikacija**:
+   - Pokrenuti su svi backend testovi (`pytest` 34 passed).
+   - Pokrenut je frontend linter (`npm run lint` bez ijedne kritične greške).
+
+---
+
 ## 2026-06-23 (11:30 CET) — Verifikacija Dynamic Merger-a, integracija diarizacije i stabilizacija LLM sudije
 
 ### Urađeno

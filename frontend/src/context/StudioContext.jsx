@@ -30,7 +30,15 @@ export function StudioProvider({ children }) {
   const [newProjectName, setNewProjectName] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [currentProjectId, setCurrentProjectId] = useState(null);
+  const [currentProjectId, setCurrentProjectIdState] = useState(() => localStorage.getItem('sinhronizuj_me_project_id'));
+  const setCurrentProjectId = (id) => {
+    setCurrentProjectIdState(id);
+    if (id) {
+      localStorage.setItem('sinhronizuj_me_project_id', id);
+    } else {
+      localStorage.removeItem('sinhronizuj_me_project_id');
+    }
+  };
 
   // Globalni tokovi stanja za učitavanje i obradu
   const [loading, setLoading] = useState(false);
@@ -154,6 +162,7 @@ export function StudioProvider({ children }) {
   const playheadIntervalRef = useRef(null);
   const dubbedAudioRef = useRef(null);
   const bgAudioRef = useRef(null);
+  const dashboardWsRef = useRef({});
 
   const getVideoDuration = () => {
     if (!project || !project.segments || !project.segments.length) return 30;
@@ -488,7 +497,109 @@ export function StudioProvider({ children }) {
         clearInterval(fallbackInterval);
       }
     };
-  }, [taskId, renderTaskId, videoUrl, error, currentProjectId, project]);
+  }, [taskId, renderTaskId, currentProjectId]);
+
+  // WebSocketi za praćenje progresa projekata u obradi na Dashboard-u
+  const analyzingProjectIds = projects.filter(p => p.status === 'analyzing').map(p => p.id);
+  const analyzingProjectIdsStr = JSON.stringify(analyzingProjectIds);
+
+  useEffect(() => {
+    if (!token || !projects || !projects.length) {
+      // Zatvori sve aktivne WS na Dashboard-u ako nismo ulogovani ili nema projekata
+      Object.keys(dashboardWsRef.current).forEach(projId => {
+        if (dashboardWsRef.current[projId]) {
+          dashboardWsRef.current[projId].close();
+          delete dashboardWsRef.current[projId];
+        }
+      });
+      return;
+    }
+
+    const currentAnalyzing = projects.filter(p => p.status === 'analyzing');
+    const activeWsIds = Object.keys(dashboardWsRef.current);
+
+    // Zatvori WebSocket-e za projekte koji više nisu u statusu 'analyzing'
+    activeWsIds.forEach(projId => {
+      if (!currentAnalyzing.some(p => p.id === projId)) {
+        console.log(`[WS-Dash] Zatvaram vezu za projekat ${projId} (promenio status ili obbrisan)`);
+        if (dashboardWsRef.current[projId]) {
+          dashboardWsRef.current[projId].close();
+        }
+        delete dashboardWsRef.current[projId];
+      }
+    });
+
+    // Otvori WebSocket-e za nove 'analyzing' projekte
+    currentAnalyzing.forEach(proj => {
+      if (dashboardWsRef.current[proj.id]) return; // Već imamo otvoren WS
+
+      const activeToken = localStorage.getItem('sinhronizuj_me_token');
+      let wsUrlStr = API_BASE_URL;
+      if (wsUrlStr.startsWith("http://")) {
+        wsUrlStr = wsUrlStr.replace("http://", "ws://");
+      } else if (wsUrlStr.startsWith("https://")) {
+        wsUrlStr = wsUrlStr.replace("https://", "wss://");
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        wsUrlStr = `${protocol}//${host}${API_BASE_URL}`;
+      }
+
+      const fullWsUrl = `${wsUrlStr}/api/v1/ws/project/${proj.id}${activeToken ? `?token=${activeToken}` : ''}`;
+      console.log(`[WS-Dash] Pokušavam povezivanje za projekat ${proj.id} na: ${fullWsUrl}`);
+
+      try {
+        const ws = new WebSocket(fullWsUrl);
+        dashboardWsRef.current[proj.id] = ws;
+
+        ws.onopen = () => {
+          console.log(`[WS-Dash] Veza uspostavljena za projekat ${proj.id}`);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.status === "connected") return;
+
+            // Ažuriramo konkretni projekat u projects listi sa najnovijim progresom
+            setProjects(prevProjects => 
+              prevProjects.map(p => {
+                if (p.id === proj.id) {
+                  return {
+                    ...p,
+                    progress_data: data,
+                    // Ako primimo percent=100 ili završetak, status se može ažurirati
+                    status: data.percent === 100 ? 'ready' : p.status
+                  };
+                }
+                return p;
+              })
+            );
+
+            if (data.percent === 100) {
+              console.log(`[WS-Dash] Projekat ${proj.id} je završen (100%), osvežavam projekte...`);
+              ws.close();
+              fetchProjects();
+            }
+          } catch (err) {
+            console.error(`[WS-Dash] Greška u parsiranju poruke za projekat ${proj.id}:`, err);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.error(`[WS-Dash] Greška na WebSocket-u za projekat ${proj.id}:`, err);
+        };
+
+        ws.onclose = () => {
+          console.log(`[WS-Dash] Veza zatvorena za projekat ${proj.id}`);
+          delete dashboardWsRef.current[proj.id];
+        };
+      } catch (err) {
+        console.error(`[WS-Dash] Neuspešno kreiranje WebSocket-a za projekat ${proj.id}:`, err);
+      }
+    });
+
+  }, [analyzingProjectIdsStr, token]);
 
   // Resetovanje studija
   function resetStudio() {

@@ -92,3 +92,23 @@ Frontend koristi **Vitest** za unit i integraciono testiranje React komponenti.
     npm run test:run
     ```
 *   **Playwright integracija**: Konfigurisana je struktura za E2E testiranje korisničkih scenarija u pretraživačima (Chrome, Firefox, WebKit) na CI workflow-u.
+
+---
+
+## 6. WebSocket Integracija za Praćenje Statusa Celery Poslova
+
+U cilju eliminisanja HTTP polling-a i smanjenja opterećenja servera, na frontendu je implementirano real-time praćenje progresa pomoću WebSocket-a:
+*   **Povezivanje na Dashboard-u**: Unutar [StudioContext.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/context/StudioContext.jsx) implementiran je `useEffect` koji reaguje na projekte u statusu `analyzing`. Za svaki od tih projekata asinhrono se otvara WebSocket veza na ruti `/api/v1/ws/project/{project_id}`.
+*   **Progres na Dashboard UI**: Progres se u realnom vremenu očitava iz WebSocket poruka i prikazuje korisniku u komponenti [ProjectList.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Dashboard/ProjectList.jsx) u formatu "Naziv_Koraka (Procenat%)" (npr. `Prevođenje (45%)`).
+*   **DAW Studio Integracija**: `useEffect` za praćenje procesa analize (Faza 1) i renderovanja (Faza 2) takođe koristi primarno WebSocket vezu, sa automatskim HTTP Polling fallback-om u slučaju pucanja WebSocket konekcije.
+
+---
+
+## 7. Drag-and-Drop manipulacija i vremensko rastezanje (Time-stretching)
+
+Korisnicima je omogućeno direktno vizuelno podešavanje brzine izgovora na vremenskoj liniji povlačenjem ivica segmenata:
+*   **Resize ručke**: Na vremenskoj liniji ([StudioTimeline.jsx](file:///home/gruya/Projektri/sinhronizuj.me/frontend/src/components/Studio/StudioTimeline.jsx)), na levoj i desnoj ivici srpskih TTS segmenata, dodate su ručke za promenu veličine (resize handles).
+*   **Kalkulacija brzine (Speed calculation)**: Kada korisnik povuče ivicu mišem, računa se novo vizuelno trajanje (`estimatedTtsDuration`). Brzina se menja u opsegu `[0.5, 2.0]` na osnovu formule:
+    $$\text{speed} = \frac{\text{baseTtsDuration} \times \text{lastGeneratedSpeed}}{\text{estimatedTtsDuration}}$$
+*   **Vizuelni feedback**: Tokom prevlačenja, širina segmenta i talasni oblik se dinamički menjaju, a na samom segmentu se rendersuje trenutni faktor ubrzanja/usporavanja (npr. `1.20x`).
+*   **Automatsko čuvanje**: Po otpuštanju tastera miša (`mouseup` događaj), promenjena brzina se automatski šalje na backend preko metode `handleSaveDraft()`.
