@@ -1,3 +1,25 @@
+## 2026-06-24 (01:15 CET) — Migracija na Mistral Small 8-bit model i implementacija jedinstvenog prolaza prevođenja i lekture (Single-Pass)
+
+### Urađeno
+1. **Migracija na Mistral Small 24B (8-bit)**:
+   - Ažuriran [lektor_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/lektor_worker.py) koji se izvršava na **A100-40GB GPU** da umesto modela `Qwen3-32B` servira `mistralai/Mistral-Small-3.2-24B-Instruct-2506` koristeći vLLM bitsandbytes 8-bit kvantizaciju.
+   - U definiciju Modal slike dodate su biblioteke `bitsandbytes` i `scipy`.
+   - Obrisan stari, suvišni [translator_worker.py](file:///home/gruya/Projektri/sinhronizuj.me/modal_workers/translator_worker.py) koji je služio prevođenje na A10G GPU.
+2. **Implementacija jedinstvenog prolaza (Single-Pass)**:
+   - Modifikovan [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) tako da su svi pozivi za prevođenje i sudiju preusmereni na `settings.MODAL_LEKTOR_URL` sa modelom `mistral-translator`.
+   - Sistemski promptovi su integrisali prevođenje i lektorske zadatke (direktno prevođenje na latinicu, ekavicu, poštovanje glosara i TTS vremenskih limita) u jedinstveni LLM prolaz.
+   - Uklonjen poziv `lektor_segments` i obrisana datoteka [lektor.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/lektor.py). Pomoćne funkcije (`calculate_jaccard_similarity` i `extract_and_parse_json`) su bezbedno migrirane u `translate.py`.
+   - Logika lektorskog popravljanja, TTS-aware kompresije i Leak Guard-a je integrisana direktno u `translate.py`.
+3. **Prilagođavanje Celery-ja i Troškova**:
+   - Ažurirana datoteka [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) tako da se za prevođenje i lekturu koristi jedinstveni prolaz, uz ažuriranu metriku troškova na A100-40GB GPU ($0.00061/sec). Lektorska faza je uklonjena iz Celery pipeline-a i postavljen je parametar `skip_lektor=True`.
+4. **Wiki i Istorija**:
+   - Detaljno su ažurirani Obsidian Wiki dokumenti [[Prevodilacki_Pipeline]] i [[Modal_Workers_i_AI]] u folderu `second_brain/Funkcionalnosti/` kako bi odražavali prelazak na Mistral Small 8-bit jedinstveni prolaz.
+5. **Ispravka Linter i Pytest grešaka**:
+   - Popravljene Ruff i Bandit greške: dodat uvoz `base64` u `tasks.py`, uklonjen neiskorišćeni `used_terms_found` u `translate.py`, uklonjeno poređenje `== True` u SQL upitima i izmenjene bare `except` klauzule.
+   - Uspešno pokrenut kompletan test paket (`pytest` 18 passed) — svi testovi (uključujući testove perpetualnog učenja, faze 4 i RAG) uspešno prolaze.
+
+---
+
 ## 2026-06-23 (11:45 CET) — Integracija WebSocket statusa na frontendu i drag-and-drop promena brzine TTS segmenata
 
 ### Urađeno

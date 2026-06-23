@@ -4,6 +4,7 @@ from backend.core.config import settings
 import os
 import shutil
 import json
+import base64
 import redis
 import re
 import time
@@ -577,13 +578,13 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                     from celery import group
                     job = group(
                         translate_segments_chunk_task.s(
-                            chunk1, stable_video_path, 1.0, False, False, False, project_id
+                            chunk1, stable_video_path, 1.0, True, False, False, project_id
                         ),
                         translate_segments_chunk_task.s(
-                            chunk2, stable_video_path, 1.0, False, False, False, project_id
+                            chunk2, stable_video_path, 1.0, True, False, False, project_id
                         ),
                         translate_segments_chunk_task.s(
-                            chunk3, stable_video_path, 1.0, False, False, False, project_id
+                            chunk3, stable_video_path, 1.0, True, False, False, project_id
                         )
                     )
                     
@@ -623,7 +624,8 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
                     optimized_segments,
                     video_path=stable_video_path,
                     progress_callback=lambda detail: update_progress(detail=detail),
-                    project_id=project_id
+                    project_id=project_id,
+                    skip_lektor=True
                 )
                 
             if translation_result["status"] == "error": 
@@ -631,12 +633,9 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
             
             metrics = translation_result.get("metrics", {})
             duration_translate = metrics.get("translator_duration", 0.0)
-            duration_lektor = metrics.get("lektor_duration", 0.0)
             
             if duration_translate > 0:
-                add_phase_cost("translation", "Prevođenje (Qwen-VL)", "A10G", duration_translate, 0.00033)
-            if duration_lektor > 0:
-                add_phase_cost("lektor", "Lektura teksta (Qwen 32B AWQ)", "A10G", duration_lektor, 0.00033)
+                add_phase_cost("translation", "Prevođenje i Lektura (Mistral-Small)", "A100-40GB", duration_translate, 0.00061)
                 
             # Otpremamo u keš na S3
             local_trans_path = os.path.join(task_workspace, "translation_cache.json")
@@ -1256,7 +1255,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 db.commit()
                 
                 # 2. Re-prevedemo oštećene segmente sa strožim vremenskim limitima
-                db_segs_to_retranslate = db.query(Segment).filter(Segment.project_id == project_id, Segment.needs_retranslation == True).all()
+                db_segs_to_retranslate = db.query(Segment).filter(Segment.project_id == project_id, Segment.needs_retranslation).all()
                 segments_to_retranslate = []
                 for s in db_segs_to_retranslate:
                     segments_to_retranslate.append({
@@ -1505,7 +1504,7 @@ def render_video_task(self, project_id: str, voice_type: str = "clone", backgrou
                 meta = json.loads(meta_bytes)
                 meta["status"] = "ready"
                 r_client.hset("projects:metadata", project_id, safe_json_dumps(meta))
-        except:
+        except Exception:
             pass
         return {"status": "error", "message": str(e)}
     finally:

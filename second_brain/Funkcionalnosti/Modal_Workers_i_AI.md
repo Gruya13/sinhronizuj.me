@@ -33,10 +33,10 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 *   **GPU zahtev**: Nvidia T4.
 *   **Karakteristike**: Faster-Whisper je primarni ASR model koji generiše transkript sa preciznim vremenskim kodovima na nivou reči (word-level timestamps). SenseVoice-Small je sekundarni ASR model bez vremenskih kodova, koji služi za transkripciju celog vokala i naknadnu LLM arbitražu radi ispravke grešaka.
 
-### 2.3. Prevođenje (`translator_worker.py`)
-*   **Model**: Qwen2-VL-7B-Instruct-AWQ (Vision-Language model pokrenut preko vLLM OpenAI API-ja).
-*   **GPU zahtev**: Nvidia A10G (24GB VRAM) za vLLM kvantizovani model.
-*   **Funkcija**: Prevodi transkribovane segmente na srpski jezik uz očuvanje prirodnog tona govora.
+### 2.3. Prevođenje i Lektura (`lektor_worker.py`)
+*   **Model**: Mistral-Small-3.2-24B-Instruct-2506 (8-bit kvantizovan preko BitsAndBytes, pokrenut preko vLLM OpenAI API-ja pod nazivom `mistral-translator`).
+*   **GPU zahtev**: Nvidia A100-40GB (potreban za vLLM 8-bit model).
+*   **Funkcija**: Obavlja i prevođenje i lekturu segmenata u jedinstvenom prolazu, uz istovremenu kompresiju rečenica za potrebe TTS vremenskih limita i očuvanje prirodnog tona. Stari `translator_worker.py` je obrisan.
 
 ### 2.4. Kloniranje i Sinteza glasa (`tts_openvoice.py` / `tts.py`)
 *   **Modeli**: Piper TTS (srpski model Marko) i OpenVoice v2 (razvijen od strane MyShell-a).
@@ -44,9 +44,6 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 *   **Funkcija**:
     *   `Piper TTS` generiše osnovni srpski govor na osnovu prevedenog teksta (model Marko koji daje prirodan izgovor).
     *   `OpenVoice` uzima kratak uzorak originalnog glasa iz `vocals.wav` (oko 3-5 sekundi je dovoljno), izvlači stil (tone color converter) i primenjuje ga na generisani srpski govor. Krajnji rezultat je klonirani glas na srpskom jeziku koji zadržava jedinstvenu boju glasa originalnog govornika.
-
-### 2.5. Lektura teksta (`lektor_worker.py`)
-*   **Funkcija**: Brza provera gramatike i stila prevedenog teksta na srpskom jeziku pre nego što se pošalje na zvučnu sintezu.
 
 ### 2.6. LipSync vizuelna sinhronizacija (`wav2lip_worker.py`)
 *   **Model**: Wav2Lip.
@@ -64,18 +61,18 @@ U direktorijumu [modal_workers/](file:///home/gruya/Projektri/sinhronizuj.me/mod
 
 Na osnovu testiranja obavljenih na platformi, troškovi obrade su izuzetno optimizovani zahvaljujući pažljivom odabiru hardvera za svaki zadatak:
 
-| Zadatak | Hardver (Modal) | Vreme Izvršavanja (5 min video) | Cena po satu | Procenjena Cena po videu (5 min) |
+| Zadatak | Hardver (Modal) | Vreme Izvršavanja (5 min video) | Cena po satu / sekundi | Procenjena Cena po videu (5 min) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Demucs Separacija** | Nvidia T4 (GPU) | ~30 sekundi | $0.59 / h | ~$0.005 |
 | **STT Transkripcija** | Nvidia T4 (GPU) | ~15 sekundi | $0.59 / h | ~$0.003 |
-| **Prevođenje** | Nvidia A10G (GPU) | ~10 sekundi | $1.10 / h | ~$0.003 |
+| **Prevođenje i Lektura** | Nvidia A100 (40GB) | ~15 sekundi | $2.21 / h ($0.00061/s) | ~$0.009 |
 | **OpenVoice TTS (Kloniranje)**| Nvidia L4 (GPU) | ~60 sekundi (paralelno) | $1.25 / h | ~$0.021 |
 | **Wav2Lip LipSync** | Nvidia T4 (GPU) | ~90 sekundi (selektivno) | $0.59 / h | ~$0.015 |
 | **Sklapanje Videa (FFmpeg)** | CPU (Shared na hostu) | ~15 sekundi | - (Host resurs) | $0.000 |
-| **Ukupno** | - | **~3.7 minuta** | - | **~$0.047 (oko 5.5 dinara)** |
+| **Ukupno** | - | **~3.8 minuta** | - | **~$0.053 (oko 6 dinara)** |
 
 > [!TIP]
-> Prosečna cena obrade 5-minutnog videa iznosi **manje od 0.05 USD (oko 5.5 dinara)**. Čak i pod maksimalnim opterećenjem i dužim hladnim startovima, trošak ne prelazi **0.07 USD** po videu, što platformu sinhronizuj.me čini izuzetno profitabilnom i skalabilnom za masovnu upotrebu.
+> Prosečna cena obrade 5-minutnog videa iznosi **oko 0.05 USD (oko 6 dinara)**. Čak i sa skupljim A100 GPU-om za prevođenje, eliminisanje drugog LLM prolaza (lektora) održava ukupni trošak i vreme obrade na minimalnom nivou, dok kvalitet i brzina reagovanja sistema ostaju vrhunski.
 
 ---
 

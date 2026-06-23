@@ -7,7 +7,7 @@ from backend.core.database import SessionLocal
 from backend.core.models import Segment, Project, WikiRule
 from backend.services.embedding import embedding_service
 from backend.worker.utils import call_modal_endpoint
-from backend.worker.translation.lektor import extract_and_parse_json
+from backend.worker.translation import extract_and_parse_json
 
 def run_nightly_pattern_analysis():
     """
@@ -84,7 +84,7 @@ def run_nightly_pattern_analysis():
 
             url = f"{settings.MODAL_TRANSLATOR_URL.rstrip('/')}/v1/chat/completions"
             payload = {
-                "model": "qwen-translator",
+                "model": "mistral-translator",
                 "messages": [
                     {"role": "system", "content": "Ti si stručni lingvistički analizator grešaka. Vrati isključivo validan JSON prema šemi."},
                     {"role": "user", "content": prompt}

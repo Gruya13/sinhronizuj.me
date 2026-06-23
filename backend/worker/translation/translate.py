@@ -15,6 +15,144 @@ from .dialect import clean_translation_text, clean_thought_tags
 from .glossary import parse_glossary_to_dict
 from .qe import get_comet_kiwi_score, check_negation_preservation, get_llm_judge_score
 
+def calculate_jaccard_similarity(text1: str, text2: str) -> float:
+    if not text1 or not text2:
+        return 0.0
+    t1 = re.sub(r'[^\w\s]', '', text1.lower()).split()
+    t2 = re.sub(r'[^\w\s]', '', text2.lower()).split()
+    set1 = set(t1)
+    set2 = set(t2)
+    if not set1 or not set2:
+        return 0.0
+    intersection = set1.intersection(set2)
+    union = set1.union(set2)
+    return len(intersection) / len(union)
+
+def fix_json_newlines(json_str: str) -> str:
+    if not json_str:
+        return ""
+    def repl(match):
+        return match.group(0).replace('\n', '\\n')
+    return re.sub(r'"(?:[^"\\]|\\.)*"', repl, json_str)
+
+def repair_truncated_json(text: str) -> str:
+    text = text.strip()
+    if not text:
+        return ""
+    if text.endswith(','):
+        text = text[:-1].strip()
+    unescaped_quotes = 0
+    in_escape = False
+    for char in text:
+        if char == '\\':
+            in_escape = not in_escape
+        elif char == '"':
+            if not in_escape:
+                unescaped_quotes += 1
+            in_escape = False
+        else:
+            in_escape = False
+    if unescaped_quotes % 2 != 0:
+        text += '"'
+    if text.endswith(','):
+        text = text[:-1].strip()
+    stack = []
+    in_string = False
+    in_escape = False
+    for char in text:
+        if char == '\\':
+            if in_string:
+                in_escape = not in_escape
+            else:
+                in_escape = False
+        elif char == '"':
+            if not in_escape:
+                in_string = not in_string
+            in_escape = False
+        elif not in_string:
+            if char in ('{', '['):
+                stack.append(char)
+            elif char in ('}', ']'):
+                if stack:
+                    last = stack[-1]
+                    if (char == '}' and last == '{') or (char == ']' and last == '['):
+                        stack.pop()
+        else:
+            in_escape = False
+    for open_char in reversed(stack):
+        if open_char == '{':
+            text += '}'
+        elif open_char == '[':
+            text += ']'
+    return text
+
+def extract_and_parse_json(text: str):
+    if not text:
+        return None
+    text = clean_thought_tags(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    try:
+        fixed_text = fix_json_newlines(text)
+        return json.loads(fixed_text)
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
+    if match:
+        json_content = match.group(1)
+        try:
+            return json.loads(json_content)
+        except json.JSONDecodeError:
+            try:
+                return json.loads(fix_json_newlines(json_content))
+            except json.JSONDecodeError:
+                pass
+    try:
+        repaired = repair_truncated_json(text)
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+    try:
+        repaired = repair_truncated_json(fix_json_newlines(text))
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+    start_arr = text.find('[')
+    if start_arr != -1:
+        json_content = text[start_arr:]
+        end_arr = text.rfind(']')
+        if end_arr != -1 and end_arr > start_arr:
+            json_content = text[start_arr:end_arr+1]
+        try:
+            return json.loads(json_content)
+        except json.JSONDecodeError:
+            try:
+                return json.loads(repair_truncated_json(json_content))
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(repair_truncated_json(fix_json_newlines(json_content)))
+                except json.JSONDecodeError:
+                    pass
+    start_obj = text.find('{')
+    if start_obj != -1:
+        json_content = text[start_obj:]
+        end_obj = text.rfind('}')
+        if end_obj != -1 and end_obj > start_obj:
+            json_content = text[start_obj:end_obj+1]
+        try:
+            return json.loads(json_content)
+        except json.JSONDecodeError:
+            try:
+                return json.loads(repair_truncated_json(json_content))
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(repair_truncated_json(fix_json_newlines(json_content)))
+                except json.JSONDecodeError:
+                    pass
+    return None
+
 def group_segments_into_sentences(segments: list, max_group_duration: float = 12.0) -> list:
     """
     Grupiše susedne segmente u rečenice na osnovu završne interpunkcije.
@@ -73,8 +211,8 @@ def split_translated_text(translated_text: str, original_segments: list) -> list
     # Kumulativni udeli
     cum_weights = []
     running_sum = 0
-    for l in orig_lens:
-        running_sum += l
+    for length in orig_lens:
+        running_sum += length
         cum_weights.append(running_sum / total_orig_len)
         
     # Izračunavanje kumulativnih dužina reči (sa uključenim razmacima)
@@ -148,7 +286,7 @@ def select_best_translation_via_llama(english_text: str, candidates: List[str]) 
     )
     
     payload = {
-        "model": "llama-8b",
+        "model": "mistral-translator",
         "messages": [
             {
                 "role": "system",
@@ -197,7 +335,7 @@ def retranslate_with_self_critique(english_text: str, bad_translation: str, feed
     )
     
     payload = {
-        "model": "qwen-lektor",
+        "model": "mistral-translator",
         "messages": [
             {
                 "role": "system",
@@ -232,6 +370,60 @@ def retranslate_with_self_critique(english_text: str, bad_translation: str, feed
         print(f"[SELF-CRITIQUE ERROR] Greška prilikom re-prevoda sa samokritikom: {e}", flush=True)
         
     return bad_translation
+
+def compress_sentence_via_llm(text: str, limit_char: int) -> str:
+    """
+    Poziva Modal Lektor (Mistral-Small) da skrati srpsku rečenicu tako da stane u limit karaktera.
+    """
+    if not settings.MODAL_LEKTOR_URL or not text or len(text) <= limit_char:
+        return text
+        
+    print(f"[COMPRESS] Skraćujem rečenicu ({len(text)} -> limit {limit_char}): {text}", flush=True)
+    
+    url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
+    prompt = (
+        f"Skrati sledeću rečenicu na srpskom jeziku (ekavica, latinica) tako da njena dužina bude maksimalno {limit_char} karaktera.\n"
+        "VAŽNA PRAVILA:\n"
+        "1. Zadrži osnovni smisao i informaciju iz rečenice.\n"
+        "2. Skraćena rečenica mora biti gramatički ispravna i prirodna na srpskom.\n"
+        "3. Tvoj odgovor mora sadržati isključivo skraćenu rečenicu, bez ikakvog dodatnog teksta, komentara, navodnika, objašnjenja ili think tagova.\n"
+        "4. STROGO ZABRANJENO: Nemoj generisati nikakvo razmišljanje, obrazloženje ili <think> tag. Samo odmah ispiši skraćeni tekst.\n"
+        "5. Ukoliko je limit karaktera prekratak da bi se zadržao ceo smisao, izostavi manje bitne detalje ili zadrži samo ključne reči.\n\n"
+        f"REČENICA ZA SKRAĆIVANJE: {text}"
+    )
+    
+    payload = {
+        "model": "mistral-translator",
+        "messages": [
+            {
+                "role": "system", 
+                "content": "Ti si brzi stručni lektor. Tvoj zadatak je da odmah vratiš skraćenu verziju rečenice na srpskom jeziku na osnovu zadatog limita. STROGO JE ZABRANJENO generisanje <think> ili <thought> tagova i bilo kakvog razmišljanja. Samo odmah ispiši skraćenu rečenicu direktno."
+            },
+            {
+                "role": "user", 
+                "content": prompt
+            }
+        ],
+        "temperature": 0.1,
+        "max_tokens": 1500,
+        "enable_thinking": False
+    }
+    
+    try:
+        from backend.worker.translator import call_modal_endpoint
+        res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=60)
+        content = res["choices"][0]["message"]["content"].strip()
+        cleaned = clean_thought_tags(content).strip().strip('"\'')
+        
+        if not cleaned or len(cleaned) < 2:
+            print(f"[COMPRESS WARNING] Dobijen prazan ili nevalidan rezultat nakon čišćenja (sirovo: {repr(content)}). Vraćam originalni tekst.", flush=True)
+            return text
+            
+        print(f"[COMPRESS SUCCESS] Nova rečenica ({len(cleaned)} karaktera): {cleaned}", flush=True)
+        return cleaned
+    except Exception as e:
+        print(f"[COMPRESS ERROR] Greška pri skraćivanju: {e}", flush=True)
+        return text
 
 def extract_video_frames(video_path: str, num_frames: int = 10) -> List[str]:
     """
@@ -337,7 +529,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 
                 # Učitavamo Wiki pravila
                 rules = db.query(WikiRule).filter(
-                    (WikiRule.user_id == user_id) | (WikiRule.is_global == True)
+                    (WikiRule.user_id == user_id) | WikiRule.is_global
                 ).all()
                 if rules:
                     wiki_lines = []
@@ -541,7 +733,7 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
         url = f"{settings.MODAL_LEKTOR_URL.rstrip('/')}/v1/chat/completions"
         payload = {
-            "model": "qwen-lektor",
+            "model": "mistral-translator",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -568,7 +760,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
             res = call_modal_endpoint(url=url, payload=payload)
             content = res["choices"][0]["message"]["content"].strip()
             
-            from backend.worker.translation.lektor import extract_and_parse_json
             data = extract_and_parse_json(content)
             if not data:
                 print(f"[TRANSLATOR DEBUG ERROR] Sadržaj koji nije mogao biti parsiran:\n{repr(content)}", flush=True)
@@ -581,8 +772,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
         parsed_dict = {}
         
         print(f"[TRANSLATOR DEBUG DATA] Parsirani podaci za batch {batch_start}:\n{json.dumps(data, indent=2, ensure_ascii=False)}", flush=True)
-        
-        from backend.worker.translation.lektor import calculate_jaccard_similarity
         
         segments_list = []
         if isinstance(data, dict):
@@ -789,7 +978,6 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
                 parsed_dict[s.get("id")] = parts[p_idx]
             
         # Ažuriranje confirmed_translations na osnovu used_terms koji je model vratio
-        used_terms_found = False
         if isinstance(data, dict):
             used_terms = data.get("used_terms")
             if isinstance(used_terms, dict):
@@ -824,103 +1012,102 @@ def translate_segments(segments: list, video_path: str = None, progress_callback
 
     # Sortiranje finalnih segmenata po ID-u kako bi ostali u pravom redosledu
     final_segments = sorted(final_segments, key=lambda x: x["id"])
+    
+    # 3. Post-procesiranje i integrisana lektura (unmasking, transliteracija, čišćenje i kompresija)
+    for fs in final_segments:
+        # Odmaskiranje entiteta
+        unmasked = unmask_text(fs["text"], fs["masks"])
+        # Transliteracija u latinicu
+        lat = to_latin(unmasked)
+        # Čišćenje dijalekata, ijekavice i thought tagova
+        cleaned = clean_translation_text(lat, qe_score=fs.get("qe_score"))
+        
+        # Izračunavanje limita dužine i kompresija ako je potrebno
+        orig_seg = next((s for s in segments if s.get("id") == fs["id"]), None)
+        if orig_seg:
+            duration = orig_seg["end"] - orig_seg["start"]
+            factor = calculate_dynamic_factor(orig_seg, user_avg_speedup)
+            limit_char = max(15, int(duration * factor), int(len(orig_seg['text']) * 0.75))
+            
+            if len(cleaned) > limit_char * 1.15:
+                # Pozivamo kompresiju rečenice preko novog Mistral modela
+                cleaned = compress_sentence_via_llm(cleaned, limit_char)
+                
+            # Evaluacija confidence score-a
+            confidence = 5
+            if fs.get("qe_score", 1.0) < 0.85:
+                confidence -= 1
+            if len(cleaned) > limit_char:
+                confidence -= 1
+            fs["confidence_score"] = max(1, confidence)
+            
+        fs["text"] = cleaned
+
     translator_duration = time.time() - t_start_trans
 
-    # Pokretanje Lektor faze sa prosleđenim parametrima
-    try:
-        if skip_lektor:
-            # Ako preskačemo lektora, moramo odraditi unmasking i prevođenje u latinicu i clean_translation_text za finalne segmente
-            for fs in final_segments:
-                unmasked = unmask_text(fs["text"], fs["masks"])
-                lat = to_latin(unmasked)
-                cleaned = clean_translation_text(lat, qe_score=fs.get("qe_score"))
-                fs["text"] = cleaned
-            return {
-                "status": "success",
-                "translated_segments": final_segments,
-                "metrics": {
-                    "translator_duration": translator_duration,
-                    "lektor_duration": 0.0
-                }
-            }
-        
-        from backend.worker.translator import lektor_segments
-        res = lektor_segments(
-            segments, 
-            final_segments, 
-            progress_callback=progress_callback, 
-            translator_duration=translator_duration,
-            dynamic_glossary_str=dynamic_glossary_str,
-            video_summary=video_summary,
-            user_avg_speedup=user_avg_speedup,
-            skip_deduplication=skip_deduplication
-        )
-        
-        # Subagent Alpha: Real-time "Tihi Konsenzus"
-        if res.get("status") == "success" and project_id:
-            try:
-                from backend.core.database import SessionLocal
-                from backend.core.models import TranslationMemory, PendingTranslationMemory, Project
-                from backend.services.embedding import embedding_service
-                
-                db = SessionLocal()
-                project_entry = db.query(Project).filter(Project.id == project_id).first()
-                if project_entry:
-                    user_id = project_entry.user_id
-                    for fs in res["translated_segments"]:
-                        final_text = fs.get("text", "")
-                        orig_text = fs.get("original_text", "")
-                        if not final_text or not orig_text:
-                            continue
-                        
-                        # Izračunavanje QE skora nad finalnim lekturisanim tekstom
-                        final_qe = get_comet_kiwi_score(orig_text, final_text)
-                        lektor_confidence = fs.get("confidence_score", 5)
-                        
-                        if final_qe > 0.92 and lektor_confidence > 4.5:
-                            # Provera da li već postoji u TranslationMemory
-                            exists = db.query(TranslationMemory).filter(
-                                TranslationMemory.user_id == user_id,
-                                TranslationMemory.source_text == orig_text
-                            ).first()
-                            if not exists:
-                                emb = embedding_service.get_embedding(orig_text)
-                                tm_entry = TranslationMemory(
-                                    user_id=user_id,
-                                    project_id=project_id,
-                                    source_text=orig_text,
-                                    target_text=final_text,
-                                    embedding=emb,
-                                    auto_approved=True
-                                )
-                                db.add(tm_entry)
-                                print(f"[ALPHA] Visok kvalitet (QE={final_qe:.3f}, Conf={lektor_confidence}). Direktan upis u TM: '{orig_text}' -> '{final_text}'", flush=True)
-                        elif final_qe > 0.85 and lektor_confidence > 3.5:
-                            # Upis u pending tabelu
-                            existing_pending = db.query(PendingTranslationMemory).filter(
-                                PendingTranslationMemory.user_id == user_id,
-                                PendingTranslationMemory.source_text == orig_text
-                            ).first()
-                            if existing_pending:
-                                existing_pending.occurrence_count += 1
-                                print(f"[ALPHA] Inkrementiram Pending TM occurrence_count za '{orig_text}': {existing_pending.occurrence_count}", flush=True)
-                            else:
-                                pending_entry = PendingTranslationMemory(
-                                    user_id=user_id,
-                                    project_id=project_id,
-                                    source_text=orig_text,
-                                    target_text=final_text,
-                                    occurrence_count=1
-                                )
-                                db.add(pending_entry)
-                                print(f"[ALPHA] Dodat u pending_translation_memory (QE={final_qe:.3f}, Conf={lektor_confidence}): '{orig_text}' -> '{final_text}'", flush=True)
+    # 4. Subagent Alpha: Real-time "Tihi Konsenzus" (Perpetual Learning)
+    if project_id:
+        try:
+            from backend.core.database import SessionLocal
+            from backend.core.models import TranslationMemory, PendingTranslationMemory, Project
+            from backend.services.embedding import embedding_service
+            
+            db = SessionLocal()
+            project_entry = db.query(Project).filter(Project.id == project_id).first()
+            if project_entry:
+                user_id = project_entry.user_id
+                for fs in final_segments:
+                    final_text = fs.get("text", "")
+                    orig_text = fs.get("original_text", "")
+                    if not final_text or not orig_text:
+                        continue
+                    
+                    final_qe = get_comet_kiwi_score(orig_text, final_text)
+                    lektor_confidence = fs.get("confidence_score", 5)
+                    
+                    if final_qe > 0.92 and lektor_confidence > 4.5:
+                        exists = db.query(TranslationMemory).filter(
+                            TranslationMemory.user_id == user_id,
+                            TranslationMemory.source_text == orig_text
+                        ).first()
+                        if not exists:
+                            emb = embedding_service.get_embedding(orig_text)
+                            tm_entry = TranslationMemory(
+                                user_id=user_id,
+                                project_id=project_id,
+                                source_text=orig_text,
+                                target_text=final_text,
+                                embedding=emb,
+                                auto_approved=True
+                            )
+                            db.add(tm_entry)
+                            print(f"[ALPHA] Visok kvalitet (QE={final_qe:.3f}, Conf={lektor_confidence}). Direktan upis u TM: '{orig_text}' -> '{final_text}'", flush=True)
+                    elif final_qe > 0.85 and lektor_confidence > 3.5:
+                        existing_pending = db.query(PendingTranslationMemory).filter(
+                            PendingTranslationMemory.user_id == user_id,
+                            PendingTranslationMemory.source_text == orig_text
+                        ).first()
+                        if existing_pending:
+                            existing_pending.occurrence_count += 1
+                        else:
+                            pending_entry = PendingTranslationMemory(
+                                user_id=user_id,
+                                project_id=project_id,
+                                source_text=orig_text,
+                                target_text=final_text,
+                                occurrence_count=1
+                            )
+                            db.add(pending_entry)
                 db.commit()
                 db.close()
-            except Exception as e:
-                print(f"[ALPHA ERROR] Greška u Perpetual Learning Real-time upisu: {e}", flush=True)
+        except Exception as e:
+            print(f"[ALPHA ERROR] Greška u Perpetual Learning Real-time upisu: {e}", flush=True)
 
-        return res
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"status": "error", "message": str(e)}
+    return {
+        "status": "success",
+        "translated_segments": final_segments,
+        "metrics": {
+            "translator_duration": translator_duration,
+            "lektor_duration": 0.0
+        }
+    }

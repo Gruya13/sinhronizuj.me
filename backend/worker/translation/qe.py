@@ -222,7 +222,7 @@ def get_llm_judge_score(english_text: str, serbian_text: str, limit_char: int = 
         res = call_modal_endpoint(url=url, payload=payload, timeout_seconds=45)
         content = res["choices"][0]["message"]["content"].strip()
         
-        from backend.worker.translation.lektor import extract_and_parse_json
+        from backend.worker.translation import extract_and_parse_json
         data = extract_and_parse_json(content)
         if not data:
             raise ValueError("Nije uspelo parsiranje niti popravljanje JSON-a sudije.")

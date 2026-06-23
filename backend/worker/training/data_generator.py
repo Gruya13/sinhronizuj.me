@@ -25,7 +25,7 @@ def generate_paraphrases(text: str) -> list:
         "Vrati isključivo JSON listu sa 3 stringa.\n"
     )
     payload = {
-        "model": "qwen-translator",
+        "model": "mistral-translator",
         "messages": [
             {"role": "system", "content": "Ti si stručni lingvistički parafrazer za srpski jezik. Vrati isključivo validan JSON listu sa 3 stringa."},
             {"role": "user", "content": prompt}
@@ -46,7 +46,7 @@ def generate_paraphrases(text: str) -> list:
         content = res["choices"][0]["message"]["content"].strip()
         content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL).strip()
         
-        from backend.worker.translation.lektor import extract_and_parse_json
+        from backend.worker.translation import extract_and_parse_json
         data = extract_and_parse_json(content)
         if isinstance(data, list) and len(data) == 3:
             return data

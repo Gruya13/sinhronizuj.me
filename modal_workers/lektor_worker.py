@@ -4,7 +4,7 @@ import modal
 huggingface_cache = modal.Volume.from_name("huggingface-cache", create_if_missing=True)
 
 # Definicija slike kontejnera optimizovana za vLLM i NVIDIA A100 hardver
-# Koristimo stabilne verzije biblioteka
+# Dodate su bitsandbytes i scipy biblioteke za 8-bitnu kvantizaciju u letu
 image = (
     modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.11")
     .apt_install("git", "ffmpeg", "libsm6", "libxext6")
@@ -13,6 +13,8 @@ image = (
         "vllm",
         "huggingface-hub",
         "transformers",
+        "bitsandbytes>=0.45.0",
+        "scipy",
         "git+https://github.com/nicta/pyairports.git"
     )
 )
@@ -28,34 +30,36 @@ app = modal.App("sinhronizuj-lektor")
     env={"VLLM_WORKER_MULTIPROC_METHOD": "spawn", "VLLM_USE_V1": "0"},
     secrets=[modal.Secret.from_dotenv()]
 )
-@modal.web_server(port=8000, startup_timeout=600)
+@modal.web_server(port=8000, startup_timeout=1200)
 def serve():
     """
-    Pokreće vLLM OpenAI-kompatibilan server koji služi Qwen 2.5 32B Instruct AWQ model.
+    Pokreće vLLM OpenAI-kompatibilan server koji služi Mistral-Small-3.2-24B-Instruct-2506 model.
+    Kvantizacija se vrši u letu u 8-bitni (bitsandbytes) format.
     """
     import subprocess
     import os
 
     cmd = [
         "python", "-m", "vllm.entrypoints.openai.api_server",
-        "--model", "Qwen/Qwen3-32B-AWQ",
-        "--quantization", "awq_marlin",
-        "--served-model-name", "qwen-lektor",
+        "--model", "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+        "--quantization", "bitsandbytes",
+        "--load-format", "bitsandbytes",
+        "--served-model-name", "mistral-translator",
         "--tensor-parallel-size", "1",
-        "--gpu-memory-utilization", "0.95",
+        "--gpu-memory-utilization", "0.90",
         "--max-model-len", "8192",
         "--enable-prefix-caching",
-        "--enable-chunked-prefill",
         "--port", "8000"
     ]
 
     api_key = os.environ.get("MODAL_API_KEY")
     if api_key:
-        print("[LEKTOR-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
+        print("[MISTRAL-WORKER] Aktiviram vLLM API autentifikaciju sa ključem.")
         cmd.extend(["--api-key", api_key])
 
-    print("Pokretanje vLLM servera za model: Qwen/Qwen3-32B-AWQ")
+    print("Pokretanje vLLM servera za model: mistralai/Mistral-Small-3.2-24B-Instruct-2506 (8-bit BNB)")
     subprocess.Popen(cmd)
 
 if __name__ == "__main__":
     app.run()
+

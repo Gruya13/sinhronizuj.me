@@ -91,8 +91,8 @@ def test_translate_segments_parallel_validation(
     mock_redis.get.return_value = None
     mock_redis_from_url.return_value = mock_redis
 
-    # Mock-ovanje CometKiwi skora: prvi segment je dobar, drugi je sumnjiv i zahteva sudiju
-    mock_kiwi.side_effect = [0.95, 0.75]
+    # Mock-ovanje CometKiwi skora: prva dva su za prevođenje, druga dva za Alpha TM upis
+    mock_kiwi.side_effect = [0.95, 0.75, 0.95, 0.75]
     
     # Mock-ovanje LLM sudije za sumnjivi segment
     mock_judge.return_value = {
@@ -134,7 +134,7 @@ def test_translate_segments_parallel_validation(
     assert translated[1]["text"] == "Kako si"
     
     # Provera da li su evaluacije pozvane
-    assert mock_kiwi.call_count == 2
+    assert mock_kiwi.call_count == 4
     mock_judge.assert_called_once()  # Samo drugi (sumnjivi) segment ide na suđenje
 
 

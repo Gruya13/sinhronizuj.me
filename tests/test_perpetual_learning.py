@@ -15,9 +15,8 @@ from backend.worker.training.train_lora import run_lora_training
 @patch("backend.worker.translator.generate_video_summary")
 @patch("backend.worker.translator.get_dynamic_glossary")
 @patch("backend.worker.translation.translate.get_comet_kiwi_score")
-@patch("backend.worker.translator.lektor_segments")
 @patch("backend.core.database.SessionLocal")
-def test_alpha_real_time_tm_insertion(mock_db_session, mock_lektor, mock_qe_score, mock_glossary, mock_summary, mock_call_modal, mock_redis_from_url):
+def test_alpha_real_time_tm_insertion(mock_db_session, mock_qe_score, mock_glossary, mock_summary, mock_call_modal, mock_redis_from_url):
     mock_db = MagicMock()
     mock_db_session.return_value = mock_db
 
@@ -30,39 +29,20 @@ def test_alpha_real_time_tm_insertion(mock_db_session, mock_lektor, mock_qe_scor
     mock_summary.return_value = "Mock video summary."
     mock_glossary.return_value = '- "exceptional" -> "izuzetan"'
 
-    # Mock response za Qwen prevođenje
+    # Mock response za Qwen prevođenje (Mistral)
     mock_trans_response = {
         "choices": [
             {
                 "message": {
-                    "content": '{"segments": [{"id": 0, "translated_text": "Ovo je izuzetan prevod."}]}'
+                    "content": '{"segments": [{"id": 0, "translated_text": "Ovo je izuzetan prevod."}, {"id": 1, "translated_text": "Ovo je pristojan prevod."}]}'
                 }
             }
         ]
     }
     mock_call_modal.return_value = mock_trans_response
 
-    # Mock Lektor izlaz
-    mock_lektor.return_value = {
-        "status": "success",
-        "translated_segments": [
-            {
-                "id": 0,
-                "original_text": "This is an exceptional translation.",
-                "text": "Ovo je izuzetan prevod.",
-                "confidence_score": 4.9
-            },
-            {
-                "id": 1,
-                "original_text": "This is a decent translation.",
-                "text": "Ovo je pristojan prevod.",
-                "confidence_score": 3.8
-            }
-        ]
-    }
-
-    # Prvi poziv (prevod seg 0) -> 0.95, drugi poziv (TM upis seg 0) -> 0.95, treći poziv (TM upis seg 1) -> 0.87
-    mock_qe_score.side_effect = [0.95, 0.95, 0.87, 0.87]
+    # Prvi poziv (prevod seg 0) -> 0.95, drugi poziv (prevod seg 1) -> 0.87, treći poziv (TM upis seg 0) -> 0.95, četvrti poziv (TM upis seg 1) -> 0.87
+    mock_qe_score.side_effect = [0.95, 0.87, 0.95, 0.87]
 
     mock_project = MagicMock(spec=Project)
     mock_project.user_id = "mock-user-id"
@@ -83,7 +63,10 @@ def test_alpha_real_time_tm_insertion(mock_db_session, mock_lektor, mock_qe_scor
         mock_emb.get_embedding.return_value = [0.1] * 384
 
         res = translate_segments(
-            [{"id": 0, "start": 0.0, "end": 2.0, "text": "This is an exceptional translation."}],
+            [
+                {"id": 0, "start": 0.0, "end": 2.0, "text": "This is an exceptional translation."},
+                {"id": 1, "start": 2.5, "end": 4.5, "text": "This is a decent translation."}
+            ],
             video_path=None,
             project_id="mock-proj-id",
             skip_lektor=False,

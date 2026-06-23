@@ -12,16 +12,13 @@ Ovaj dokument opisuje celokupan **proces prevođenja** i lektorisanja unutar pla
 
 ## 1. Pregled Arhitekture Prevođenja
 
-Prevođenje se izvršava asinhrono unutar Celery radnika (zadatak `analyze_video_task` definisan u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py)) i koristi **Qwen3-32B** (ili alternativno Qwen2-VL-7B) model pokrenut na **Modal Serverless** GPU infrastrukturi (A10G GPU).
+Prevođenje se izvršava asinhrono unutar Celery radnika (zadatak `analyze_video_task` definisan u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py)) i koristi **Mistral-Small-3.2-24B-Instruct-2506** (8-bit kvantizovan preko bitsandbytes) model pokrenut na **Modal Serverless** GPU infrastrukturi (**A100-40GB GPU**).
 
-Celokupan proces prevođenja odvija se u dva glavna koraka:
+Celokupan proces prevođenja i lekture spojen je u **jedinstveni prolaz (Single-Pass)** unutar modula [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py). Stari lektorski LLM radnik i fajl `lektor.py` su uklonjeni radi smanjenja troškova za ~50% i ubrzanja procesa za ~40%.
 
-| Prolaz | Modul | Uloga |
-| :--- | :--- | :--- |
-| **Prvi prolaz** — Prevod | [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) | Generiše inicijalni prevod svakog segmenta, uz RAG TM pretragu i kontrolu kvaliteta |
-| **Drugi prolaz** — Lektor | [lektor.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/lektor.py) | Lekturiše, polira stil, vrši kompresiju i priprema tekst za TTS sintezu |
-
-Nakon ovih prolaza, primenjuju se **deterministička morfološka pravila** iz modula [dialect.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/dialect.py) (preko 100 regex zamena) i [transliter.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/transliter.py) (preko 350 zamena dijalekata i ekavizacije).
+Proces se sastoji od:
+*   **Jedinstveni LLM prolaz**: Generiše prevod svakog segmenta uz istovremenu lekturu, poštovanje glosara, RAG TM pretragu i TTS vremensku kompresiju integrisanu direktno u sistemski prompt.
+*   **Deterministička post-obrada**: Nakon LLM prolaza, primenjuju se brza morfološka pravila iz modula [dialect.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/dialect.py) (preko 100 regex zamena) i [transliter.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/transliter.py) (preko 350 zamena dijalekata i ekavizacije).
 
 ---
 
@@ -103,16 +100,16 @@ Kvalitet se procenjuje bez referentnog prevoda na osnovu kosinusne sličnosti se
 *   **Predugačak prevod**: $-0.05$ (ako je prevod preko 1.5 puta duži od originala).
 
 ### 4.3. LLM Judge i Self-Critique
-Ako je `QE < 0.85`, poziva se Qwen kao sudija koji ocenjuje prevod na skali od 1.0 do 5.0. U slučaju ocene `< 4.0`, pokreće se **Self-Critique** petlja (maksimalno 2 pokušaja) sa dinamičkim uputstvima za popravku (npr. "Skrati prevod na 45 karaktera" ili "Napiši brojeve rečima").
+Ako je `QE < 0.85`, poziva se Mistral-Small kao sudija koji ocenjuje prevod na skali od 1.0 do 5.0. U slučaju ocene `< 4.0`, pokreće se **Self-Critique** petlja (maksimalno 2 pokušaja) sa dinamičkim uputstvima za popravku (npr. "Skrati prevod na 45 karaktera" ili "Napiši brojeve rečima").
 
 ---
 
-## 5. Lektorska Revizija (`lektor.py`)
+## 5. Integrisana Lektorska Revizija i Kompresija
 
-Nakon uspešnog prevođenja, svi segmenti prolaze kroz drugi prolaz - **Lektorsku reviziju** u batch-evima od 5 segmenata:
-1.  **Deduplikacija**: Izbegava se ponovno prevođenje identičnih tekstova. Segmente sa Jaccard sličnošću $\ge 0.85$ sistem prepoznaje kao duplikate i kopira rešenja.
-2.  **TTS-Aware Compression**: Lektor meri dužinu teksta u odnosu na vremenski limit segmenta. Ako tekst prelazi limit za više od 15%, poziva se funkcija `compress_sentence_via_llm()` koja inteligentno skraćuje rečenicu zadržavajući smisao, kako govor u TTS fazi ne bi zvučao neprirodno brzo.
-3.  **Leak Guard**: Poslednja linija odbrane pre slanja na sintezu zvuka koja regex-om proverava prisustvo ijekavizama i automatski primenjuje ispravke.
+Uklanjanjem odvojenog drugog prolaza, lektorska logika i optimizacije su integrisane direktno u modul [translate.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/translation/translate.py) kako bi se sve odradilo u okviru jednog radnog procesa:
+1.  **Deduplikacija**: Izbegava se ponovno prevođenje identičnih tekstova. Segmente sa Jaccard sličnošću $\ge 0.85$ sistem prepoznaje kao duplikate i kopira rešenja (pomoćna funkcija `calculate_jaccard_similarity` je prebačena u `translate.py`).
+2.  **TTS-Aware Compression (LLM Kompresija)**: Tokom samog prevođenja i evaluacije, meri se dužina teksta u odnosu na vremenski limit segmenta. Ako tekst prelazi limit za više od 15%, poziva se funkcija `compress_sentence_via_llm()` koja inteligentno skraćuje rečenicu zadržavajući smisao koristeći Mistral-Small model, kako govor u TTS fazi ne bi zvučao neprirodno brzo.
+3.  **Leak Guard**: Brza provera i ispravka preostalih ijekavizama i nedoslednosti primenom determinističkih regex pravila odmah nakon LLM prolaza.
 
 ---
 
