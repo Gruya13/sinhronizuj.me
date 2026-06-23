@@ -1,3 +1,20 @@
+## 2026-06-23 (10:45 CET) — Isporuka ispravke za prijavu na sajt i stabilizaciju S3 preuzimanja na produkciju
+
+### Problem
+1. **Nemogućnost prijave (Login 500)**: Korisnici na produkciji (`sinhronizuj.me`) su dobijali grešku `500 Internal Server Error` i `Failed to fetch` pri pokušaju prijave na sajt jer prethodne izmene (pinovanje FastAPI-ja i popravka praznog `translator.py` modula) nisu bile spojene na `main` granu, pa produkcioni VPS nije imao ove ispravke.
+2. **Celery radnik bagovi**: Uočen je `ModuleNotFoundError` pri uvozu `get_presigned_download_url` u Celery zadacima, kao i `403 Forbidden` pri preuzimanju fajlova sa S3 na produkciji usled Cloudflare blokiranja podrazumevanog boto3 User-Agent-a.
+
+### Rešenje
+1. **Spajanje i isporuka**: Spojena je grana `development` u `main` granu, a potom je urađen `git push origin main` što je pokrenulo produkcioni deploy pipeline. Time su na produkciju isporučene sve ispravke (pinovani FastAPI 0.136.0, stabilan `translator.py`).
+2. **Rešavanje Celery i S3 problema**:
+   - Ispravljeni su svi uvozi `get_presigned_download_url` na 5 mesta u [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py) (sada uvozi iz `backend.services.s3`).
+   - Postavljen je validan pretraživački `User-Agent` za `boto3` s3 klijente u [s3.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/services/s3.py) i [tasks.py](file:///home/gruya/Projektri/sinhronizuj.me/backend/worker/tasks.py), čime je uspešno rešen problem sa `403 Forbidden` greškama tokom preuzimanja sa S3/MinIO preko Cloudflare-a.
+3. **Verifikacija**:
+   - Pokrenut je selektivni Ruff i Bandit skener lokalno — svi testovi prošli bez grešaka.
+   - Pokrenuti su testovi za Fazu 2 i Fazu 4 (`tests/test_faza2.py`, `tests/test_faza4.py`) sa `PYTHONPATH=.` i svi testovi su uspešno prošli bez pokretanja teških Modal radnika.
+
+---
+
 ## 2026-06-22 (16:30 CET) — Rešavanje greške prijave na sajt i popravka praznog translator modula
 
 ### Problem
