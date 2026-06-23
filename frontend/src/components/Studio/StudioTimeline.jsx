@@ -931,33 +931,7 @@ export default function StudioTimeline() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left', whiteSpace: 'normal' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#f87171' }}>
                           {hasCollision ? "Kolizija tajminga!" : "Predugačak srpski izgovor!"}
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: '#cbd5e1', lineHeight: '1.3' }}>
-                          {hasCollision 
-                            ? `Srpski izgovor se preklapa sa početkom sledećeg segmenta #${nextSeg.id}.`
-                            : `Srpski glas traje ${estimatedTtsDuration.toFixed(2)}s što je za ${(estimatedTtsDuration - (seg.end - seg.start)).toFixed(2)}s duže od originalnog prozora.`
-                          }
-                        </span>
-                        <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontStyle: 'italic', marginTop: '4px' }}>
-                          💡 Skratite prevod ili ubrzajte segment u Podešavanjima Zvuka.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Ako je duži, obeležavamo crvenom pozadinom višak trajanja */}
-                {isLonger && (
-                  <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: `${((estimatedTtsDuration - (seg.end - seg.start)) / estimatedTtsDuration) * 100}%`, background: 'rgba(239, 68, 68, 0.35)', borderLeft: '1px dashed #ef4444', borderRadius: '0 4px 4px 0', pointerEvents: 'none' }} />
-                )}
-         
-                {/* Waveform */}
-
-
-        {/* 5. TRAKA: POZADINSKA MUZIKA */}
-        <div style={{ height: '40px', background: 'rgba(255,255,255,0.01)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
-          {/* Wavesurfer stvarni talasni oblik u pozadini */}
-          {noVocalsAudioUrl && (
             <div 
               ref={musicWaveformRef} 
               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} 

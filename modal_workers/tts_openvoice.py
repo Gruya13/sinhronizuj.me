@@ -378,17 +378,40 @@ class OpenVoiceWorker:
             if segments:
                 print(f"[OpenVoice] Pokrećem paralelnu konverziju za {len(segments)} segmenata sa Piper-Marko modelom...")
                 from concurrent.futures import ThreadPoolExecutor
+                import threading
                 
+                callback_url = data.get("callback_url")
+                completed_count = 0
+                lock = threading.Lock()
+                
+                def send_progress(url, pct, dt):
+                    if not url: return
+                    import urllib.request
+                    import json
+                    try:
+                        req = urllib.request.Request(
+                            url,
+                            data=json.dumps({"percent": pct, "detail": dt}).encode("utf-8"),
+                            headers={"Content-Type": "application/json"}
+                        )
+                        api_key = os.environ.get("MODAL_API_KEY")
+                        if api_key:
+                            req.add_header("X-API-Key", api_key)
+                        with urllib.request.urlopen(req, timeout=5) as response:
+                            response.read()
+                    except Exception as err:
+                        print(f"[TTS PROGRESS ERROR] {err}", flush=True)
+
                 def process_single(seg):
+                    nonlocal completed_count
                     try:
                         seg_voice = seg.get("voice_type") or voice_type
                         ref_se_p = ref_se_paths.get(seg_voice)
                         
-                        # Ako za ovaj glas nismo našli SE ali počinje sa "clone", probajmo sa fallbackom na prvi raspoloživi
                         if not ref_se_p and seg_voice.startswith("clone"):
                             ref_se_p = ref_se_paths.get("clone") or (list(ref_se_paths.values())[0] if ref_se_paths else None)
                             
-                        return self._generate_segment(
+                        res = self._generate_segment(
                             seg,
                             ref_se_path=ref_se_p,
                             base_se_path=base_se_path,
@@ -397,11 +420,20 @@ class OpenVoiceWorker:
                             disable_enhance=disable_enhance,
                             default_voice_type=voice_type
                         )
+                        return res
                     except Exception as e:
                         return {"id": seg.get("id"), "error": str(e)}
- 
+                    finally:
+                        with lock:
+                            completed_count += 1
+                            percent = int((completed_count / len(segments)) * 100)
+                            percent = min(99, percent)
+                            send_progress(callback_url, percent, f"Sinteza segmenata: {completed_count}/{len(segments)}")
+
                 with ThreadPoolExecutor(max_workers=8) as executor:
                     results = list(executor.map(process_single, segments))
+                
+                send_progress(callback_url, 100, "Završena sinteza svih segmenata.")
                 
                 # Brisanje embedding-a sa NFS-a
                 for f in list(ref_se_paths.values()) + [base_se_path]:

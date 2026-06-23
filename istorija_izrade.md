@@ -564,3 +564,14 @@ Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni 
 
 
 
+## [2026-06-23 11:35:00] Implementacija sitnozrnog progresa za Modal radnike i Alerting monitoringa
+
+- **Opis:**
+  Uspostavljena je celokupna infrastruktura za slanje i praćenje progresa Modal radnika u realnom vremenu i konfigurisan je Alertmanager sistem monitoringa:
+  1. **Deploy LLM Sudije:** Deploy-ovan je `judge_worker.py` na Modal platformu i konfigurisan `MODAL_JUDGE_URL` u `.env`. Ispravljena je logika u `qe.py` i `translate.py` da stvarno koriste LLM sudiju bez tihih fallback-a.
+  2. **Alertmanager i Redis Exporter:** Dodat Alertmanager i Redis Exporter servisi u produkcioni `docker-compose.prod.yml`. Kreirana su pravila za uzbunjivanje u `infra/monitoring/alert_rules.yml` za Redis redove i Celery OOM padove.
+  3. **Backend Progres Endpoint:** Kreiran je POST endpoint `/api/v1/project/{project_id}/progress` u `backend/routes/projects.py` koji prihvata progres od Modal radnika, validira ga i upisuje u Redis Pub/Sub i Redis perzistentni keš `progress_meta`.
+  4. **Modifikacija Celery Taskova:** Ažurirani `analyze_video_task` i `render_video_task` u `backend/worker/tasks.py` da koriste Redis `progress_meta` i šalju `project_id` i `callback_url` ka Modal klijentima.
+  5. **Modal Radnici Progress Reporting:** Implementirana je urllib-based funkcija `send_progress` u tri Modal radnika (`stt_worker.py`, `demucs_worker.py`, `tts_openvoice.py`) koja bezbedno šalje real-time procenat završenosti na backend callback endpoint sa MODAL_API_KEY autorizacijom (koristeći pozadinsku nit u Demucs i thread-safe lock u TTS).
+  6. **CI/CD i Testovi:** Izvršena je lokalna verifikacija pokretanjem `pytest` (svih 25 testova uspešno prošlo) i Ruff/Bandit lintera radi CI/CD usklađenosti.
+- **Status:** Uspešno implementirano i testirano.

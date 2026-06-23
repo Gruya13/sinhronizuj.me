@@ -56,6 +56,48 @@ class DemucsWorker:
 
             output_dir = tempfile.mkdtemp()
 
+            callback_url = data.get("callback_url")
+            audio_duration = data.get("audio_duration", 0.0)
+
+            def send_progress(url, pct, dt):
+                if not url: return
+                import urllib.request
+                import json
+                try:
+                    req = urllib.request.Request(
+                        url,
+                        data=json.dumps({"percent": pct, "detail": dt}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"}
+                    )
+                    api_key = os.environ.get("MODAL_API_KEY")
+                    if api_key:
+                        req.add_header("X-API-Key", api_key)
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        response.read()
+                except Exception as err:
+                    print(f"[DEMUCS PROGRESS ERROR] {err}", flush=True)
+
+            import threading
+            import time
+            stop_progress = threading.Event()
+
+            def progress_loop(url, dur):
+                est_total = max(5.0, dur / 10.0)
+                interval = est_total / 10.0
+                current_pct = 5
+                send_progress(url, current_pct, "Izolacija vokala (Demucs) započeta...")
+                while not stop_progress.is_set() and current_pct < 95:
+                    time.sleep(interval)
+                    if stop_progress.is_set():
+                        break
+                    current_pct += 10
+                    send_progress(url, current_pct, f"Odvajanje vokala i muzike: {current_pct}%")
+
+            t_progress = None
+            if callback_url:
+                t_progress = threading.Thread(target=progress_loop, args=(callback_url, audio_duration))
+                t_progress.start()
+
             try:
                 # Pokrecemo demucs preko komandne linije
                 command = [
@@ -69,9 +111,16 @@ class DemucsWorker:
                 print(f"[DEMUCS-WORKER] Komanda: {' '.join(command)}")
                 result = subprocess.run(command, capture_output=True, text=True)
                 
+                stop_progress.set()
+                if t_progress:
+                    t_progress.join()
+                
                 if result.returncode != 0:
                     print(f"[DEMUCS-WORKER] Greška pri izvršavanju demucs-a: {result.stderr}")
+                    send_progress(callback_url, 0, f"Greška pri separaciji vokala: {result.stderr}")
                     return {"error": f"Demucs error: {result.stderr}"}
+
+                send_progress(callback_url, 100, "Separacija vokala uspešno završena.")
 
                 # Demucs kreira fajlove na lokaciji: output_dir/htdemucs/{base_filename}/vocals.wav i no_vocals.wav
                 base_filename = os.path.splitext(os.path.basename(tmp_audio_path))[0]

@@ -672,7 +672,7 @@ def analyze_video_task(self, video_url: str, debug: bool = False, project_id: st
         diarization_segments = []
         if settings.MODAL_DIARIZATION_URL:
             try:
-                print(f"[DIARIZATION] Pokrećem diarizaciju na Modalu...", flush=True)
+                print("[DIARIZATION] Pokrećem diarizaciju na Modalu...", flush=True)
                 update_progress(detail="Pokrećem PyAnnote.audio diarizaciju na Modalu...")
                 
                 with open(stable_vocals_path, "rb") as f_aud:

@@ -109,8 +109,27 @@ class STTWorker:
                 )
                 
                 result = []
+                callback_url = data.get("callback_url")
+                
+                def send_progress(url, pct, dt):
+                    if not url: return
+                    import urllib.request
+                    import json
+                    try:
+                        req = urllib.request.Request(
+                            url,
+                            data=json.dumps({"percent": pct, "detail": dt}).encode("utf-8"),
+                            headers={"Content-Type": "application/json"}
+                        )
+                        api_key = os.environ.get("MODAL_API_KEY")
+                        if api_key:
+                            req.add_header("X-API-Key", api_key)
+                        with urllib.request.urlopen(req, timeout=5) as response:
+                            response.read()
+                    except Exception as err:
+                        print(f"[STT PROGRESS ERROR] {err}", flush=True)
+
                 for s in segments:
-                    # Izvlačimo reči sa njihovim timestamp-ovima
                     words = []
                     if s.words:
                         for w in s.words:
@@ -122,6 +141,12 @@ class STTWorker:
                         "text": s.text,
                         "words": words
                     })
+                    
+                    if info.duration:
+                        percent = min(99, int((s.end / info.duration) * 100))
+                        send_progress(callback_url, percent, f"Transkribovano: {s.text[:30]}...")
+
+                send_progress(callback_url, 100, "Završeno prepoznavanje govora.")
                 return {"language": info.language, "segments": result}
             except Exception as e:
                 print(f"Greška pri transkripciji: {e}")
