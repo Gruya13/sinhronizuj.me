@@ -10,6 +10,11 @@ Ovaj dokument služi kao indeks svih izmena, implementacija i sesija razvoja na 
 
 ## 📅 Hronološki Pregled Implementacija
 
+### Avgust 2026.
+
+#### [[2026-08-30 - Prevodjenje README na engleski]]
+*   **Opis**: Kompletno prevođenje glavne projektne dokumentacije (`README.md`) sa srpskog na engleski jezik, uključujući arhitekturu, tokove podataka, komponente, stack, konfiguraciju i plan razvoja.
+
 ### Jun 2026.
 
 #### [[2026-06-23 - Uklanjanje Realnih Modal Testova i Deploy na Produkciju]]

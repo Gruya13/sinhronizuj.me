@@ -1,3 +1,13 @@
+## 2026-08-30 (15:43 CET) — Prevođenje README dokumentacije na engleski jezik
+
+### Urađeno
+1. **Prevođenje [README.md](file:///home/gruya/Projektri/sinhronizuj.me/README.md)**:
+   - Celokupna projektna dokumentacija u korenu repozitorijuma (`README.md`) prevedena je sa srpskog na tečni i tehnički precizan engleski jezik.
+   - Ažuriran opis hibridne VPS + Modal arhitekture, ključnih karakteristika, modularnog React DAW studija, tehnološkog stack-a i stabla strukture projekta.
+   - Prevedeni su Mermaid dijagrami toka, lokalna uputstva za pokretanje/testiranje, primeri konfiguracije (`.env`) i plan budućeg razvoja.
+
+---
+
 ## 2026-06-24 (01:30 CET) — Integracija i optimizacija sistemskog prompta sa novim prevodilačkim smernicama
 
 ### Urađeno
@@ -651,3 +661,15 @@ Svi ekrani su uspešno generisani, registrovani i vidljivi na Stitch-u. Lokalni 
   - Identifikovani su privremeni testovi u folderu `scratch/` (`test_lektor_raw.py` i `test_lektor_batch1.py`) koji su vršili stvarne HTTP pozive na Modal endpoints. Ovi fajlovi su preimenovani u `run_lektor_raw.py` i `run_lektor_batch1.py`, a funkcije unutar njih su preimenovane iz `test_*` u `run_*`. Ovo sprečava `pytest` da automatski pokreće ove fajlove, čime se eliminišu nepotrebni troškovi i ubrzava izvršavanje testova (ukupno vreme izvršavanja smanjeno sa 38.64s na 17.70s, broj pokrenutih testova smanjen sa 34 na 31).
   - Pripremljeno je spajanje najnovijih izmena sa grane `development` na granu `main` radi pokretanja produkcionog deploy-a.
 - **Status:** Uspešno verifikovano lokalno; pripremljeno za produkcioni deploy.
+
+## [2026-06-25 15:25:00] Sveobuhvatni Tehnički Opis Sistema
+- **Opis:**
+  Izvučeni su svi podaci iz Obsidian Second Brain trezora (`second_brain/`) i kreirana je datoteka [OPIS_SISTEMA.md](file:///home/gruya/Projektri/sinhronizuj.me/OPIS_SISTEMA.md) u korenu projekta. Ovaj dokument pruža detaljan i strukturiran tehnički pregled svih delova sistema: troslojne arhitekture, baze podataka i modela, performansi i SLA standarda, audio/video procesnog cevovoda, prevodilačkog cevovoda sa LLM kontrolom kvaliteta, trostepenog sistema samounapređenja (Alfa, Beta, Gama), frontend aplikacije (React/Vite DAW), mrežne i DevOps infrastrukture, kao i baze znanja za rešavanje čestih bagova.
+- **Status:** Završeno bez izmena koda aplikacije.
+
+## [2026-06-25 16:55:00] Kreiranje dokumenta sa ciljem i vizijom projekta
+- **Opis:**
+  Kreirana je datoteka [CILJ_PROJEKTA.md](file:///home/gruya/Projektri/sinhronizuj.me/CILJ_PROJEKTA.md) u korenu projekta. Ovaj dokument pruža jasan poslovni, korisnički i tehnički kontekst platforme, objašnjava probleme tradicionalne sinhronizacije (visoke cene, gubitak autentičnosti, time-desync) i detaljno navodi ključne ciljeve platforme (automatizacija, kloniranje glasa, pametno uklapanje vremena, AI lipsync, trostepeno samoučenje, visoka isplativost i intuitivno DAW Studio korisničko iskustvo).
+- **Status:** Završeno bez izmena koda aplikacije.
+
+
